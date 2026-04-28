@@ -1,6 +1,6 @@
 {
   "name": "@netlify/axis",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Agent eXperience Index Score — synthetic testing for AI agent interaction",
   "type": "module",
   "main": "./dist/index.js",
@@ -37,7 +37,9 @@
     "node": ">=18.0.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/docs-site",
+    "!dist/report-ui/mock-data.json"
   ],
   "devDependencies": {
     "@eslint/js": "^9.39.4",

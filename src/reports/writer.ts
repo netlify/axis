@@ -16,7 +16,7 @@ const REPORTS_DIR = ".axis/reports";
  *   .axis/reports/{reportId}/report.json
  *   .axis/reports/{reportId}/scenarios/{scenarioKey}/{agentName}.json
  */
-export function writeReportToStore(output: ScoredOutput | RunOutput, configDir: string): string {
+export function writeReportToStore(output: ScoredOutput | RunOutput, configDir: string, name?: string): string {
   const reportId = generateReportId(output.timestamp);
   const reportDir = path.join(configDir, REPORTS_DIR, reportId);
 
@@ -69,6 +69,7 @@ export function writeReportToStore(output: ScoredOutput | RunOutput, configDir: 
   const manifest: ReportManifest = {
     version: output.version,
     reportId,
+    ...(name ? { name } : {}),
     timestamp: output.timestamp,
     durationMs: output.durationMs,
     summary: output.summary,

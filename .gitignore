@@ -2,3 +2,4 @@ node_modules
 dist/
 .axis
 .astro
+.claude/worktrees

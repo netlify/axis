@@ -33,6 +33,15 @@ function fmtCost(usd: number | undefined): string {
   return `$${usd.toFixed(4)}`;
 }
 
+function fmtTokens(usage: { input: number; output: number; cacheReadInput?: number } | undefined): string {
+  if (!usage) return "\u2014";
+  const total = usage.input + usage.output + (usage.cacheReadInput ?? 0);
+  if (total === 0) return "\u2014";
+  if (total >= 1_000_000) return `${(total / 1_000_000).toFixed(1)}M`;
+  if (total >= 1_000) return `${(total / 1_000).toFixed(1)}k`;
+  return total.toLocaleString();
+}
+
 function fmtTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
@@ -96,7 +105,6 @@ export function renderReport(report: ReportData): string {
     <div class="container">
       ${renderHeader(report)}
       ${renderResultsSection(report)}
-      <footer class="report-footer">AXIS \u2014 Agent eXperience Index Score</footer>
     </div>
     ${renderModals(report.results)}`;
 }
@@ -109,11 +117,15 @@ function renderHeader(report: ReportData): string {
 
   return `
     <header class="report-header">
-      <div class="report-title">
-        <h1>AXIS Report</h1>
-        <span class="report-id">${escapeHtml(report.reportId)}</span>
+      <div class="report-branding">
+        <span class="site-logo-mark"><span class="logo-ax">AX</span><span class="logo-i">I</span>S</span>
+        <span class="report-badge">Report</span>
       </div>
-      <span class="report-timestamp">${fmtTimestamp(report.timestamp)}</span>
+      <div class="report-meta">
+        ${report.name ? `<div class="report-meta-row"><span class="report-meta-label">Report name:</span> <span class="report-meta-value">${escapeHtml(report.name)}</span></div>` : ""}
+        <div class="report-meta-row"><span class="report-meta-label">Generated on:</span> <span class="report-meta-value">${fmtTimestamp(report.timestamp)}</span></div>
+        <div class="report-meta-row"><span class="report-meta-label">ID:</span> <span class="report-meta-value report-meta-id">${escapeHtml(report.reportId)}</span></div>
+      </div>
       <div class="summary-cards">
         <div class="summary-card">
           <div class="card-value">${report.summary.total}</div>
@@ -180,6 +192,7 @@ function renderResultsSection(report: ReportData): string {
                 : `
             <th class="col-score">Status</th>`
             }
+            <th class="col-right hide-mobile">Tokens</th>
             <th class="col-right hide-mobile">Duration</th>
             <th class="col-right hide-mobile">Cost</th>
           </tr>
@@ -210,6 +223,7 @@ function renderResultRow(entry: ResultEntry, index: number, hasScores: boolean):
         <td class="col-score hide-mobile">${scoreBadge(s?.environment.score)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.service.score)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.agent.score)}</td>
+        <td class="col-right hide-mobile">${fmtTokens(entry.tokenUsage)}</td>
         <td class="col-right hide-mobile">${fmtDuration(entry.durationMs)}</td>
         <td class="col-right hide-mobile">${fmtCost(entry.totalCostUsd)}</td>
       </tr>`;
@@ -225,13 +239,14 @@ function renderResultRow(entry: ResultEntry, index: number, hasScores: boolean):
       <td class="col-scenario">${escapeHtml(entry.scenarioName)}${infoBtn}${errorHint}</td>
       <td class="col-agent">${escapeHtml(entry.agentName)}</td>
       <td class="col-score">${status}</td>
+      <td class="col-right hide-mobile">${fmtTokens(entry.tokenUsage)}</td>
       <td class="col-right hide-mobile">${fmtDuration(entry.durationMs)}</td>
       <td class="col-right hide-mobile">${fmtCost(entry.totalCostUsd)}</td>
     </tr>`;
 }
 
 function renderDetailRow(entry: ResultEntry, index: number): string {
-  const colspan = entry.score ? 10 : 7;
+  const colspan = entry.score ? 11 : 8;
   return `
     <tr class="detail-row" id="detail-${index}">
       <td colspan="${colspan}">

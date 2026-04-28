@@ -76,10 +76,10 @@ describe("generateReportHtml", () => {
 
   it("includes design system colors in CSS", () => {
     const html = generateReportHtml(makeReport());
-    expect(html).toContain("#faf9f5");
-    expect(html).toContain("#d97757");
-    expect(html).toContain("#788c5d");
-    expect(html).toContain("#c9a227");
+    expect(html).toContain("#fafbf9");
+    expect(html).toContain("#016867");
+    expect(html).toContain("#059669");
+    expect(html).toContain("#d97706");
   });
 
   it("embeds report data as JSON", () => {

@@ -116,7 +116,7 @@ async function executeRunPipeline(
     output = runOutput;
   }
 
-  const reportId = writeReportToStore(output, configDir);
+  const reportId = writeReportToStore(output, configDir, config.name);
 
   if (opts.outputDir) {
     const reportPath = writeReportFile(output, opts.outputDir);

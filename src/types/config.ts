@@ -1,4 +1,6 @@
 export interface AxisConfig {
+  /** Human-readable project name. Shown in report headers. */
+  name?: string;
   scenarios: string;
   agents: (string | AgentConfig)[];
   defaults?: DefaultsConfig;

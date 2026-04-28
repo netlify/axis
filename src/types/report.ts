@@ -9,6 +9,8 @@ import type { RubricCriterion } from "./scenario.js";
 export interface ReportManifest {
   version: string;
   reportId: string;
+  /** Human-readable project name from config. */
+  name?: string;
   timestamp: string;
   durationMs: number;
   summary: ScoredSummary | RunSummary;
