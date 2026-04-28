@@ -117,44 +117,51 @@ function renderHeader(report: ReportData): string {
 
   return `
     <header class="report-header">
-      <div class="report-branding">
-        <span class="site-logo-mark"><span class="logo-ax">AX</span><span class="logo-i">I</span>S</span>
-        <span class="report-badge">Report</span>
+      <div class="header-left">
+        <div class="report-branding">
+          <span class="site-logo-mark"><span class="logo-ax">AX</span><span class="logo-i">I</span>S</span>
+          <span class="report-badge">Report</span>
+        </div>
+        <div class="report-meta">
+          ${report.name ? `<div class="report-meta-row"><span class="report-meta-label">Report name:</span> <span class="report-meta-value">${escapeHtml(report.name)}</span></div>` : ""}
+          <div class="report-meta-row"><span class="report-meta-label">Generated on:</span> <span class="report-meta-value">${fmtTimestamp(report.timestamp)}</span></div>
+          <div class="report-meta-row"><span class="report-meta-label">Total duration:</span> <span class="report-meta-value">${fmtDuration(report.durationMs)}</span></div>
+          <div class="report-meta-row"><span class="report-meta-label">Report ID:</span> <span class="report-meta-value report-meta-id">${escapeHtml(report.reportId)}</span></div>
+        </div>
       </div>
-      <div class="report-meta">
-        ${report.name ? `<div class="report-meta-row"><span class="report-meta-label">Report name:</span> <span class="report-meta-value">${escapeHtml(report.name)}</span></div>` : ""}
-        <div class="report-meta-row"><span class="report-meta-label">Generated on:</span> <span class="report-meta-value">${fmtTimestamp(report.timestamp)}</span></div>
-        <div class="report-meta-row"><span class="report-meta-label">ID:</span> <span class="report-meta-value report-meta-id">${escapeHtml(report.reportId)}</span></div>
-      </div>
-      <div class="summary-cards">
-        <div class="summary-card">
-          <div class="card-value">${report.summary.total}</div>
-          <div class="card-label">Scenarios</div>
-        </div>
-        <div class="summary-card">
-          <div class="card-value">${report.summary.completed}</div>
-          <div class="card-label">Passed</div>
-        </div>
-        <div class="summary-card${report.summary.failed > 0 ? " card-failed" : ""}">
-          <div class="card-value">${report.summary.failed}</div>
-          <div class="card-label">Failed</div>
-        </div>
+      <div class="summary-card">
         ${
           scored
             ? `
-        <div class="summary-card">
-          <div class="card-value">${scoreBadge(report.summary.averageAxisScore)}</div>
-          <div class="card-label">Avg AXIS Result</div>
-        </div>`
+        <div class="summary-hero">
+          <div class="hero-score">${report.summary.averageAxisScore}</div>
+          <div class="hero-label">AXIS Result</div>
+        </div>
+        <div class="summary-divider"></div>`
             : ""
         }
-        <div class="summary-card">
-          <div class="card-value">${fmtDuration(report.durationMs)}</div>
-          <div class="card-label">Duration</div>
-        </div>
-        <div class="summary-card">
-          <div class="card-value">${fmtCost(totalCost > 0 ? totalCost : undefined)}</div>
-          <div class="card-label">Total Cost</div>
+        <div class="summary-stats">
+          <div class="summary-stat">
+            <div class="stat-value">${report.summary.total}</div>
+            <div class="stat-label">Scenarios</div>
+          </div>
+          <div class="summary-stat stat-passed">
+            <div class="stat-value">${report.summary.completed}</div>
+            <div class="stat-label">Passed</div>
+          </div>
+          <div class="summary-stat${report.summary.failed > 0 ? " stat-failed" : ""}">
+            <div class="stat-value">${report.summary.failed}</div>
+            <div class="stat-label">Failed</div>
+          </div>
+          ${
+            totalCost > 0
+              ? `
+          <div class="summary-stat">
+            <div class="stat-value">${fmtCost(totalCost)}</div>
+            <div class="stat-label">Cost</div>
+          </div>`
+              : ""
+          }
         </div>
       </div>
     </header>`;

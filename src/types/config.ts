@@ -3,7 +3,7 @@ export interface AxisConfig {
   name?: string;
   scenarios: string;
   agents: (string | AgentConfig)[];
-  defaults?: DefaultsConfig;
+  settings?: SettingsConfig;
   /** Custom adapter modules. Keys are adapter names, values are paths (relative to config) to JS/TS modules that export an AgentAdapter. */
   adapters?: Record<string, string>;
   /** Environment variables to pass through to agent processes. System vars (PATH, HOME, etc.) are always included. */
@@ -33,7 +33,7 @@ export interface AgentConfig {
   flags?: Record<string, string | boolean>;
 }
 
-export interface DefaultsConfig {
+export interface SettingsConfig {
   scoring_weights?: ScoringWeights;
   /** Maximum number of parallel jobs. Defaults to unlimited (all jobs run simultaneously). */
   concurrency?: number;

@@ -41,11 +41,11 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
     }
   }
 
-  const defaults = obj.defaults as Record<string, unknown> | undefined;
-  if (defaults?.concurrency !== undefined) {
-    const c = defaults.concurrency;
+  const settings = obj.settings as Record<string, unknown> | undefined;
+  if (settings?.concurrency !== undefined) {
+    const c = settings.concurrency;
     if (typeof c !== "number" || !Number.isInteger(c) || c < 1) {
-      throw new Error(`Invalid config at ${filePath}: "defaults.concurrency" must be a positive integer`);
+      throw new Error(`Invalid config at ${filePath}: "settings.concurrency" must be a positive integer`);
     }
   }
 

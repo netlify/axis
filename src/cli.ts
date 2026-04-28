@@ -2,6 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { run } from "./runner/runner.js";
 import { loadConfig } from "./config/loader.js";
@@ -22,9 +23,12 @@ import { formatError } from "./types/output.js";
 import type { Logger, JobState, RunResult, RunOutput } from "./types/output.js";
 import type { ScoredRunResult, ScoredOutput } from "./types/scoring.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf-8"));
+
 const program = new Command();
 
-program.name("axis").description("AXIS — Agent eXperience Index Score").version("0.1.0");
+program.name("axis").description("AXIS — Agent eXperience Index Score").version(pkg.version);
 
 // --- Signal handling: kill child processes and clean up on Ctrl-C ---
 
@@ -78,7 +82,7 @@ async function executeRunPipeline(
   const { config, configDir } = await loadConfig(opts.configPath);
   const scoringPromises: Promise<ScoredRunResult>[] = [];
 
-  const concurrency = opts.concurrency ?? config.defaults?.concurrency;
+  const concurrency = opts.concurrency ?? config.settings?.concurrency;
 
   const runOutput = await run({
     configPath: opts.configPath,
@@ -92,7 +96,7 @@ async function executeRunPipeline(
     onResult: opts.score
       ? (result: RunResult): Promise<void> => {
           const scoring = scoreRunResult(result, {
-            weights: config.defaults?.scoring_weights,
+            weights: config.settings?.scoring_weights,
             logger,
             onProgress: (scenarioKey, agentName, phase) => {
               if (phase === "start") onScoringStart?.(scenarioKey, agentName);

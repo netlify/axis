@@ -40,7 +40,7 @@ const mcpExample = `{
       "flags": { "yolo": true }
     }
   ],
-  "defaults": {
+  "settings": {
     "concurrency": 4,
     "scoring_weights": {
       "goal_achievement": 0.4,
@@ -84,9 +84,9 @@ const mcpExample = `{
         <td>Adapter names or full agent configurations (required).</td>
       </tr>
       <tr>
-        <td><code>defaults</code></td>
+        <td><code>settings</code></td>
         <td><code>object</code></td>
-        <td>Default concurrency and scoring weights.</td>
+        <td>Concurrency and scoring weight configuration.</td>
       </tr>
       <tr>
         <td><code>env</code></td>
@@ -159,11 +159,11 @@ const mcpExample = `{
 
   <h3>Scoring Weights</h3>
   <p>
-    Override the default dimension weights under <code>defaults.scoring_weights</code>. Values
+    Override the default dimension weights under <code>settings.scoring_weights</code>. Values
     must sum to 1.0.
   </p>
   <pre><code>{`{
-  "defaults": {
+  "settings": {
     "scoring_weights": {
       "goal_achievement": 0.4,
       "environment": 0.2,

@@ -64,11 +64,11 @@ describe("validateConfig", () => {
     expect(() => validateConfig(config, "test.json")).not.toThrow();
   });
 
-  it("accepts valid defaults.concurrency", () => {
+  it("accepts valid settings.concurrency", () => {
     const config = {
       scenarios: "./s",
       agents: ["claude-code"],
-      defaults: { concurrency: 4 },
+      settings: { concurrency: 4 },
     };
     expect(() => validateConfig(config, "test.json")).not.toThrow();
   });
@@ -77,7 +77,7 @@ describe("validateConfig", () => {
     const config = {
       scenarios: "./s",
       agents: ["claude-code"],
-      defaults: { concurrency: 2.5 },
+      settings: { concurrency: 2.5 },
     };
     expect(() => validateConfig(config, "test.json")).toThrow("positive integer");
   });
@@ -86,7 +86,7 @@ describe("validateConfig", () => {
     const config = {
       scenarios: "./s",
       agents: ["claude-code"],
-      defaults: { concurrency: 0 },
+      settings: { concurrency: 0 },
     };
     expect(() => validateConfig(config, "test.json")).toThrow("positive integer");
   });
@@ -95,7 +95,7 @@ describe("validateConfig", () => {
     const config = {
       scenarios: "./s",
       agents: ["claude-code"],
-      defaults: { concurrency: -1 },
+      settings: { concurrency: -1 },
     };
     expect(() => validateConfig(config, "test.json")).toThrow("positive integer");
   });

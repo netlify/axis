@@ -1,6 +1,6 @@
 {
   "name": "@netlify/axis",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Agent eXperience Index Score — synthetic testing for AI agent interaction",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,6 +22,7 @@
     "lint:fix": "eslint --fix src/ test/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "prepublishOnly": "rm -rf dist && npm run build",
     "prepare": "husky"
   },
   "lint-staged": {
