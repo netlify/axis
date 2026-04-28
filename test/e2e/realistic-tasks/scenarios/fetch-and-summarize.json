@@ -1,0 +1,13 @@
+{
+  "name": "Fetch a webpage and summarize it",
+
+  "prompt": "Fetch the content from https://httpbin.org/html and write a summary of what you find to /tmp/axis-e2e-summarize/summary.txt. The summary should be no more than 3 sentences. Create the directory if it doesn't exist.",
+
+  "rubric": [
+    { "check": "Agent fetched content from the target URL", "weight": 0.3 },
+    { "check": "File /tmp/axis-e2e-summarize/summary.txt was created", "weight": 0.3 },
+    { "check": "Summary is 3 sentences or fewer and accurately describes the page content", "weight": 0.4 }
+  ],
+
+  "teardown": [{ "action": "run_script", "command": "rm -rf /tmp/axis-e2e-summarize" }]
+}

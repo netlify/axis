@@ -1,0 +1,5 @@
+{
+  "scenarios": "./scenarios",
+  "agents": ["codex"],
+  "skills": ["./skills/test-skill"]
+}

@@ -1,0 +1,4 @@
+{
+  "scenarios": "./scenarios",
+  "agents": ["claude-sdk"]
+}

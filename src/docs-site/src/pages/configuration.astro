@@ -1,0 +1,306 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+
+const mcpExample = `{
+  "mcp_servers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "env": { "LOG_LEVEL": "info" }
+    },
+    "remote-api": {
+      "type": "http",
+      "url": "https://mcp.example.com/tools",
+      "headers": { "Authorization": "Bearer \${TOKEN}" }
+    }
+  }
+}`;
+---
+
+<DocsLayout title="Configuration" active="configuration">
+  <h1>Configuration Reference</h1>
+  <p class="lead">
+    Complete reference for <code>axis.config.json</code> and scenario files.
+  </p>
+
+  <h2>axis.config.json</h2>
+  <p>
+    AXIS is configured via an <code>axis.config.json</code> file in your project root.
+  </p>
+
+  <pre><code>{`{
+  "scenarios": "./scenarios",
+  "agents": [
+    "claude-code",
+    {
+      "adapter": "gemini",
+      "model": "gemini-2.5-pro",
+      "scenarios": ["cms/*"],
+      "flags": { "yolo": true }
+    }
+  ],
+  "defaults": {
+    "concurrency": 4,
+    "scoring_weights": {
+      "goal_achievement": 0.4,
+      "environment": 0.2,
+      "service": 0.2,
+      "agent": 0.2
+    }
+  },
+  "env": ["ANTHROPIC_API_KEY", "GEMINI_API_KEY"],
+  "mcp_servers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    }
+  },
+  "skills": ["./skills/deploy"],
+  "adapters": {
+    "my-agent": "./adapters/my-agent.ts"
+  }
+}`}</code></pre>
+
+  <h3>Top-Level Fields</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>scenarios</code></td>
+        <td><code>string</code></td>
+        <td>Path to the scenarios directory (required).</td>
+      </tr>
+      <tr>
+        <td><code>agents</code></td>
+        <td><code>(string | AgentConfig)[]</code></td>
+        <td>Adapter names or full agent configurations (required).</td>
+      </tr>
+      <tr>
+        <td><code>defaults</code></td>
+        <td><code>object</code></td>
+        <td>Default concurrency and scoring weights.</td>
+      </tr>
+      <tr>
+        <td><code>env</code></td>
+        <td><code>string[]</code></td>
+        <td>Environment variables to pass through to agent processes.</td>
+      </tr>
+      <tr>
+        <td><code>mcp_servers</code></td>
+        <td><code>object</code></td>
+        <td>MCP servers available to all agents.</td>
+      </tr>
+      <tr>
+        <td><code>skills</code></td>
+        <td><code>string[]</code></td>
+        <td>Skills available to all agents (local paths, GitHub shorthand, or URLs).</td>
+      </tr>
+      <tr>
+        <td><code>adapters</code></td>
+        <td><code>object</code></td>
+        <td>Custom adapter module paths, keyed by adapter name.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Agent Configuration</h3>
+  <p>
+    Agents can be specified as a simple string (adapter name) or a full configuration object.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>adapter</code></td>
+        <td><code>string</code></td>
+        <td>Adapter type (required): <code>claude-code</code>, <code>codex</code>, <code>gemini</code>, etc.</td>
+      </tr>
+      <tr>
+        <td><code>model</code></td>
+        <td><code>string</code></td>
+        <td>Model override passed to the agent CLI.</td>
+      </tr>
+      <tr>
+        <td><code>scenarios</code></td>
+        <td><code>string[]</code></td>
+        <td>Subset of scenarios to run (supports glob patterns like <code>cms/*</code>).</td>
+      </tr>
+      <tr>
+        <td><code>skills</code></td>
+        <td><code>string[]</code></td>
+        <td>Agent-specific skills (merged with top-level skills).</td>
+      </tr>
+      <tr>
+        <td><code>flags</code></td>
+        <td><code>object</code></td>
+        <td>CLI flags passed to the agent (for example, <code>{`{"full-auto": true}`}</code>).</td>
+      </tr>
+      <tr>
+        <td><code>command</code></td>
+        <td><code>string</code></td>
+        <td>Custom CLI command (for custom adapters).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Scoring Weights</h3>
+  <p>
+    Override the default dimension weights under <code>defaults.scoring_weights</code>. Values
+    must sum to 1.0.
+  </p>
+  <pre><code>{`{
+  "defaults": {
+    "scoring_weights": {
+      "goal_achievement": 0.4,
+      "environment": 0.2,
+      "service": 0.2,
+      "agent": 0.2
+    }
+  }
+}`}</code></pre>
+
+  <h3>MCP Servers</h3>
+  <p>
+    Configure Model Context Protocol servers that are automatically wired into each agent
+    environment. AXIS supports both stdio (local process) and HTTP (remote endpoint) servers.
+  </p>
+  <pre><code>{mcpExample}</code></pre>
+  <p>
+    Each adapter writes MCP configuration in its native format before spawning the agent.
+  </p>
+  <ul>
+    <li><strong>Claude Code:</strong> <code>.mcp.json</code> in workspace root.</li>
+    <li><strong>Codex:</strong> <code>config.toml</code> in <code>CODEX_HOME</code>.</li>
+    <li><strong>Gemini:</strong> <code>settings.json</code> in <code>GEMINI_CLI_HOME</code>.</li>
+  </ul>
+
+  <h3>Skills</h3>
+  <p>
+    Skills extend agent capabilities with reusable instruction sets. Specify them at the top level
+    (shared), per agent, or per scenario.
+  </p>
+  <pre><code>{`{
+  "skills": [
+    "./skills/deploy",
+    "netlify/axis-skill-deploy",
+    "https://github.com/owner/repo"
+  ]
+}`}</code></pre>
+  <ul>
+    <li><strong>Local paths:</strong> Relative to the config file.</li>
+    <li><strong>GitHub shorthand:</strong> <code>owner/repo</code> format.</li>
+    <li><strong>Full URLs:</strong> GitHub repository URLs.</li>
+  </ul>
+  <p>
+    Remote skills are cached in <code>.axis/skills-cache/</code>. Use <code>--refresh-skills</code>
+    to force re-clone.
+  </p>
+
+  <h3>Environment Variables</h3>
+  <p>
+    The <code>env</code> field lists additional environment variables to pass through to agent
+    processes. The following are always passed through by default:
+  </p>
+  <ul>
+    <li><code>ANTHROPIC_API_KEY</code>, <code>CODEX_API_KEY</code>, <code>GEMINI_API_KEY</code></li>
+    <li>System essentials: <code>PATH</code>, <code>USER</code>, <code>SHELL</code>, <code>LANG</code>, <code>TERM</code>, <code>TMPDIR</code></li>
+  </ul>
+
+  <h2>Scenarios</h2>
+  <p>
+    Scenarios are JSON files in the configured scenarios directory. The filename (without <code>.json</code>)
+    becomes the scenario key. Nested directories create namespaced keys.
+  </p>
+  <ul>
+    <li><code>scenarios/hello-world.json</code> maps to key <code>hello-world</code>.</li>
+    <li><code>scenarios/cms/create-post.json</code> maps to key <code>cms/create-post</code>.</li>
+  </ul>
+
+  <h3>Scenario Schema</h3>
+  <pre><code>{`{
+  "name": "Debug and fix a broken script",
+  "prompt": "There is a JavaScript file at /tmp/app/add.js that has a bug. Find it, fix it, and verify.",
+  "rubric": [
+    { "check": "Agent identified the bug", "weight": 0.3 },
+    { "check": "Agent fixed the bug", "weight": 0.4 },
+    { "check": "Agent verified the fix", "weight": 0.3 }
+  ],
+  "setup": [
+    { "action": "run_script", "command": "mkdir -p /tmp/app" },
+    { "action": "run_script", "command": "echo 'function add(a,b) { return a-b; }' > /tmp/app/add.js" }
+  ],
+  "teardown": [
+    { "action": "run_script", "command": "rm -rf /tmp/app" }
+  ],
+  "agents": ["claude-code"]
+}`}</code></pre>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>name</code></td>
+        <td><code>string</code></td>
+        <td>Human-readable scenario title (required).</td>
+      </tr>
+      <tr>
+        <td><code>prompt</code></td>
+        <td><code>string</code></td>
+        <td>Task description sent to the agent (required).</td>
+      </tr>
+      <tr>
+        <td><code>rubric</code></td>
+        <td><code>string | object[]</code></td>
+        <td>Success criteria: a string or array of checks with optional weights (required).</td>
+      </tr>
+      <tr>
+        <td><code>setup</code></td>
+        <td><code>object[]</code></td>
+        <td>Lifecycle actions run before the agent.</td>
+      </tr>
+      <tr>
+        <td><code>teardown</code></td>
+        <td><code>object[]</code></td>
+        <td>Lifecycle actions run after scoring.</td>
+      </tr>
+      <tr>
+        <td><code>agents</code></td>
+        <td><code>string[]</code></td>
+        <td>Override which agents run this scenario.</td>
+      </tr>
+      <tr>
+        <td><code>skills</code></td>
+        <td><code>string[]</code></td>
+        <td>Scenario-specific skills.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Setup and Teardown</div>
+    <p>
+      Lifecycle actions run sequentially with a 30-second timeout per action. Setup failures abort
+      the job. Teardown failures are logged but do not block subsequent jobs.
+    </p>
+  </div>
+</DocsLayout>

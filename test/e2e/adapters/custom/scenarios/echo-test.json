@@ -1,0 +1,5 @@
+{
+  "name": "Echo test",
+  "prompt": "Hello from AXIS CLI adapter",
+  "rubric": "The agent should echo back the prompt text."
+}

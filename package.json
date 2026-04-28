@@ -1,0 +1,65 @@
+{
+  "name": "@netlify/axis",
+  "version": "0.2.0",
+  "description": "Agent eXperience Index Score — synthetic testing for AI agent interaction",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "axis": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && npm run build:report-ui",
+    "build:report-ui": "astro build --root src/report-ui --outDir ../../dist/report-ui",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "dev:report-ui": "astro dev --root src/report-ui",
+    "build:docs": "cd src/docs-site && npm run build",
+    "dev:docs": "cd src/docs-site && npm run dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint --fix src/ test/",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.2.14",
+    "astro": "^6.1.9",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.58.2",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.19.0",
+    "commander": "^14.0.3",
+    "ink": "^7.0.0",
+    "react": "^19.2.5"
+  }
+}

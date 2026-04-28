@@ -1,0 +1,27 @@
+{
+  "name": "Download and explain documentation",
+
+  "prompt": "Fetch the documentation page at https://docs.netlify.com/build/async-workloads/overview/ and write a clear explanation of what it covers to /tmp/axis-e2e-explain-docs/explanation.md. Your explanation should include: what async workloads are, what problems they solve, and how they relate to Netlify's build system. Create the directory if it doesn't exist.",
+
+  "rubric": [
+    {
+      "check": "Agent fetched content from https://docs.netlify.com/build/async-workloads/overview/",
+      "weight": 0.25
+    },
+    {
+      "check": "File /tmp/axis-e2e-explain-docs/explanation.md was created with substantive content",
+      "weight": 0.2
+    },
+    {
+      "check": "Explanation accurately describes what async workloads are based on the documentation",
+      "weight": 0.25
+    },
+    {
+      "check": "Explanation covers what problems async workloads solve and how they relate to Netlify builds",
+      "weight": 0.2
+    },
+    { "check": "Explanation is well-structured and readable (uses headings, paragraphs, or lists)", "weight": 0.1 }
+  ],
+
+  "teardown": [{ "action": "run_script", "command": "rm -rf /tmp/axis-e2e-explain-docs" }]
+}

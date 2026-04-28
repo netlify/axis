@@ -1,0 +1,179 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+
+const ciExample = `# GitHub Actions example
+- name: Run AXIS tests
+  env:
+    ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+  run: npx @netlify/axis run --json --compare-baseline`;
+---
+
+<DocsLayout title="Running Tests" active="running">
+  <h1>Running AXIS Tests</h1>
+  <p class="lead">
+    How AXIS executes scenarios, manages agent processes, and produces reports.
+  </p>
+
+  <h2>Execution Model</h2>
+  <p>
+    When you run <code>axis run</code>, AXIS loads your config, discovers scenarios, and executes
+    each scenario/agent combination as an independent job. Jobs run in parallel up to the configured
+    concurrency limit.
+  </p>
+  <p>
+    Each job follows the same lifecycle:
+  </p>
+  <ol>
+    <li>Run setup actions (if defined in the scenario).</li>
+    <li>Spawn the agent process in an isolated workspace.</li>
+    <li>Stream and capture the full interaction transcript.</li>
+    <li>Score the transcript against the rubric (unless <code>--no-score</code> is set).</li>
+    <li>Run teardown actions (if defined).</li>
+    <li>Save the result to the report.</li>
+  </ol>
+
+  <h2>Built-in Adapters</h2>
+  <p>
+    AXIS ships with adapters for popular AI coding agents. Each adapter handles CLI resolution,
+    process spawning, transcript capture, and output normalization.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Adapter</th>
+        <th>CLI Binary</th>
+        <th>Required Env</th>
+        <th>Default Flags</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>claude-code</code></td>
+        <td><code>claude</code></td>
+        <td><code>ANTHROPIC_API_KEY</code></td>
+        <td><code>dangerously-skip-permissions</code></td>
+      </tr>
+      <tr>
+        <td><code>codex</code></td>
+        <td><code>codex</code></td>
+        <td><code>CODEX_API_KEY</code></td>
+        <td><code>full-auto</code>, <code>skip-git-repo-check</code></td>
+      </tr>
+      <tr>
+        <td><code>gemini</code></td>
+        <td><code>gemini</code></td>
+        <td><code>GEMINI_API_KEY</code></td>
+        <td><code>yolo</code></td>
+      </tr>
+      <tr>
+        <td><code>goose</code></td>
+        <td><code>goose</code></td>
+        <td>None</td>
+        <td>None</td>
+      </tr>
+      <tr>
+        <td><code>claude-sdk</code></td>
+        <td>SDK</td>
+        <td><code>ANTHROPIC_API_KEY</code></td>
+        <td>None</td>
+      </tr>
+      <tr>
+        <td><code>gemini-acp</code></td>
+        <td>ACP</td>
+        <td><code>GEMINI_API_KEY</code></td>
+        <td>None</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    CLI binaries are resolved automatically. If not found locally, AXIS falls back to
+    <code>npx --yes &lt;package&gt;</code> silently.
+  </p>
+
+  <h2>Custom Adapters</h2>
+  <p>
+    Create a custom adapter module using <code>createAgentAdapter()</code> and register it in your
+    <a href="/configuration">config</a>.
+  </p>
+  <pre><code>{`// adapters/my-agent.ts
+import { createAgentAdapter } from "@netlify/axis";
+
+export default createAgentAdapter<{ stdout: string }>({
+  name: "my-agent",
+  resolveCommand: () => ({ command: "my-cli", prefixArgs: [] }),
+  buildArgs: (input) => [input.prompt],
+  initialState: () => ({ stdout: "" }),
+  streamConfig: {
+    mode: "aggregate",
+    onChunk: (chunk, ctx) => {
+      ctx.state.stdout += chunk;
+    },
+  },
+  getResult: (ctx) => ({
+    result: ctx.state.stdout.trim() || null,
+  }),
+});`}</code></pre>
+  <p>
+    Adapters support two stream modes: <strong>lines</strong> (NDJSON, one JSON object per stdout
+    line) and <strong>aggregate</strong> (raw chunks accumulated in state). The module must export
+    an <code>AgentAdapter</code> as default or as a named <code>adapter</code> export.
+  </p>
+
+  <h2>Workspace Isolation</h2>
+  <p>
+    Each agent run gets a fresh temporary directory as its workspace. AXIS isolates the following.
+  </p>
+  <ul>
+    <li><strong>HOME directory:</strong> Set to the workspace to prevent global config leakage.</li>
+    <li><strong>Adapter-specific dirs:</strong> <code>CLAUDE_CONFIG_DIR</code>, <code>CODEX_HOME</code>, <code>GEMINI_CLI_HOME</code>.</li>
+    <li><strong>Environment variables:</strong> Only explicitly listed vars and system essentials are passed through.</li>
+  </ul>
+
+  <h2>Reports</h2>
+  <p>
+    Every run automatically saves a report to <code>.axis/reports/</code>.
+  </p>
+  <pre><code>{`.axis/reports/{reportId}/
+  report.json                          # Manifest with summary + metadata
+  scenarios/{key}/{agent}.json         # Full result with transcript
+  scenarios/{key}/{agent}.raw.ndjson   # Raw stdout (--debug only)
+  scenarios/{key}/{agent}.sparse-index.txt  # Scoring reference`}</code></pre>
+  <p>
+    Use <code>axis reports</code> to list, view, and export reports. See the
+    <a href="/cli">CLI reference</a> for all available options.
+  </p>
+
+  <h2>Baselines</h2>
+  <p>
+    Baselines let you snapshot scores and detect regressions in future runs. They are stored in
+    <code>.axis/baselines/</code> and designed to be checked into version control.
+  </p>
+  <pre><code>{`# 1. Run your scenarios
+axis run
+
+# 2. Save the results as a baseline
+axis baseline set
+
+# 3. In future runs, compare against the baseline
+axis run --compare-baseline
+
+# 4. Or diff explicitly
+axis baseline diff`}</code></pre>
+  <p>
+    Baseline diff uses a noise tolerance of 1 point. Score deltas of 0 to 1 are reported
+    as unchanged. The diff command exits with code 1 if any regressions are detected, making it
+    suitable for CI gating.
+  </p>
+
+  <h2>CI Integration</h2>
+  <p>
+    AXIS is designed to work in CI environments. Key patterns:
+  </p>
+  <ul>
+    <li>Use <code>--json</code> for machine-readable output.</li>
+    <li>Use <code>--compare-baseline</code> to gate on regressions (exit code 1).</li>
+    <li>Set <code>--concurrency</code> to control resource usage.</li>
+    <li>Pass API keys via environment variables.</li>
+  </ul>
+  <pre><code>{ciExample}</code></pre>
+</DocsLayout>

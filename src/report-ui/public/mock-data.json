@@ -1,0 +1,298 @@
+{
+  "version": "0.1.0",
+  "reportId": "2026-04-23-222213",
+  "timestamp": "2026-04-23T22:22:13.210Z",
+  "durationMs": 102590,
+  "summary": {
+    "total": 1,
+    "completed": 1,
+    "failed": 0,
+    "averageAxisScore": 74
+  },
+  "results": [
+    {
+      "scenarioKey": "explain-docs",
+      "scenarioName": "Fetch and summarize documentation",
+      "agentName": "claude-sdk",
+      "durationMs": 29570,
+      "exitCode": 0,
+      "file": "scenarios/explain-docs/claude-sdk.json",
+      "tokenUsage": {
+        "input": 8,
+        "output": 1146,
+        "cacheReadInput": 51619
+      },
+      "totalCostUsd": 0.05663694999999999,
+      "prompt": "Fetch the documentation page at https://docs.netlify.com/build/async-workloads/overview/ and write a detailed summary to summary.md. The summary should cover what the product does, setup steps, and key concepts.",
+      "rubric": [
+        { "check": "Agent fetched the documentation URL", "weight": 0.25 },
+        { "check": "Agent wrote summary.md with substantive content", "weight": 0.25 },
+        { "check": "Summary covers what the product does", "weight": 0.25 },
+        { "check": "Summary includes setup steps and key concepts", "weight": 0.25 }
+      ],
+      "agentConfig": { "adapter": "claude-sdk", "model": "claude-sonnet-4-5-20250929", "maxTurns": 10 },
+      "score": {
+        "axisScore": 74,
+        "goalAchievement": {
+          "score": 88,
+          "criteria": [
+            {
+              "check": "Agent fetched the documentation URL",
+              "weight": 0.25,
+              "score": 10,
+              "rationale": "Agent used WebFetch on the exact URL provided and the fetched content matches what I independently retrieved from the live page."
+            },
+            {
+              "check": "Agent wrote summary.md with substantive content",
+              "weight": 0.25,
+              "score": 10,
+              "rationale": "summary.md exists at the expected path with 42 lines of well-structured, substantive markdown including headers, a feature table, and use cases."
+            },
+            {
+              "check": "Summary covers what the product does",
+              "weight": 0.25,
+              "score": 10,
+              "rationale": "The summary clearly explains what async workloads are (background fault-tolerant tasks decoupled from client requests), problems solved (retries, scheduling, workflow complexity, infrastructure overhead), and how they relate to Netlify's serverless platform."
+            },
+            {
+              "check": "Summary includes setup steps and key concepts",
+              "weight": 0.25,
+              "score": 5,
+              "rationale": "Key concepts (durable execution, multi-step workflows, scheduling, event-based triggers) are well covered. However, setup steps are entirely absent \u2014 the actual docs describe team-level (Extensions page) and site-level (Project > Build & Deploy) configuration, which the summary omits."
+            }
+          ]
+        },
+        "environment": {
+          "score": 67,
+          "interactionCount": 1,
+          "auditedCount": 1,
+          "dimensions": {
+            "success": 100,
+            "speed": 100,
+            "weight": 100,
+            "relevance": 60,
+            "necessity": 100
+          },
+          "audits": [
+            {
+              "id": 6,
+              "categories": ["environment"],
+              "success": 1,
+              "speed": 1,
+              "weight": 1,
+              "contextRelevance": 0.6,
+              "rationale": "The write operation itself succeeded and was right-sized \u2014 the agent wrote what it intended to write (2.9KB). Weight scores high because the tool was used appropriately for the intended operation. contextRelevance is reduced because the output closely mirrors the fetched content structure rather than distilling it, undermining the summarization goal \u2014 though this is a content quality issue, not a tool operation issue."
+            }
+          ],
+          "necessity": {
+            "category": "environment",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "Writing summary.md was the core task deliverable. The write was necessary."
+          }
+        },
+        "service": {
+          "score": 65,
+          "interactionCount": 1,
+          "auditedCount": 1,
+          "dimensions": {
+            "success": 70,
+            "speed": 100,
+            "weight": 60,
+            "relevance": 70,
+            "necessity": 100
+          },
+          "audits": [
+            {
+              "id": 4,
+              "categories": ["service"],
+              "success": 0.7,
+              "speed": 1,
+              "weight": 0.6,
+              "contextRelevance": 0.7,
+              "rationale": "Fetch succeeded and returned structured content, but 3.0KB for a documentation overview page is suspiciously small, suggesting possible JS-gated content was missed. The content returned appears to be a subset of the full page. Weight is penalized because the prompt was verbose but the returned payload was minimal, indicating the fetch likely hit a lightweight shell rather than full rendered docs."
+            }
+          ],
+          "necessity": {
+            "category": "service",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "Fetching the documentation page was required to complete the task. The single fetch was necessary and no retries were made."
+          }
+        },
+        "agent": {
+          "score": 63,
+          "interactionCount": 5,
+          "auditedCount": 0,
+          "dimensions": {
+            "success": 100,
+            "speed": 80,
+            "weight": 80,
+            "relevance": 80,
+            "necessity": 80
+          },
+          "audits": [
+            {
+              "id": 1,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.8,
+              "contextRelevance": 0.8,
+              "rationale": "default"
+            },
+            {
+              "id": 2,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.8,
+              "contextRelevance": 0.8,
+              "rationale": "default"
+            },
+            {
+              "id": 3,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.8,
+              "contextRelevance": 0.8,
+              "rationale": "default"
+            },
+            {
+              "id": 5,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.8,
+              "contextRelevance": 0.8,
+              "rationale": "default"
+            },
+            {
+              "id": 7,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.8,
+              "contextRelevance": 0.8,
+              "rationale": "default"
+            }
+          ],
+          "necessity": {
+            "category": "agent",
+            "score": 0.8,
+            "unnecessaryIds": [],
+            "rationale": "default"
+          }
+        },
+        "weights": {
+          "goal_achievement": 0.4,
+          "environment": 0.2,
+          "service": 0.2,
+          "agent": 0.2
+        },
+        "sparseIndex": {
+          "lines": [
+            "#1   agent    user        Fetch the documentation page at https://docs.netlify.com/build/async-workload...",
+            "#2   agent    assistant   Fetching the Netlify async workloads documentation page.",
+            "#3   agent    tool_use    ToolSearch(query: select:WebFetch, max_results: 1) -> ok, 57B, 211ms",
+            "#4   service  tool_use    Fetch(url: https://docs.netlify.com/build/async-workloads/overv...) -> ok, 3.0KB, 10.2s",
+            "#5   agent    assistant   Now writing the summary to `summary.md`.",
+            "#6   env      tool_use    Write(file_path: /private/var/folders/rw/rqr32pr1037grxt33xs5y6...) -> ok, 2.9KB, 11.7s",
+            "#7   agent    assistant   `summary.md` has been written. It covers: - **What async workloads are** \u2014 ba..."
+          ],
+          "interactions": [
+            {
+              "id": 1,
+              "entryIndices": [0],
+              "categories": ["agent"],
+              "sparseLine": "#1   agent    user        Fetch the documentation page at https://docs.netlify.com/build/async-workload...",
+              "toolName": null,
+              "hasError": false,
+              "durationMs": 2100,
+              "contextBytes": 236,
+              "startMs": 0
+            },
+            {
+              "id": 2,
+              "entryIndices": [1],
+              "categories": ["agent"],
+              "sparseLine": "#2   agent    assistant   Fetching the Netlify async workloads documentation page.",
+              "toolName": null,
+              "hasError": false,
+              "durationMs": 1300,
+              "contextBytes": 56,
+              "startMs": 2100
+            },
+            {
+              "id": 3,
+              "entryIndices": [2, 3],
+              "categories": ["agent"],
+              "sparseLine": "#3   agent    tool_use    ToolSearch(query: select:WebFetch, max_results: 1) -> ok, 57B, 211ms",
+              "toolName": "ToolSearch",
+              "hasError": false,
+              "durationMs": 211,
+              "contextBytes": 57,
+              "startMs": 3400
+            },
+            {
+              "id": 4,
+              "entryIndices": [4, 5],
+              "categories": ["service"],
+              "sparseLine": "#4   service  tool_use    Fetch(url: https://docs.netlify.com/build/async-workloads/overv...) -> ok, 3.0KB, 10.2s",
+              "toolName": "Fetch",
+              "hasError": false,
+              "durationMs": 10195,
+              "contextBytes": 3089,
+              "startMs": 3611
+            },
+            {
+              "id": 5,
+              "entryIndices": [6],
+              "categories": ["agent"],
+              "sparseLine": "#5   agent    assistant   Now writing the summary to `summary.md`.",
+              "toolName": null,
+              "hasError": false,
+              "durationMs": 2194,
+              "contextBytes": 40,
+              "startMs": 13806
+            },
+            {
+              "id": 6,
+              "entryIndices": [7, 8],
+              "categories": ["environment"],
+              "sparseLine": "#6   env      tool_use    Write(file_path: /private/var/folders/rw/rqr32pr1037grxt33xs5y6...) -> ok, 2.9KB, 11.7s",
+              "toolName": "Write",
+              "hasError": false,
+              "durationMs": 11670,
+              "contextBytes": 2975,
+              "startMs": 16000
+            },
+            {
+              "id": 7,
+              "entryIndices": [9],
+              "categories": ["agent"],
+              "sparseLine": "#7   agent    assistant   `summary.md` has been written. It covers: - **What async workloads are** \u2014 ba...",
+              "toolName": null,
+              "hasError": false,
+              "durationMs": 2000,
+              "contextBytes": 465,
+              "startMs": 27670
+            }
+          ],
+          "stats": {
+            "totalInteractions": 7,
+            "byCategory": {
+              "environment": 1,
+              "service": 1,
+              "agent": 5
+            },
+            "totalErrors": 0,
+            "totalDurationMs": 22076,
+            "wallClockMs": 29670
+          }
+        }
+      }
+    }
+  ]
+}

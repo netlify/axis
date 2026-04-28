@@ -1,0 +1,15 @@
+{
+  "name": "Create and verify a file",
+
+  "setup": [{ "action": "run_script", "command": "mkdir -p /tmp/axis-test" }],
+
+  "prompt": "Create a file called hello.txt in /tmp/axis-test with the content 'Hello from AXIS'. Then read the file back and confirm its contents.",
+
+  "rubric": [
+    { "check": "File hello.txt was created at the target path", "weight": 0.4 },
+    { "check": "File contains the text 'Hello from AXIS'", "weight": 0.4 },
+    { "check": "Agent verified the file contents after creation", "weight": 0.2 }
+  ],
+
+  "teardown": [{ "action": "run_script", "command": "rm -rf /tmp/axis-test" }]
+}

@@ -1,0 +1,394 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Scoring Framework" active="scoring">
+  <h1>AXIS Scoring Framework</h1>
+  <p class="lead">
+    AXIS produces a composite 0 to 100 AXIS Result by evaluating four independent dimensions
+    of agent performance. Each dimension captures a different aspect of how the agent interacted
+    with your system.
+  </p>
+
+  <h2>The Four Dimensions</h2>
+
+  <div class="dimension-wheel">
+    <a href="#agent" class="dimension-label dimension-label-agent" data-segment="agent">
+      <span class="dimension-pct" style="color: var(--color-agent)">20%</span>
+      <span class="dimension-name">Agent</span>
+      <span class="dimension-desc">Planning, reasoning, self-organization</span>
+    </a>
+
+    <a href="#goal-achievement" class="dimension-label dimension-label-goal" data-segment="goal">
+      <span class="dimension-pct" style="color: var(--accent)">40%</span>
+      <span class="dimension-name">Goal Achievement</span>
+      <span class="dimension-desc">Evaluated against your scenario rubric</span>
+    </a>
+
+    <svg class="dimension-chart" viewBox="0 0 200 200" role="img" aria-label="Scoring dimensions: Goal Achievement 40%, Environment 20%, Service 20%, Agent 20%">
+      <!-- Goal Achievement — 40%, starts at 12 o'clock -->
+      <circle cx="100" cy="100" r="70" fill="none"
+        stroke="var(--accent)" stroke-width="28"
+        stroke-dasharray="173.7 266.1" stroke-dashoffset="111.1"
+        data-segment="goal"/>
+      <!-- Environment — 20% -->
+      <circle cx="100" cy="100" r="70" fill="none"
+        stroke="var(--color-env)" stroke-width="28"
+        stroke-dasharray="85.8 354.0" stroke-dashoffset="375.0"
+        data-segment="env"/>
+      <!-- Service — 20% -->
+      <circle cx="100" cy="100" r="70" fill="none"
+        stroke="var(--color-svc)" stroke-width="28"
+        stroke-dasharray="85.8 354.0" stroke-dashoffset="287.0"
+        data-segment="svc"/>
+      <!-- Agent — 20% -->
+      <circle cx="100" cy="100" r="70" fill="none"
+        stroke="var(--color-agent)" stroke-width="28"
+        stroke-dasharray="85.8 354.0" stroke-dashoffset="199.0"
+        data-segment="agent"/>
+      <!-- Center label — default -->
+      <text class="center-default" x="100" y="95" text-anchor="middle" fill="var(--text-muted)" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="12" font-weight="700" letter-spacing="0.5">AXIS</text>
+      <text class="center-default" x="100" y="112" text-anchor="middle" fill="var(--text-muted)" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="11">Result</text>
+      <!-- Center label — hover (hidden by default) -->
+      <text class="center-pct" x="100" y="98" text-anchor="middle" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="28" font-weight="800" opacity="0">40%</text>
+      <text class="center-name" x="100" y="116" text-anchor="middle" fill="var(--text-muted)" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="10" font-weight="500" letter-spacing="0.3" opacity="0">Goal Achievement</text>
+    </svg>
+
+    <a href="#service" class="dimension-label dimension-label-svc" data-segment="svc">
+      <span class="dimension-pct" style="color: var(--color-svc)">20%</span>
+      <span class="dimension-name">Service</span>
+      <span class="dimension-desc">APIs, MCP tools, network requests</span>
+    </a>
+
+    <a href="#environment" class="dimension-label dimension-label-env" data-segment="env">
+      <span class="dimension-pct" style="color: var(--color-env)">20%</span>
+      <span class="dimension-name">Environment</span>
+      <span class="dimension-desc">Shell, filesystem, git, build tools</span>
+    </a>
+  </div>
+
+  <h2>Composite AXIS Result</h2>
+  <p>
+    The final AXIS Result is the weighted average of all four dimension scores.
+  </p>
+  <pre><code>AXIS Result = (Goal Achievement x 0.4) + (Environment x 0.2) + (Service x 0.2) + (Agent x 0.2)</code></pre>
+  <p>
+    All dimension scores are 0 to 100. The composite result is rounded to the nearest whole number.
+  </p>
+
+  <h2 id="goal-achievement">Goal Achievement</h2>
+  <p>
+    Goal Achievement is evaluated by a Judge that reads the full agent transcript and compares
+    the outcome against the rubric checks you defined in the scenario. Each check receives a
+    score from 0 to 10, which is scaled to 0 to 100 and combined using the check weights.
+  </p>
+  <p>
+    This is the only dimension driven entirely by your rubric. The other three dimensions are
+    calculated from the agent's interaction transcript.
+  </p>
+
+  <h2 id="interaction-signals">Interaction Signals</h2>
+  <p>
+    The Environment, Service, and Agent dimensions are scored by analyzing every tool interaction
+    in the agent's transcript. Each interaction is evaluated on five signals.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Signal</th>
+        <th>Method</th>
+        <th>What It Measures</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Success</strong></td>
+        <td>Judge</td>
+        <td>Did the interaction complete without errors? Were the results usable?</td>
+      </tr>
+      <tr>
+        <td><strong>Speed</strong></td>
+        <td>Heuristic</td>
+        <td>How long did the interaction take relative to expectations for its category?</td>
+      </tr>
+      <tr>
+        <td><strong>Weight</strong></td>
+        <td>Judge</td>
+        <td>Was the tool invocation right-sized? Did the agent request more or less than needed?</td>
+      </tr>
+      <tr>
+        <td><strong>Relevance</strong></td>
+        <td>Judge</td>
+        <td>Was the tool output relevant and useful for completing the task?</td>
+      </tr>
+      <tr>
+        <td><strong>Necessity</strong></td>
+        <td>Judge</td>
+        <td>Were the interactions in this category actually needed, or were they avoidable?</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Judge</strong> signals are evaluated by an LLM that reads the full content of each tool
+    call and its result. <strong>Heuristic</strong> signals are computed deterministically from
+    measured values like duration, with no LLM involved.
+  </p>
+
+  <h3>Signal Weights by Category</h3>
+  <p>
+    Each category emphasizes different signals based on what matters most for that type of interaction.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Signal</th>
+        <th>Environment</th>
+        <th>Service</th>
+        <th>Agent</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Success</td>
+        <td>0.35</td>
+        <td>0.25</td>
+        <td>0.15</td>
+      </tr>
+      <tr>
+        <td>Speed</td>
+        <td>0.15</td>
+        <td>0.15</td>
+        <td>0.15</td>
+      </tr>
+      <tr>
+        <td>Weight</td>
+        <td>0.15</td>
+        <td>0.20</td>
+        <td>0.20</td>
+      </tr>
+      <tr>
+        <td>Relevance</td>
+        <td>0.15</td>
+        <td>0.20</td>
+        <td>0.25</td>
+      </tr>
+      <tr>
+        <td>Necessity</td>
+        <td>0.20</td>
+        <td>0.20</td>
+        <td>0.25</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Environment scores weight Success most heavily because failed shell commands or file operations
+    are the most direct signal of a poor interaction. Speed is weighted equally across all categories
+    at 0.15 — the category-specific speed thresholds (below) handle the fact that different operation
+    types have different expected durations. Agent scores weight Necessity, Weight, and Relevance more
+    heavily because self-organization quality is best measured by whether the agent's own actions were
+    purposeful and well-scoped.
+  </p>
+
+  <h3>Speed Thresholds</h3>
+  <p>
+    Speed scores are based on how long each interaction took. Thresholds vary by category because
+    different types of operations have different expected durations.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Excellent</th>
+        <th>Good</th>
+        <th>Fair</th>
+        <th>Slow</th>
+        <th>Very Slow</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Environment</td>
+        <td>&le;500ms</td>
+        <td>&le;2s</td>
+        <td>&le;5s</td>
+        <td>&le;10s</td>
+        <td>&gt;10s</td>
+      </tr>
+      <tr>
+        <td>Service</td>
+        <td>&le;2s</td>
+        <td>&le;5s</td>
+        <td>&le;10s</td>
+        <td>&le;25s</td>
+        <td>&gt;25s</td>
+      </tr>
+      <tr>
+        <td>Agent</td>
+        <td>&le;2s</td>
+        <td>&le;5s</td>
+        <td>&le;15s</td>
+        <td>&le;30s</td>
+        <td>&gt;30s</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Score Calibration</h2>
+  <p>
+    Raw signal scores are mapped to a 0 to 100 scale using an S-curve rather than linear scaling.
+    This means:
+  </p>
+  <ul>
+    <li>Improving from 20 to 50 is relatively easy (fixing obvious problems).</li>
+    <li>Improving from 80 to 95 requires significant quality gains.</li>
+    <li>A score of 50 represents median performance for that category.</li>
+  </ul>
+  <p>
+    Speed is aggregated using a <strong>severity-weighted average</strong>: slow interactions pull the
+    score down disproportionately rather than being hidden by many fast interactions. Other signals
+    (success, weight, relevance) are weighted by context size, so a failed API call that returns a
+    large error response influences the score more than a trivial file read.
+  </p>
+
+  <h2>Transcript Categorization</h2>
+  <p>
+    Every tool interaction is classified into a category based on the tool name. This classification
+    determines which dimension the interaction contributes to.
+  </p>
+
+  <h3 id="environment">Environment</h3>
+  <p>OS, filesystem, and dev tooling interactions:</p>
+  <ul>
+    <li><strong>Shell:</strong> bash, shell, terminal, exec.</li>
+    <li><strong>File ops:</strong> read, write, edit, glob, grep, cat, head, tail, find, ls, mkdir, rm, cp, mv.</li>
+    <li><strong>Version control:</strong> git.</li>
+    <li><strong>Package managers:</strong> npm, yarn, pip, cargo, go, brew, apt.</li>
+    <li><strong>Build and test:</strong> make, tsc, docker, kubectl, node, python.</li>
+  </ul>
+
+  <h3 id="agent">Agent</h3>
+  <p>Self-organization and metacognition:</p>
+  <ul>
+    <li><strong>Tool discovery:</strong> toolsearch, listtoolsets, list_tools.</li>
+    <li><strong>Task management:</strong> taskcreate, taskupdate, tasklist, todo_read, todo_write.</li>
+    <li><strong>Planning:</strong> enterplanmode, exitplanmode.</li>
+    <li><strong>User interaction:</strong> askuserquestion, askfollowupquestion.</li>
+    <li><strong>Skill invocation:</strong> skill.</li>
+  </ul>
+
+  <h3 id="service">Service</h3>
+  <p>
+    Everything else: external APIs, MCP tools, network calls, and custom services. Any tool not
+    matching the environment or agent patterns is classified as a service interaction.
+  </p>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Multi-Category Interactions</div>
+    <p>
+      Some interactions span categories. For example, running <code>curl</code> via bash is both an
+      environment interaction (shell command) and a service interaction (network call). Environment
+      tools that target agent-internal paths (like <code>.claude/</code>) are reclassified as agent
+      interactions.
+    </p>
+  </div>
+
+  <h2>Interpreting Scores</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Range</th>
+        <th>Interpretation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>90 to 100</strong></td>
+        <td>Excellent. Agent completed the task efficiently with minimal waste.</td>
+      </tr>
+      <tr>
+        <td><strong>75 to 89</strong></td>
+        <td>Good. Task completed with minor inefficiencies or missed optimizations.</td>
+      </tr>
+      <tr>
+        <td><strong>50 to 74</strong></td>
+        <td>Fair. Notable issues in execution quality, speed, or unnecessary operations.</td>
+      </tr>
+      <tr>
+        <td><strong>Below 50</strong></td>
+        <td>Poor. Significant failures, errors, or excessive waste in the execution.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    When a category score falls below 75, the CLI displays <strong>score insights</strong> that
+    identify the weakest signal, helping you understand where the agent struggled.
+  </p>
+
+  <script is:inline>
+    const wheel = document.querySelector(".dimension-wheel");
+    if (wheel) {
+      const segments = wheel.querySelectorAll(".dimension-chart circle[data-segment]");
+      const labels = wheel.querySelectorAll(".dimension-label");
+      const defaults = wheel.querySelectorAll(".center-default");
+      const pctEl = wheel.querySelector(".center-pct");
+      const nameEl = wheel.querySelector(".center-name");
+
+      const info = {
+        goal:  { pct: "40%", name: "Goal Achievement", color: "var(--accent)" },
+        env:   { pct: "20%", name: "Environment",      color: "var(--color-env)" },
+        svc:   { pct: "20%", name: "Service",           color: "var(--color-svc)" },
+        agent: { pct: "20%", name: "Agent",             color: "var(--color-agent)" }
+      };
+
+      function highlight(seg) {
+        // Fade/grow segments
+        segments.forEach(s => {
+          s.style.opacity = s.dataset.segment === seg ? "1" : "0.15";
+          s.style.strokeWidth = s.dataset.segment === seg ? "34" : "28";
+        });
+        // Swap center text
+        const d = info[seg];
+        defaults.forEach(t => { t.style.opacity = "0"; });
+        pctEl.textContent = d.pct;
+        pctEl.setAttribute("fill", d.color);
+        pctEl.style.opacity = "1";
+        nameEl.textContent = d.name;
+        nameEl.style.opacity = "1";
+      }
+
+      function reset() {
+        segments.forEach(s => { s.style.opacity = "1"; s.style.strokeWidth = "28"; });
+        labels.forEach(l => { l.style.background = ""; l.style.boxShadow = ""; });
+        defaults.forEach(t => { t.style.opacity = "1"; });
+        pctEl.style.opacity = "0";
+        nameEl.style.opacity = "0";
+      }
+
+      labels.forEach(label => {
+        label.addEventListener("mouseenter", () => {
+          highlight(label.dataset.segment);
+          label.style.background = "var(--light-gray)";
+          label.style.boxShadow = "var(--shadow)";
+        });
+        label.addEventListener("mouseleave", reset);
+      });
+
+      segments.forEach(circle => {
+        circle.addEventListener("mouseenter", () => {
+          highlight(circle.dataset.segment);
+          const label = wheel.querySelector(`.dimension-label[data-segment="${circle.dataset.segment}"]`);
+          if (label) {
+            label.style.background = "var(--light-gray)";
+            label.style.boxShadow = "var(--shadow)";
+          }
+        });
+        circle.addEventListener("mouseleave", reset);
+        circle.addEventListener("click", () => {
+          const label = wheel.querySelector(`.dimension-label[data-segment="${circle.dataset.segment}"]`);
+          if (label) label.click();
+        });
+      });
+    }
+  </script>
+</DocsLayout>

@@ -1,0 +1,10 @@
+{
+  "name": "Summarize async workloads docs",
+  "prompt": "Fetch the documentation page at https://docs.netlify.com/build/async-workloads/overview/ and write a concise summary to summary.md covering what async workloads are, key features, and setup steps.",
+  "rubric": [
+    { "check": "Agent fetched the documentation URL", "weight": 0.25 },
+    { "check": "Agent wrote summary.md with substantive content", "weight": 0.25 },
+    { "check": "Summary covers what async workloads are and their key features", "weight": 0.25 },
+    { "check": "Summary includes setup steps", "weight": 0.25 }
+  ]
+}

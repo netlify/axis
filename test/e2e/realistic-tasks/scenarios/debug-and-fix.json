@@ -1,0 +1,22 @@
+{
+  "name": "Debug and fix a broken script",
+
+  "setup": [
+    { "action": "run_script", "command": "mkdir -p /tmp/axis-e2e-debug" },
+    {
+      "action": "run_script",
+      "command": "cat > /tmp/axis-e2e-debug/add.js << 'SCRIPT'\nfunction add(a, b) {\n  return a - b; // BUG: should be addition\n}\n\nconsole.log(add(2, 3)); // Expected: 5\nconsole.log(add(10, -5)); // Expected: 5\nconsole.log(add(0, 0)); // Expected: 0\nSCRIPT"
+    }
+  ],
+
+  "prompt": "There is a JavaScript file at /tmp/axis-e2e-debug/add.js that has a bug. Run the file, identify the bug, fix it, and verify the fix by running it again. The expected outputs are shown in the comments.",
+
+  "rubric": [
+    { "check": "Agent ran the script and identified incorrect output", "weight": 0.25 },
+    { "check": "Agent identified the bug (subtraction instead of addition)", "weight": 0.25 },
+    { "check": "Agent fixed the bug in the file", "weight": 0.25 },
+    { "check": "Agent verified the fix by running the script again and confirming correct output", "weight": 0.25 }
+  ],
+
+  "teardown": [{ "action": "run_script", "command": "rm -rf /tmp/axis-e2e-debug" }]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Skills test",
+  "prompt": "Read the SKILL.md file located at .gemini/skills/test-skill/SKILL.md. Using the formula and constants described in that skill, compute the AXIS Result for: task_completion=70, efficiency=80, resilience=90. Show your work and give the final answer.",
+  "rubric": "The agent must produce the correct final answer of 117. The raw calculation is (70*0.6)+(80*0.3)+(90*0.1) = 42+24+9 = 75, plus the magic constant 42 = 117. If the agent does not add 42 or gets a different answer, it did not correctly use the skill."
+}

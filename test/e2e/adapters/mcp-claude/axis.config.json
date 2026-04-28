@@ -1,0 +1,16 @@
+{
+  "scenarios": "./scenarios",
+  "agents": ["claude-code"],
+  "mcp_servers": {
+    "netlify": {
+      "type": "http",
+      "url": "https://mcp.netlify.com",
+      "headers": { "Authorization": "Bearer test-token" }
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    }
+  }
+}

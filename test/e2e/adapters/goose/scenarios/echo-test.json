@@ -1,0 +1,5 @@
+{
+  "name": "Goose echo test",
+  "prompt": "Hello from AXIS Goose adapter",
+  "rubric": "The agent should echo back the prompt text."
+}

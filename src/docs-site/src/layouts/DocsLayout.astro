@@ -1,0 +1,69 @@
+---
+import "../styles/docs.css";
+
+interface Props {
+  title: string;
+  active: "overview" | "quickstart" | "scoring" | "running" | "cli" | "configuration";
+}
+
+const { title, active } = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} - AXIS Docs</title>
+    <meta name="description" content="Documentation for AXIS, the Agent eXperience Index Score synthetic testing framework for AI agents." />
+  </head>
+  <body>
+    <header class="site-header">
+      <a href="/" class="site-logo" aria-label="AXIS home">
+        <span class="site-logo-mark"><span class="logo-ax">AX</span><span class="logo-i">I</span>S</span>
+      </a>
+      <div class="site-header-links">
+        <a href="https://github.com/netlify/axis">GitHub</a>
+        <a href="https://www.npmjs.com/package/@netlify/axis">npm</a>
+      </div>
+      <button class="mobile-menu-btn" id="menu-btn" aria-label="Toggle navigation">&#9776;</button>
+    </header>
+
+    <div class="site-shell">
+      <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-section-label">Getting Started</div>
+          <a href="/" class:list={["sidebar-link", { active: active === "overview" }]}>What is AXIS</a>
+          <a href="/quickstart" class:list={["sidebar-link", { active: active === "quickstart" }]}>Quick Start</a>
+          <div class="sidebar-section-label">How It Works</div>
+          <a href="/scoring" class:list={["sidebar-link", { active: active === "scoring" }]}>Scoring Framework</a>
+          <a href="/running" class:list={["sidebar-link", { active: active === "running" }]}>Running Tests</a>
+          <div class="sidebar-section-label">Reference</div>
+          <a href="/cli" class:list={["sidebar-link", { active: active === "cli" }]}>CLI</a>
+          <a href="/configuration" class:list={["sidebar-link", { active: active === "configuration" }]}>Configuration</a>
+        </nav>
+      </aside>
+
+      <main class="main-content">
+        <slot />
+        <footer class="site-footer">
+          AXIS is maintained by Netlify.
+        </footer>
+      </main>
+    </div>
+
+    <script is:inline>
+      const btn = document.getElementById("menu-btn");
+      const sidebar = document.getElementById("sidebar");
+      const backdrop = document.getElementById("sidebar-backdrop");
+
+      function toggle() {
+        sidebar.classList.toggle("open");
+        backdrop.classList.toggle("open");
+      }
+
+      btn.addEventListener("click", toggle);
+      backdrop.addEventListener("click", toggle);
+    </script>
+  </body>
+</html>

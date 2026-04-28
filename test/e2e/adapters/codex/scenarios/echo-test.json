@@ -1,0 +1,5 @@
+{
+  "name": "Codex echo test",
+  "prompt": "Hello from AXIS Codex adapter",
+  "rubric": "The agent should echo back the prompt text."
+}

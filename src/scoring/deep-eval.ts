@@ -1,0 +1,446 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { getAdapter } from "../adapters/registry.js";
+import type { NormalizedEntry, NormalizedTranscript } from "../transcript/types.js";
+import type { RunResult } from "../types/output.js";
+import type {
+  DeepEvalResult,
+  Interaction,
+  InteractionAudit,
+  InteractionCategory,
+  NecessityJudgment,
+  SparseIndex,
+  TriageResult,
+} from "../types/scoring.js";
+import { DEFAULT_AUDIT_SCORES } from "./category-score.js";
+import { parseJsonFromText } from "./parse-json.js";
+
+/** Max characters of full content to include per interaction. */
+const MAX_CONTENT_PER_INTERACTION = 3_000;
+
+/** Max total content characters to send to the judge. */
+const MAX_TOTAL_CONTENT = 40_000;
+
+/** Max characters for the sparse index in the evaluation prompt. */
+const MAX_SPARSE_INDEX_CHARS = 60_000;
+
+/**
+ * Run the deep evaluation LLM pass.
+ *
+ * Speed is always computed heuristically from interaction timing data (no LLM needed).
+ * The LLM evaluates ALL interactions for success, weight, contextRelevance,
+ * and necessity per category.
+ */
+export async function runDeepEval(
+  result: RunResult,
+  sparseIndex: SparseIndex,
+  triage: TriageResult,
+  normalized: NormalizedTranscript,
+): Promise<DeepEvalResult> {
+  // If there are no interactions at all, return defaults
+  if (sparseIndex.interactions.length === 0) {
+    return buildDefaultResult(sparseIndex);
+  }
+
+  // Always call LLM to evaluate all interactions
+  const prompt = buildDeepEvalPrompt(result, sparseIndex, triage, normalized);
+  const responseText = await callJudge(result, prompt);
+  const deepResult = parseDeepEvalResponse(responseText, sparseIndex);
+
+  // Inject heuristic speed into ALL audits — speed is always deterministic
+  for (const audit of deepResult.audits) {
+    const interaction = sparseIndex.interactions.find((i) => i.id === audit.id);
+    if (interaction) {
+      audit.speed = computeHeuristicSpeed(interaction);
+    }
+  }
+
+  return deepResult;
+}
+
+/**
+ * Compute a heuristic speed score (0-1) for an interaction based on
+ * duration and category. Deterministic — no LLM needed.
+ *
+ * Thresholds are generous to account for system overhead
+ * (SDK roundtrips, sandbox setup, process spawning).
+ */
+export function computeHeuristicSpeed(interaction: Interaction): number {
+  const { durationMs, categories } = interaction;
+
+  // No timing data — assume efficient
+  if (durationMs === null || durationMs <= 0) return 1.0;
+
+  const seconds = durationMs / 1000;
+
+  // Service interactions (API calls, web fetches): network latency expected
+  if (categories.includes("service")) {
+    if (seconds <= 2) return 1.0;
+    if (seconds <= 5) return 0.9;
+    if (seconds <= 10) return 0.8;
+    if (seconds <= 25) return 0.6;
+    return 0.4;
+  }
+
+  // Environment interactions (file ops, shell commands): local, should be near-instant
+  if (categories.includes("environment")) {
+    if (seconds <= 0.5) return 1.0;
+    if (seconds <= 2) return 0.9;
+    if (seconds <= 5) return 0.8;
+    if (seconds <= 10) return 0.6;
+    return 0.4;
+  }
+
+  // Agent thinking: reasoning latency
+  if (seconds <= 2) return 1.0;
+  if (seconds <= 5) return 0.9;
+  if (seconds <= 15) return 0.8;
+  if (seconds <= 30) return 0.6;
+  return 0.4;
+}
+
+function buildDeepEvalPrompt(
+  result: RunResult,
+  sparseIndex: SparseIndex,
+  triage: TriageResult,
+  normalized: NormalizedTranscript,
+): string {
+  const { stats } = sparseIndex;
+
+  // Always include the full sparse index
+  const sparseLines = truncateSparseLines(sparseIndex.lines);
+
+  // Include full content for ALL interactions (within budget)
+  const interactionContent = buildInteractionContent(sparseIndex, triage, normalized);
+
+  // Include triage context when available
+  let triageSection = "";
+  if (triage.patterns.length > 0 || Object.values(triage.categoryNotes).some((n) => n)) {
+    const patternsText = triage.patterns
+      .map((p) => `- ${p.description} (severity: ${p.severity}, interactions: #${p.interactionIds.join(", #")})`)
+      .join("\n");
+
+    const categories: InteractionCategory[] = ["environment", "service", "agent"];
+    const categoryNotesText = categories
+      .filter((c) => triage.categoryNotes[c])
+      .map((c) => `${c}: ${triage.categoryNotes[c]}`)
+      .join("\n");
+
+    triageSection = `
+TRIAGE ANALYSIS:
+${categoryNotesText || "(none)"}
+${patternsText ? `\nPATTERNS:\n${patternsText}` : ""}
+`;
+  }
+
+  return `You are an expert evaluator for AXIS, an AI agent testing framework.
+
+You are performing a comprehensive evaluation of ALL interactions from an agent execution.
+
+SCENARIO: ${result.scenarioName}
+
+TASK GIVEN TO AGENT:
+${result.prompt}
+${triageSection}
+COMPLETE SPARSE INDEX (${stats.totalInteractions} interactions):
+${sparseLines}
+
+STATS:
+- Environment interactions: ${stats.byCategory.environment}
+- Service interactions: ${stats.byCategory.service}
+- Agent interactions: ${stats.byCategory.agent}
+- Errors: ${stats.totalErrors}
+- Total duration: ${stats.totalDurationMs}ms
+
+FULL INTERACTION CONTENT:
+${interactionContent}
+
+NOTE: Content shown above may be truncated for evaluation purposes. This does NOT mean the agent's actual tool results were truncated — evaluate based on the quality and structure of what is shown, not on apparent truncation boundaries.
+
+EVALUATION DIMENSIONS (score each 0.0 to 1.0):
+- success: Did the interaction complete without errors? Were the results correct and usable? Evaluate based on the actual content returned, not assumptions about what a "complete" result should look like. For service calls (API requests, web fetches), if the call returned structured, usable content and the agent used it successfully, score success high — do not speculate about content that might be missing or hypothesize about JS-gated pages or truncation.
+- weight: Was the tool invocation right-sized for the operation? Evaluate whether the agent sent an appropriate amount of data to the tool and received a proportionate response. For environment tools (file writes, edits, shell commands), judge the tool operation — not the semantic quality of the content the agent chose to write. A 2KB file write is right-sized if the agent intended to write 2KB of content. For service calls, if the call returned the data the agent needed, it is right-sized — do not penalize because a page returned fewer bytes than expected. (1.0 = right-sized, 0.3 = bloated/wasteful)
+- contextRelevance: Was the tool's output relevant and usable for the task? If the tool succeeded and the agent used the output to make progress, score 1.0. Only reduce this score if the output was genuinely irrelevant noise that the agent could not use. Do NOT reduce this score for content quality judgments (e.g., whether a summary was condensed enough, whether fetched content was comprehensive enough) — those are evaluated by goal achievement, not here. Agent-internal operations (tool discovery, planning) are necessary infrastructure — score based on whether they were needed. (1.0 = all useful/necessary, 0.0 = all noise)
+
+For each CATEGORY present, also evaluate necessity:
+- necessity (0.0 to 1.0): Were the interactions that the agent performed in this category necessary? Evaluate only what the agent actually did — do not penalize for hypothetical steps it could have taken. 1.0 = all interactions were necessary, 0.0 = all were unnecessary.
+- List any interaction IDs that were unnecessary.
+
+CONTEXT FOR EVALUATION:
+- Tool discovery (e.g., ToolSearch, ListTools) and agent configuration reads are required infrastructure — do not flag as unnecessary unless genuinely redundant (same query repeated).
+- Byte counts in sparse lines show total I/O transferred, not file content size. Small results are normal for write/edit confirmations.
+- If a service call (API request, web fetch) returned structured, usable content and the agent used it to complete the task, do not flag it for concerns about hypothetical missing content or page size.
+
+Respond with ONLY valid JSON:
+{
+  "audits": [
+    {"id": 1, "category": "environment", "success": 0.9, "weight": 0.8, "contextRelevance": 0.6, "rationale": "brief explanation"},
+    ...
+  ],
+  "necessity": [
+    {"category": "environment", "score": 0.85, "unnecessaryIds": [4], "rationale": "brief explanation"},
+    {"category": "service", "score": 0.7, "unnecessaryIds": [5, 6], "rationale": "brief explanation"},
+    {"category": "agent", "score": 0.95, "unnecessaryIds": [], "rationale": "brief explanation"}
+  ]
+}
+
+Include an audit for EVERY interaction listed above.`;
+}
+
+/**
+ * Build the full content section for ALL interactions.
+ * Includes as much content as fits within the total budget.
+ */
+function buildInteractionContent(
+  sparseIndex: SparseIndex,
+  triage: TriageResult,
+  normalized: NormalizedTranscript,
+): string {
+  const sections: string[] = [];
+  let totalChars = 0;
+
+  const flagMap = new Map(triage.flaggedInteractions.map((f) => [f.id, f]));
+
+  for (let idx = 0; idx < sparseIndex.interactions.length; idx++) {
+    const interaction = sparseIndex.interactions[idx];
+
+    // Build full content from the normalized entries
+    const fullContent = interaction.entryIndices.map((i) => formatFullEntry(normalized.entries[i])).join("\n");
+
+    const truncatedContent =
+      fullContent.length > MAX_CONTENT_PER_INTERACTION
+        ? fullContent.slice(0, MAX_CONTENT_PER_INTERACTION) + "\n... (truncated)"
+        : fullContent;
+
+    if (totalChars + truncatedContent.length > MAX_TOTAL_CONTENT) {
+      sections.push(
+        `\n... (remaining ${sparseIndex.interactions.length - idx} interactions shown only in sparse index above)`,
+      );
+      break;
+    }
+
+    const flag = flagMap.get(interaction.id);
+    const triageNote = flag ? ` | Triage: ${flag.reason}` : "";
+
+    sections.push(`---
+#${interaction.id} | Category: ${interaction.categories.join(", ")}${triageNote}
+${truncatedContent}
+---`);
+
+    totalChars += truncatedContent.length;
+  }
+
+  return sections.join("\n\n");
+}
+
+function formatFullEntry(entry: NormalizedEntry): string {
+  const parts: string[] = [];
+
+  switch (entry.type) {
+    case "assistant":
+      parts.push(`[ASSISTANT] ${entry.text ?? "(no text)"}`);
+      break;
+    case "tool_use":
+      parts.push(`[TOOL_USE] ${entry.toolName ?? "unknown"}`);
+      if (entry.toolInputSummary) parts.push(`  Input: ${entry.toolInputSummary}`);
+      if (entry.toolInput) {
+        const inputStr = JSON.stringify(entry.toolInput);
+        parts.push(`  Full input: ${inputStr.length > 1000 ? inputStr.slice(0, 1000) + "..." : inputStr}`);
+      }
+      break;
+    case "tool_result":
+      parts.push(`[TOOL_RESULT]`);
+      if (entry.toolResultText) {
+        const result =
+          entry.toolResultText.length > 2000 ? entry.toolResultText.slice(0, 2000) + "..." : entry.toolResultText;
+        parts.push(`  Result: ${result}`);
+      }
+      break;
+    case "error":
+      parts.push(`[ERROR] ${entry.errorMessage ?? entry.text ?? "(unknown error)"}`);
+      break;
+    default:
+      parts.push(`[${entry.type.toUpperCase()}] ${entry.text ?? "(no content)"}`);
+  }
+
+  return parts.join("\n");
+}
+
+async function callJudge(runResult: RunResult, prompt: string): Promise<string> {
+  const adapter = getAdapter(runResult.agentConfig.adapter);
+
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "axis-deep-eval-"));
+  try {
+    const output = await adapter.run({
+      prompt,
+      config: runResult.agentConfig,
+      scenario: {
+        key: "__deep_eval__",
+        name: "AXIS Deep Evaluation",
+        prompt,
+        rubric: [],
+      },
+      workingDirectory: workspace,
+    });
+    return output.result ?? "";
+  } finally {
+    try {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+// --- Response parsing ---
+
+/**
+ * Parse the deep eval LLM response.
+ * Fills in default audits for interactions the LLM missed and default necessity for missing categories.
+ */
+export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseIndex): DeepEvalResult {
+  const parsed = parseJsonFromText(responseText);
+
+  let llmAudits: InteractionAudit[] = [];
+  let llmNecessity: NecessityJudgment[] = [];
+
+  if (parsed) {
+    llmAudits = parseAudits(parsed.audits, sparseIndex);
+    llmNecessity = parseNecessity(parsed.necessity);
+  }
+
+  // Build complete audit list: LLM-scored where available, defaults for any the LLM missed
+  const auditMap = new Map(llmAudits.map((a) => [a.id, a]));
+  const allAudits: InteractionAudit[] = [];
+
+  for (const interaction of sparseIndex.interactions) {
+    const existing = auditMap.get(interaction.id);
+    if (existing) {
+      allAudits.push(existing);
+    } else {
+      allAudits.push({
+        id: interaction.id,
+        categories: interaction.categories,
+        success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
+        speed: DEFAULT_AUDIT_SCORES.speed,
+        weight: DEFAULT_AUDIT_SCORES.weight,
+        contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
+        rationale: "default",
+      });
+    }
+  }
+
+  // Ensure all three categories have necessity judgments
+  const categories: InteractionCategory[] = ["environment", "service", "agent"];
+  const necessityMap = new Map(llmNecessity.map((n) => [n.category, n]));
+  const allNecessity: NecessityJudgment[] = categories.map((cat) => {
+    const existing = necessityMap.get(cat);
+    if (existing) return existing;
+    return {
+      category: cat,
+      score: 1.0,
+      unnecessaryIds: [],
+      rationale: "default",
+    };
+  });
+
+  return { audits: allAudits, necessity: allNecessity };
+}
+
+function parseAudits(raw: unknown, sparseIndex: SparseIndex): InteractionAudit[] {
+  if (!Array.isArray(raw)) return [];
+
+  const interactionMap = new Map(sparseIndex.interactions.map((i) => [i.id, i]));
+  const audits: InteractionAudit[] = [];
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+
+    if (typeof obj.id !== "number") continue;
+
+    const interaction = interactionMap.get(obj.id);
+    if (!interaction) continue;
+
+    audits.push({
+      id: obj.id,
+      categories: interaction.categories,
+      success: clamp01(obj.success),
+      speed: DEFAULT_AUDIT_SCORES.speed, // placeholder — overridden by heuristic
+      weight: clamp01(obj.weight),
+      contextRelevance: clamp01(obj.contextRelevance),
+      rationale: typeof obj.rationale === "string" ? obj.rationale : "",
+    });
+  }
+
+  return audits;
+}
+
+function parseNecessity(raw: unknown): NecessityJudgment[] {
+  if (!Array.isArray(raw)) return [];
+
+  const validCategories = new Set<InteractionCategory>(["environment", "service", "agent"]);
+  const judgments: NecessityJudgment[] = [];
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+
+    if (typeof obj.category !== "string" || !validCategories.has(obj.category as InteractionCategory)) continue;
+
+    const unnecessaryIds = Array.isArray(obj.unnecessaryIds)
+      ? obj.unnecessaryIds.filter((id): id is number => typeof id === "number")
+      : [];
+
+    judgments.push({
+      category: obj.category as InteractionCategory,
+      score: clamp01(obj.score),
+      unnecessaryIds,
+      rationale: typeof obj.rationale === "string" ? obj.rationale : "",
+    });
+  }
+
+  return judgments;
+}
+
+function buildDefaultResult(sparseIndex: SparseIndex): DeepEvalResult {
+  const audits: InteractionAudit[] = sparseIndex.interactions.map((interaction) => ({
+    id: interaction.id,
+    categories: interaction.categories,
+    success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
+    speed: DEFAULT_AUDIT_SCORES.speed,
+    weight: DEFAULT_AUDIT_SCORES.weight,
+    contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
+    rationale: "default",
+  }));
+
+  const categories: InteractionCategory[] = ["environment", "service", "agent"];
+  const necessity: NecessityJudgment[] = categories.map((cat) => ({
+    category: cat,
+    score: 0.8,
+    unnecessaryIds: [],
+    rationale: "default",
+  }));
+
+  return { audits, necessity };
+}
+
+function truncateSparseLines(lines: string[]): string {
+  let totalChars = 0;
+  const included: string[] = [];
+  for (const line of lines) {
+    if (totalChars + line.length > MAX_SPARSE_INDEX_CHARS) {
+      included.push(`... (${lines.length - included.length} more interactions omitted)`);
+      break;
+    }
+    included.push(line);
+    totalChars += line.length;
+  }
+  return included.join("\n");
+}
+
+function clamp01(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0.5;
+  return Math.max(0, Math.min(1, value));
+}

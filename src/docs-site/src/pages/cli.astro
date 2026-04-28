@@ -1,0 +1,144 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="CLI" active="cli">
+  <h1>CLI Reference</h1>
+  <p class="lead">
+    Complete reference for the <code>axis</code> command-line interface. All commands can be run
+    directly or via <code>npx @netlify/axis</code>.
+  </p>
+
+  <h2><code>axis run</code></h2>
+  <div class="cli-block">
+    <div class="cli-command">axis run [options]</div>
+    <div class="cli-desc">Execute scenarios against configured agents.</div>
+    <div class="cli-flags">
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-c, --config &lt;path&gt;</code></span>
+        <span class="cli-flag-desc">Config file (default: <code>axis.config.json</code>).</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-s, --scenario &lt;key&gt;</code></span>
+        <span class="cli-flag-desc">Run a specific scenario by key.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-a, --agent &lt;name&gt;</code></span>
+        <span class="cli-flag-desc">Run with a specific agent only.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--json</code></span>
+        <span class="cli-flag-desc">JSON output to stdout (no live terminal display).</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-v, --verbose</code></span>
+        <span class="cli-flag-desc">Detailed per-step logging.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-o, --output-dir &lt;dir&gt;</code></span>
+        <span class="cli-flag-desc">Also write report files to this directory.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--concurrency &lt;n&gt;</code></span>
+        <span class="cli-flag-desc">Max parallel jobs.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--debug</code></span>
+        <span class="cli-flag-desc">Capture raw agent stdout for debugging.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--no-score</code></span>
+        <span class="cli-flag-desc">Skip scoring (raw results only).</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--refresh-skills</code></span>
+        <span class="cli-flag-desc">Force re-clone remote skills.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--compare-baseline [name]</code></span>
+        <span class="cli-flag-desc">Diff against a baseline after scoring.</span>
+      </div>
+    </div>
+  </div>
+
+  <h2><code>axis reports</code></h2>
+  <div class="cli-block">
+    <div class="cli-command">axis reports [reportId] [scenarioKey] [options]</div>
+    <div class="cli-desc">View past AXIS reports.</div>
+    <div class="cli-flags">
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>[reportId]</code></span>
+        <span class="cli-flag-desc">Report ID or <code>latest</code>. Omit to list all reports.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>[scenarioKey]</code></span>
+        <span class="cli-flag-desc">Drill into a specific scenario detail.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-a, --agent &lt;name...&gt;</code></span>
+        <span class="cli-flag-desc">Filter by agent(s), repeatable.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--json</code></span>
+        <span class="cli-flag-desc">Output as JSON.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--html</code></span>
+        <span class="cli-flag-desc">Open report in browser.</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-n, --limit &lt;count&gt;</code></span>
+        <span class="cli-flag-desc">Max reports to list (default: 10).</span>
+      </div>
+    </div>
+  </div>
+
+  <h2><code>axis baseline</code></h2>
+
+  <div class="cli-block">
+    <div class="cli-command">axis baseline set [name]</div>
+    <div class="cli-desc">Create or update a baseline snapshot from a report.</div>
+    <div class="cli-flags">
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--from &lt;reportId&gt;</code></span>
+        <span class="cli-flag-desc">Use a specific report (default: latest).</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cli-block">
+    <div class="cli-command">axis baseline list</div>
+    <div class="cli-desc">List all saved baselines.</div>
+  </div>
+
+  <div class="cli-block">
+    <div class="cli-command">axis baseline show [name]</div>
+    <div class="cli-desc">Display baseline contents.</div>
+    <div class="cli-flags">
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--json</code></span>
+        <span class="cli-flag-desc">Output as JSON.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cli-block">
+    <div class="cli-command">axis baseline diff [name]</div>
+    <div class="cli-desc">Compare a report against a baseline. Exits with code 1 if regressions are detected.</div>
+    <div class="cli-flags">
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--report &lt;reportId&gt;</code></span>
+        <span class="cli-flag-desc">Specific report to compare (default: latest).</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--json</code></span>
+        <span class="cli-flag-desc">Output as JSON.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cli-block">
+    <div class="cli-command">axis baseline delete [name]</div>
+    <div class="cli-desc">Delete a saved baseline.</div>
+  </div>
+</DocsLayout>

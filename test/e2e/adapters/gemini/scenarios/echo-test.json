@@ -1,0 +1,5 @@
+{
+  "name": "Gemini echo test",
+  "prompt": "Hello from AXIS Gemini adapter",
+  "rubric": "The agent should echo back the prompt text."
+}

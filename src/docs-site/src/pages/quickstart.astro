@@ -1,0 +1,86 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Quick Start" active="quickstart">
+  <h1>Quick Start</h1>
+  <p class="lead">
+    Get AXIS running in your project in a few minutes. This guide walks through creating a config,
+    writing your first scenario, and viewing the results.
+  </p>
+
+  <h2>Prerequisites</h2>
+  <ul>
+    <li>Node.js 18 or later.</li>
+    <li>An API key for at least one supported agent (for example, <code>ANTHROPIC_API_KEY</code> for Claude Code).</li>
+  </ul>
+
+  <h2>1. Create a Config File</h2>
+  <p>
+    Add an <code>axis.config.json</code> to your project root. At minimum, specify where your
+    scenarios live and which agents to run.
+  </p>
+  <pre><code>{`{
+  "scenarios": "./scenarios",
+  "agents": ["claude-code"]
+}`}</code></pre>
+
+  <h2>2. Write a Scenario</h2>
+  <p>
+    Create a <code>scenarios/</code> directory and add your first scenario as a JSON file. Each
+    scenario needs a name, a prompt (the task for the agent), and a rubric (your success criteria).
+  </p>
+  <pre><code>{`{
+  "name": "Create a greeting file",
+  "prompt": "Create a file called hello.txt with the content 'Hello from AXIS'.",
+  "rubric": [
+    { "check": "File hello.txt exists", "weight": 0.5 },
+    { "check": "File contains 'Hello from AXIS'", "weight": 0.5 }
+  ]
+}`}</code></pre>
+  <p>
+    Save this as <code>scenarios/hello-world.json</code>. The filename (without <code>.json</code>)
+    becomes the scenario key used in reports and CLI commands.
+  </p>
+
+  <h2>3. Run It</h2>
+  <pre><code>npx @netlify/axis run</code></pre>
+  <p>
+    AXIS spawns the agent in an isolated workspace, captures the full interaction transcript, scores
+    the result against your rubric, and displays a report in your terminal.
+  </p>
+
+  <h2>4. View the Report</h2>
+  <p>
+    Every run saves a report to <code>.axis/reports/</code>. You can view it again at any time.
+  </p>
+  <pre><code>{`# View the latest report summary
+npx @netlify/axis reports latest
+
+# Open the HTML report in your browser
+npx @netlify/axis reports latest --html
+
+# Get JSON output for scripting
+npx @netlify/axis reports latest --json`}</code></pre>
+
+  <h2>5. Set a Baseline</h2>
+  <p>
+    Once you have a run you are happy with, save it as a baseline. Future runs can diff against it
+    to detect regressions.
+  </p>
+  <pre><code>{`# Save the latest report as a baseline
+npx @netlify/axis baseline set
+
+# Compare future runs automatically
+npx @netlify/axis run --compare-baseline`}</code></pre>
+  <p>
+    The diff command exits with code 1 if any regressions are detected, making it suitable for CI
+    gating.
+  </p>
+
+  <h2>Next Steps</h2>
+  <ul>
+    <li><a href="/scoring">Scoring Framework</a> explains how the four dimensions are calculated and what signals drive each score.</li>
+    <li><a href="/running">Running Tests</a> covers the full config reference, CLI commands, custom adapters, MCP servers, and CI integration.</li>
+  </ul>
+</DocsLayout>

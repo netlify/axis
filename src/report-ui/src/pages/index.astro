@@ -1,0 +1,54 @@
+---
+import "../styles/global.css";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AXIS Report</title>
+  </head>
+  <body>
+    <div id="app">
+      <div class="loading">Loading report&hellip;</div>
+    </div>
+
+    <script is:inline id="axis-data" type="application/json">__AXIS_REPORT_DATA__</script>
+
+    <script>
+      import { renderReport, escapeHtml } from "../scripts/render";
+      import { initInteractions } from "../scripts/interactions";
+      import type { ReportData } from "../scripts/types";
+
+      function boot(data: ReportData) {
+        const app = document.getElementById("app");
+        if (!app) return;
+        app.innerHTML = renderReport(data);
+        document.title = `AXIS Report \u2014 ${escapeHtml(data.reportId)}`;
+        initInteractions();
+      }
+
+      const dataEl = document.getElementById("axis-data");
+      const raw = dataEl?.textContent?.trim();
+
+      if (raw && raw !== "__AXIS_REPORT_DATA__") {
+        // Production: data is embedded
+        try {
+          boot(JSON.parse(raw));
+        } catch (e) {
+          const app = document.getElementById("app");
+          if (app) app.innerHTML = `<div class="error-banner">Failed to parse report data.</div>`;
+        }
+      } else {
+        // Dev mode: fetch mock data
+        fetch("/mock-data.json")
+          .then((r) => r.json())
+          .then((data) => boot(data))
+          .catch((e) => {
+            const app = document.getElementById("app");
+            if (app) app.innerHTML = `<div class="error-banner">Failed to load mock data: ${e.message}</div>`;
+          });
+      }
+    </script>
+  </body>
+</html>
