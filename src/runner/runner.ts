@@ -247,7 +247,7 @@ async function executeJob(
   updateTokens: (index: number, tokens: number, final?: boolean) => void,
   resolvedSkillMap: Map<string, ResolvedSkill>,
   registerCleanup?: (fn: () => void) => void,
-  debug?: boolean,
+  _debug?: boolean,
 ): Promise<JobOutput> {
   const { index, agentName, agentConfig, scenario, axisConfig } = job;
   const label = `${scenario.key} (${agentName})`;
@@ -314,7 +314,7 @@ async function executeJob(
       workingDirectory: workspace,
       env: jobEnv,
       registerCleanup,
-      captureRawOutput: !!debug,
+      captureRawOutput: true,
       mcpServers: axisConfig.mcp_servers,
       resolvedSkills: agentSkills.length > 0 ? agentSkills : undefined,
       onTokenProgress: (tokens) => updateTokens(index, tokens),
