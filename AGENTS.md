@@ -81,20 +81,19 @@ For built-in adapters, register the factory in `src/adapters/registry.ts`. Exter
 
 ## Documentation Policy
 
-All changes to the CLI, programmatic API, scoring system, or configuration schema **must** be reflected in `README.md`. The README is the user-facing documentation and must stay in sync with the implementation.
+User-facing documentation lives in `src/docs-site/` (Astro), published at https://axis-docs.netlify.app. All changes to the CLI, scoring system, or configuration schema **must** be reflected there — the docs site is canonical and must stay in sync with the implementation.
 
-When making changes, update the relevant README section:
+`README.md` is intentionally lean: tagline, quick start, link tree to the docs site, and the programmatic API surface. Don't expand it back into a full reference — update the docs site instead.
 
-| Change Type                         | README Section                        |
-| ----------------------------------- | ------------------------------------- |
-| New/modified CLI flags or commands  | **CLI Reference**                     |
-| New/modified config fields          | **Configuration**                     |
-| New/modified scenario schema fields | **Scenarios**                         |
-| Scoring algorithm changes           | **Scoring**                           |
-| New/modified public exports         | **Programmatic API**                  |
-| Adapter contract changes            | **Agent Adapters**                    |
-| Report format changes               | **Reports**                           |
-| Display/output format changes       | **CLI Reference** or relevant section |
+| Change Type                         | Where to update                                                |
+| ----------------------------------- | -------------------------------------------------------------- |
+| New/modified CLI flags or commands  | `src/docs-site/src/pages/cli.astro`                            |
+| New/modified config fields          | `src/docs-site/src/pages/configuration.astro`                  |
+| New/modified scenario schema fields | `src/docs-site/src/pages/configuration.astro`                  |
+| Scoring algorithm changes           | `src/docs-site/src/pages/scoring.astro`                        |
+| Adapter contract / built-in changes | `src/docs-site/src/pages/running.astro`                        |
+| Report / baseline format changes    | `src/docs-site/src/pages/running.astro` + `cli.astro`          |
+| New/modified public exports         | `README.md` Programmatic API section (kept here, not in docs)  |
 
 ## Build & Test
 
