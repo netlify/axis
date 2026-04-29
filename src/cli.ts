@@ -10,14 +10,14 @@ import { scoreRunResult, buildScoredOutput } from "./scoring/index.js";
 import { writeReportToStore } from "./reports/writer.js";
 import { listReports, readReport, readScenarioResults } from "./reports/reader.js";
 import { setBaseline, readBaseline, listBaselines, deleteBaseline, DEFAULT_BASELINE_NAME } from "./baselines/store.js";
-import { diffBaseline } from "./baselines/diff.js";
+import { compareBaseline } from "./baselines/compare.js";
 import {
   renderReportList,
   renderReportDetail,
   renderScenarioDetail,
   renderBaselineList,
   renderBaselineShow,
-  renderBaselineDiff,
+  renderBaselineComparison,
 } from "./ui/format.js";
 import { formatError } from "./types/output.js";
 import type { Logger, JobState, RunResult, RunOutput } from "./types/output.js";
@@ -399,12 +399,12 @@ function runBaselineComparison(configDir: string, baselineName: string, reportId
       return 1;
     }
 
-    const diff = diffBaseline(baseline, report);
+    const diff = compareBaseline(baseline, report);
 
     if (json) {
       process.stdout.write(JSON.stringify(diff, null, 2) + "\n");
     } else {
-      process.stdout.write(renderBaselineDiff(diff));
+      process.stdout.write(renderBaselineComparison(diff));
     }
 
     return diff.summary.regressed > 0 ? 1 : 0;
@@ -504,8 +504,8 @@ baselineCmd
   });
 
 baselineCmd
-  .command("diff [name]")
-  .description(`Compare the latest (or specific) report against a baseline (default name: "${DEFAULT_BASELINE_NAME}")`)
+  .command("compare [name]")
+  .description(`Compare a report against a baseline (default name: "${DEFAULT_BASELINE_NAME}")`)
   .option("-c, --config <path>", "path to axis.config.json", "axis.config.json")
   .option("--report <reportId>", "compare a specific report instead of latest")
   .option("--json", "output as JSON", false)
@@ -530,12 +530,12 @@ baselineCmd
         process.exit(1);
       }
 
-      const diff = diffBaseline(baseline, report);
+      const diff = compareBaseline(baseline, report);
 
       if (opts.json) {
         process.stdout.write(JSON.stringify(diff, null, 2) + "\n");
       } else {
-        process.stdout.write(renderBaselineDiff(diff));
+        process.stdout.write(renderBaselineComparison(diff));
       }
 
       if (diff.summary.regressed > 0) process.exit(1);

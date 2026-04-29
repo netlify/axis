@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffBaseline } from "../../../src/baselines/diff.js";
+import { compareBaseline } from "../../../src/baselines/compare.js";
 import type { Baseline } from "../../../src/types/baseline.js";
 import type { ReportManifest } from "../../../src/types/report.js";
 import type { CategoryScore } from "../../../src/types/scoring.js";
@@ -68,15 +68,15 @@ function makeReport(overrides: Partial<ReportManifest> = {}): ReportManifest {
   };
 }
 
-describe("baselines/diff", () => {
+describe("baselines/compare", () => {
   it("detects improvement", () => {
-    const diff = diffBaseline(makeBaseline(), makeReport());
+    const result = compareBaseline(makeBaseline(), makeReport());
 
-    expect(diff.entries).toHaveLength(1);
-    expect(diff.entries[0].delta).toBe(7); // 92 - 85
-    expect(diff.summary.improved).toBe(1);
-    expect(diff.summary.regressed).toBe(0);
-    expect(diff.summary.unchanged).toBe(0);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].delta).toBe(7); // 92 - 85
+    expect(result.summary.improved).toBe(1);
+    expect(result.summary.regressed).toBe(0);
+    expect(result.summary.unchanged).toBe(0);
   });
 
   it("detects regression", () => {
@@ -101,11 +101,11 @@ describe("baselines/diff", () => {
       ],
     });
 
-    const diff = diffBaseline(makeBaseline(), report);
+    const result = compareBaseline(makeBaseline(), report);
 
-    expect(diff.entries[0].delta).toBe(-15); // 70 - 85
-    expect(diff.summary.regressed).toBe(1);
-    expect(diff.summary.improved).toBe(0);
+    expect(result.entries[0].delta).toBe(-15); // 70 - 85
+    expect(result.summary.regressed).toBe(1);
+    expect(result.summary.improved).toBe(0);
   });
 
   it("treats delta <=1 as unchanged (noise tolerance)", () => {
@@ -130,12 +130,12 @@ describe("baselines/diff", () => {
       ],
     });
 
-    const diff = diffBaseline(makeBaseline(), report);
+    const result = compareBaseline(makeBaseline(), report);
 
-    expect(diff.entries[0].delta).toBe(1);
-    expect(diff.summary.unchanged).toBe(1);
-    expect(diff.summary.improved).toBe(0);
-    expect(diff.summary.regressed).toBe(0);
+    expect(result.entries[0].delta).toBe(1);
+    expect(result.summary.unchanged).toBe(1);
+    expect(result.summary.improved).toBe(0);
+    expect(result.summary.regressed).toBe(0);
   });
 
   it("counts new scenarios (in report, not baseline)", () => {
@@ -160,10 +160,10 @@ describe("baselines/diff", () => {
       ],
     });
 
-    const diff = diffBaseline(makeBaseline(), report);
+    const result = compareBaseline(makeBaseline(), report);
 
-    expect(diff.entries).toHaveLength(0);
-    expect(diff.summary.newScenarios).toBe(1);
+    expect(result.entries).toHaveLength(0);
+    expect(result.summary.newScenarios).toBe(1);
   });
 
   it("ignores scenarios in baseline but not report (partial runs)", () => {
@@ -199,17 +199,17 @@ describe("baselines/diff", () => {
     });
 
     // Report only has hello-world
-    const diff = diffBaseline(baseline, makeReport());
+    const result = compareBaseline(baseline, makeReport());
 
     // Only hello-world is compared; cms/create-post is ignored
-    expect(diff.entries).toHaveLength(1);
-    expect(diff.entries[0].scenarioKey).toBe("hello-world");
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].scenarioKey).toBe("hello-world");
   });
 
   it("computes per-category deltas", () => {
-    const diff = diffBaseline(makeBaseline(), makeReport());
+    const result = compareBaseline(makeBaseline(), makeReport());
 
-    const cats = diff.entries[0].categories;
+    const cats = result.entries[0].categories;
     expect(cats.goalAchievement).toEqual({ baseline: 80, current: 90, delta: 10 });
     expect(cats.environment).toEqual({ baseline: 90, current: 95, delta: 5 });
     expect(cats.service).toEqual({ baseline: 95, current: 98, delta: 3 });
@@ -231,9 +231,9 @@ describe("baselines/diff", () => {
       ],
     });
 
-    const diff = diffBaseline(makeBaseline(), report);
-    expect(diff.entries).toHaveLength(0);
-    expect(diff.summary.newScenarios).toBe(0);
+    const result = compareBaseline(makeBaseline(), report);
+    expect(result.entries).toHaveLength(0);
+    expect(result.summary.newScenarios).toBe(0);
   });
 
   it("skips failed report results", () => {
@@ -259,8 +259,8 @@ describe("baselines/diff", () => {
       ],
     });
 
-    const diff = diffBaseline(makeBaseline(), report);
-    expect(diff.entries).toHaveLength(0);
+    const result = compareBaseline(makeBaseline(), report);
+    expect(result.entries).toHaveLength(0);
   });
 
   it("handles empty overlap (no matching scenarios)", () => {
@@ -303,12 +303,12 @@ describe("baselines/diff", () => {
       ],
     });
 
-    const diff = diffBaseline(baseline, report);
-    expect(diff.entries).toHaveLength(0);
-    expect(diff.summary.improved).toBe(0);
-    expect(diff.summary.regressed).toBe(0);
-    expect(diff.summary.unchanged).toBe(0);
-    expect(diff.summary.newScenarios).toBe(1);
+    const result = compareBaseline(baseline, report);
+    expect(result.entries).toHaveLength(0);
+    expect(result.summary.improved).toBe(0);
+    expect(result.summary.regressed).toBe(0);
+    expect(result.summary.unchanged).toBe(0);
+    expect(result.summary.newScenarios).toBe(1);
   });
 
   it("treats new agent for existing scenario as new", () => {
@@ -335,8 +335,8 @@ describe("baselines/diff", () => {
       ],
     });
 
-    const diff = diffBaseline(makeBaseline(), report);
-    expect(diff.entries).toHaveLength(0);
-    expect(diff.summary.newScenarios).toBe(1);
+    const result = compareBaseline(makeBaseline(), report);
+    expect(result.entries).toHaveLength(0);
+    expect(result.summary.newScenarios).toBe(1);
   });
 });

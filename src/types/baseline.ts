@@ -22,8 +22,8 @@ export interface Baseline {
   results: BaselineResults;
 }
 
-/** A single row in a baseline diff comparison. */
-export interface BaselineDiffEntry {
+/** A single row in a baseline comparison. */
+export interface BaselineComparisonEntry {
   scenarioKey: string;
   agentName: string;
   baseline: number;
@@ -38,10 +38,10 @@ export interface BaselineDiffEntry {
 }
 
 /** Result of comparing a report against a baseline. */
-export interface BaselineDiff {
+export interface BaselineComparison {
   baselineName: string;
   reportId: string;
-  entries: BaselineDiffEntry[];
+  entries: BaselineComparisonEntry[];
   summary: {
     improved: number;
     regressed: number;

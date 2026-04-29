@@ -1,4 +1,4 @@
-import type { Baseline, BaselineDiff, BaselineDiffEntry } from "../types/baseline.js";
+import type { Baseline, BaselineComparison, BaselineComparisonEntry } from "../types/baseline.js";
 import type { ReportManifest } from "../types/report.js";
 
 /** Noise tolerance: deltas within this range are treated as unchanged. */
@@ -9,8 +9,8 @@ const NOISE_THRESHOLD = 1;
  * Only scenarios×agents present in BOTH baseline and report are compared.
  * Scenarios in report but not baseline are counted as "new" (informational).
  */
-export function diffBaseline(baseline: Baseline, report: ReportManifest): BaselineDiff {
-  const entries: BaselineDiffEntry[] = [];
+export function compareBaseline(baseline: Baseline, report: ReportManifest): BaselineComparison {
+  const entries: BaselineComparisonEntry[] = [];
   const newScenarioKeys = new Set<string>();
 
   for (const result of report.results) {

@@ -68,7 +68,7 @@ const scored = await scoreResults(output);
 console.log(`Average AXIS Result: ${scored.summary.averageAxisScore}`);
 ```
 
-The package also exports `loadConfig`, `discoverScenarios`, `setBaseline`, `diffBaseline`, `createAgentAdapter`, `registerAdapter`, and the underlying scoring primitives (`buildSparseIndex`, `categorizeInteraction`, `normalizeTranscript`). See [`src/index.ts`](./src/index.ts) for the full surface.
+The package also exports `loadConfig`, `discoverScenarios`, `setBaseline`, `compareBaseline`, `createAgentAdapter`, `registerAdapter`, and the underlying scoring primitives (`buildSparseIndex`, `categorizeInteraction`, `normalizeTranscript`). See [`src/index.ts`](./src/index.ts) for the full surface.
 
 ## Roadmap
 

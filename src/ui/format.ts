@@ -2,7 +2,7 @@ import type { RunOutput, RunResult } from "../types/output.js";
 import { isScoredResult } from "../types/output.js";
 import type { CategoryScore, InteractionAudit, ScoreResult, ScoredOutput, ScoredRunResult } from "../types/scoring.js";
 import type { ReportManifest } from "../types/report.js";
-import type { Baseline, BaselineDiff } from "../types/baseline.js";
+import type { Baseline, BaselineComparison } from "../types/baseline.js";
 
 // --- Layout constants ---
 const COL_SCENARIO = 30;
@@ -624,7 +624,7 @@ function deltaIndicator(delta: number): string {
   return `${delta} ▼`;
 }
 
-export function renderBaselineDiff(diff: BaselineDiff): string {
+export function renderBaselineComparison(diff: BaselineComparison): string {
   const lines: string[] = [];
   const sep = "─".repeat(SEP_BASELINE);
 

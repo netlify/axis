@@ -6,12 +6,12 @@ import {
   renderResultDetail,
   renderScenarioDetail,
   renderBaselineList,
-  renderBaselineDiff,
+  renderBaselineComparison,
 } from "../../../src/ui/format.js";
 import type { CategoryScore, ScoreResult } from "../../../src/types/scoring.js";
 import type { RunOutput, RunResult } from "../../../src/types/output.js";
 import type { AgentOutput } from "../../../src/types/agent.js";
-import type { Baseline, BaselineDiff } from "../../../src/types/baseline.js";
+import type { Baseline, BaselineComparison } from "../../../src/types/baseline.js";
 
 // --- friendlyError ---
 
@@ -248,9 +248,9 @@ describe("renderBaselineList", () => {
   });
 });
 
-describe("renderBaselineDiff", () => {
+describe("renderBaselineComparison", () => {
   it("renders improvement with ▲", () => {
-    const diff: BaselineDiff = {
+    const diff: BaselineComparison = {
       baselineName: "main",
       reportId: "r2",
       entries: [
@@ -271,14 +271,14 @@ describe("renderBaselineDiff", () => {
       summary: { improved: 1, regressed: 0, unchanged: 0, newScenarios: 0 },
     };
 
-    const output = renderBaselineDiff(diff);
+    const output = renderBaselineComparison(diff);
     expect(output).toContain("Baseline: main");
     expect(output).toContain("+7 ▲");
     expect(output).toContain("1 improved, 0 regressed, 0 unchanged");
   });
 
   it("renders regression with ▼", () => {
-    const diff: BaselineDiff = {
+    const diff: BaselineComparison = {
       baselineName: "main",
       reportId: "r2",
       entries: [
@@ -299,13 +299,13 @@ describe("renderBaselineDiff", () => {
       summary: { improved: 0, regressed: 1, unchanged: 0, newScenarios: 0 },
     };
 
-    const output = renderBaselineDiff(diff);
+    const output = renderBaselineComparison(diff);
     expect(output).toContain("-15 ▼");
     expect(output).toContain("0 improved, 1 regressed, 0 unchanged");
   });
 
   it("renders unchanged with bare number (no indicator)", () => {
-    const diff: BaselineDiff = {
+    const diff: BaselineComparison = {
       baselineName: "main",
       reportId: "r2",
       entries: [
@@ -326,7 +326,7 @@ describe("renderBaselineDiff", () => {
       summary: { improved: 0, regressed: 0, unchanged: 1, newScenarios: 0 },
     };
 
-    const output = renderBaselineDiff(diff);
+    const output = renderBaselineComparison(diff);
     expect(output).toContain("0 improved, 0 regressed, 1 unchanged");
     // Zero delta should not have a "+" prefix or any direction indicator
     expect(output).not.toContain("+0");
@@ -335,7 +335,7 @@ describe("renderBaselineDiff", () => {
   });
 
   it("shows direction for noise-range deltas (±1) without arrow indicator", () => {
-    const diff: BaselineDiff = {
+    const diff: BaselineComparison = {
       baselineName: "main",
       reportId: "r2",
       entries: [
@@ -356,33 +356,33 @@ describe("renderBaselineDiff", () => {
       summary: { improved: 0, regressed: 0, unchanged: 1, newScenarios: 0 },
     };
 
-    const output = renderBaselineDiff(diff);
+    const output = renderBaselineComparison(diff);
     expect(output).toContain("+1");
     // No arrow — it's within noise tolerance
     expect(output).not.toContain("+1 ▲");
   });
 
   it("shows new scenario count when present", () => {
-    const diff: BaselineDiff = {
+    const diff: BaselineComparison = {
       baselineName: "main",
       reportId: "r2",
       entries: [],
       summary: { improved: 0, regressed: 0, unchanged: 0, newScenarios: 2 },
     };
 
-    const output = renderBaselineDiff(diff);
+    const output = renderBaselineComparison(diff);
     expect(output).toContain("New (not in baseline): 2");
   });
 
   it("hides new scenario line when zero", () => {
-    const diff: BaselineDiff = {
+    const diff: BaselineComparison = {
       baselineName: "main",
       reportId: "r2",
       entries: [],
       summary: { improved: 0, regressed: 0, unchanged: 0, newScenarios: 0 },
     };
 
-    const output = renderBaselineDiff(diff);
+    const output = renderBaselineComparison(diff);
     expect(output).not.toContain("New (not in baseline)");
   });
 });

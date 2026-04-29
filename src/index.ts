@@ -31,7 +31,7 @@ export {
   readBaseline,
   listBaselines,
   deleteBaseline,
-  diffBaseline,
+  compareBaseline,
   DEFAULT_BASELINE_NAME,
 } from "./baselines/index.js";
 export * from "./types/index.js";
