@@ -344,6 +344,7 @@ async function executeJob(
         rubric: scenario.rubric,
         agentConfig,
         output,
+        workingDirectory: workspace,
       },
       cleanup,
     };

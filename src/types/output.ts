@@ -20,6 +20,8 @@ export interface BaseRunResult {
   rubric: string | RubricCriterion[];
   agentConfig: AgentConfig;
   output: AgentOutput;
+  /** Path to the agent's workspace directory (available during scoring, before cleanup). */
+  workingDirectory?: string;
 }
 
 export interface RunResult extends BaseRunResult {}

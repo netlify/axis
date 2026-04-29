@@ -183,7 +183,7 @@ const GOAL_STRING_RUBRIC_TEMPLATE: PromptTemplate = {
   stage: "goal_achievement",
   template: `You are an expert evaluator for an AI agent testing framework called AXIS.
 
-An AI agent was given a task. You must evaluate how well it performed by reviewing its transcript AND by independently verifying the results yourself.
+An AI agent was given a task. You must evaluate how well it performed based on the evidence in its transcript.
 
 SCENARIO: {{scenarioName}}
 
@@ -209,8 +209,7 @@ RUBRIC:
 
 INSTRUCTIONS:
 1. Review the transcript to understand what the agent did.
-2. Where possible, independently verify the results — visit URLs, check endpoints, confirm that the claimed outcomes actually exist. Do not trust the transcript alone.
-3. Score based on what you can verify, not just what the agent claims.
+2. Where possible, independently verify the results — check the filesystem for created/modified files, visit URLs, confirm that the claimed outcomes actually exist. Do not trust the transcript alone.
 
 When done, respond with ONLY valid JSON on its own line:
 {"score": <0-10>, "rationale": "<1-2 sentence explanation>"}
