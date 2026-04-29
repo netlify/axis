@@ -26,7 +26,6 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: write
       pull-requests: write
     needs: create-release
@@ -49,7 +48,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # TODO: re-enable `--provenance` (and `id-token: write` permission above) once the repo is public.
+      # npm provenance verification rejects private source repos.
       - name: Publish package
-        run: npm publish --provenance --access public
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
