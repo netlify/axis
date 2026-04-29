@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/netlify/axis/compare/v1.1.2...v1.1.3) (2026-04-29)
+
+
+### Bug Fixes
+
+* improve scoring concerns ([b8f2a8d](https://github.com/netlify/axis/commit/b8f2a8d424978daee6b44e901edaf6183515c498))
+
 ## [1.1.2](https://github.com/netlify/axis/compare/v1.1.1...v1.1.2) (2026-04-29)
 
 
