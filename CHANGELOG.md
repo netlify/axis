@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/netlify/axis/compare/v1.1.0...v1.1.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* release-please is stuck ([cf0e7f5](https://github.com/netlify/axis/commit/cf0e7f5ddbb9d0c7a2a2e68764dbee8b3ec252fa))
+
 ## [1.1.0](https://github.com/netlify/axis/compare/v1.0.0...v1.1.0) (2026-04-29)
 
 
