@@ -76,10 +76,8 @@ Delivered: scenario runner, four-dimension scoring pipeline, baselines with regr
 
 Planned:
 
+- **Historical trending** — score regression detection over time
+- **AXIS Badge** — embeddable score badge for READMEs
 - **Configurable judge** — separate adapter/model for scoring, independent of the agent under test
 - **Score thresholds** — CI gating with configurable pass/fail thresholds
 - **Human interruption detection** — penalize agent requests for human intervention
-- **Report cleanup** — `axis reports prune` for managing disk usage
-- **Markdown report output** — `axis reports <id> --format md` for PR/doc embedding
-- **Historical trending** — score regression detection over time
-- **AXIS Badge** — embeddable score badge for READMEs
