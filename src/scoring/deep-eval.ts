@@ -15,6 +15,7 @@ import type {
 } from "../types/scoring.js";
 import { DEFAULT_AUDIT_SCORES } from "./category-score.js";
 import { parseJsonFromText } from "./parse-json.js";
+import { getPromptTemplates, interpolate } from "./prompt-templates.js";
 
 /** Max characters of full content to include per interaction. */
 const MAX_CONTENT_PER_INTERACTION = 3_000;
@@ -134,58 +135,21 @@ ${patternsText ? `\nPATTERNS:\n${patternsText}` : ""}
 `;
   }
 
-  return `You are an expert evaluator for AXIS, an AI agent testing framework.
+  const { deep_eval } = getPromptTemplates();
 
-You are performing a comprehensive evaluation of ALL interactions from an agent execution.
-
-SCENARIO: ${result.scenarioName}
-
-TASK GIVEN TO AGENT:
-${result.prompt}
-${triageSection}
-COMPLETE SPARSE INDEX (${stats.totalInteractions} interactions):
-${sparseLines}
-
-STATS:
-- Environment interactions: ${stats.byCategory.environment}
-- Service interactions: ${stats.byCategory.service}
-- Agent interactions: ${stats.byCategory.agent}
-- Errors: ${stats.totalErrors}
-- Total duration: ${stats.totalDurationMs}ms
-
-FULL INTERACTION CONTENT:
-${interactionContent}
-
-NOTE: Content shown above may be truncated for evaluation purposes. This does NOT mean the agent's actual tool results were truncated — evaluate based on the quality and structure of what is shown, not on apparent truncation boundaries.
-
-EVALUATION DIMENSIONS (score each 0.0 to 1.0):
-- success: Did the interaction complete without errors? Were the results correct and usable? Evaluate based on the actual content returned, not assumptions about what a "complete" result should look like. For service calls (API requests, web fetches), if the call returned structured, usable content and the agent used it successfully, score success high — do not speculate about content that might be missing or hypothesize about JS-gated pages or truncation.
-- weight: Was the tool invocation right-sized for the operation? Evaluate whether the agent sent an appropriate amount of data to the tool and received a proportionate response. For environment tools (file writes, edits, shell commands), judge the tool operation — not the semantic quality of the content the agent chose to write. A 2KB file write is right-sized if the agent intended to write 2KB of content. For service calls, if the call returned the data the agent needed, it is right-sized — do not penalize because a page returned fewer bytes than expected. (1.0 = right-sized, 0.3 = bloated/wasteful)
-- contextRelevance: Was the tool's output relevant and usable for the task? If the tool succeeded and the agent used the output to make progress, score 1.0. Only reduce this score if the output was genuinely irrelevant noise that the agent could not use. Do NOT reduce this score for content quality judgments (e.g., whether a summary was condensed enough, whether fetched content was comprehensive enough) — those are evaluated by goal achievement, not here. Agent-internal operations (tool discovery, planning) are necessary infrastructure — score based on whether they were needed. (1.0 = all useful/necessary, 0.0 = all noise)
-
-For each CATEGORY present, also evaluate necessity:
-- necessity (0.0 to 1.0): Were the interactions that the agent performed in this category necessary? Evaluate only what the agent actually did — do not penalize for hypothetical steps it could have taken. 1.0 = all interactions were necessary, 0.0 = all were unnecessary.
-- List any interaction IDs that were unnecessary.
-
-CONTEXT FOR EVALUATION:
-- Tool discovery (e.g., ToolSearch, ListTools) and agent configuration reads are required infrastructure — do not flag as unnecessary unless genuinely redundant (same query repeated).
-- Byte counts in sparse lines show total I/O transferred, not file content size. Small results are normal for write/edit confirmations.
-- If a service call (API request, web fetch) returned structured, usable content and the agent used it to complete the task, do not flag it for concerns about hypothetical missing content or page size.
-
-Respond with ONLY valid JSON:
-{
-  "audits": [
-    {"id": 1, "category": "environment", "success": 0.9, "weight": 0.8, "contextRelevance": 0.6, "rationale": "brief explanation"},
-    ...
-  ],
-  "necessity": [
-    {"category": "environment", "score": 0.85, "unnecessaryIds": [4], "rationale": "brief explanation"},
-    {"category": "service", "score": 0.7, "unnecessaryIds": [5, 6], "rationale": "brief explanation"},
-    {"category": "agent", "score": 0.95, "unnecessaryIds": [], "rationale": "brief explanation"}
-  ]
-}
-
-Include an audit for EVERY interaction listed above.`;
+  return interpolate(deep_eval.template, {
+    scenarioName: result.scenarioName,
+    prompt: result.prompt,
+    triageSection,
+    totalInteractions: stats.totalInteractions,
+    sparseLines,
+    envInteractions: stats.byCategory.environment,
+    svcInteractions: stats.byCategory.service,
+    agentInteractions: stats.byCategory.agent,
+    totalErrors: stats.totalErrors,
+    totalDurationMs: stats.totalDurationMs,
+    interactionContent,
+  });
 }
 
 /**

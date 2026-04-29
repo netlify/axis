@@ -7,6 +7,7 @@ import type { RubricCriterion } from "../types/scenario.js";
 import type { RunResult } from "../types/output.js";
 import type { GoalAchievementScore, CriterionGrade } from "../types/scoring.js";
 import { parseJsonFromText } from "./parse-json.js";
+import { getPromptTemplates, interpolate } from "./prompt-templates.js";
 
 export async function scoreGoalAchievement(
   result: RunResult,
@@ -117,41 +118,15 @@ function buildStringRubricPrompt(
   finalResult: string | null,
   rubric: string,
 ): string {
-  return `You are an expert evaluator for an AI agent testing framework called AXIS.
+  const { goal_string_rubric } = getPromptTemplates();
 
-An AI agent was given a task. You must evaluate how well it performed by reviewing its transcript AND by independently verifying the results yourself.
-
-SCENARIO: ${result.scenarioName}
-
-TASK GIVEN TO AGENT:
-${getOriginalPrompt(result)}
-
----
-
-AGENT TRANSCRIPT (condensed):
-${formatTranscriptForJudge(entries)}
-
----
-
-AGENT'S FINAL RESULT:
-${finalResult ?? "(no final result)"}
-
----
-
-RUBRIC:
-${rubric}
-
----
-
-INSTRUCTIONS:
-1. Review the transcript to understand what the agent did.
-2. Where possible, independently verify the results — visit URLs, check endpoints, confirm that the claimed outcomes actually exist. Do not trust the transcript alone.
-3. Score based on what you can verify, not just what the agent claims.
-
-When done, respond with ONLY valid JSON on its own line:
-{"score": <0-10>, "rationale": "<1-2 sentence explanation>"}
-
-Score guide: 0 = not met at all, 5 = partially met, 10 = fully met.`;
+  return interpolate(goal_string_rubric.template, {
+    scenarioName: result.scenarioName,
+    prompt: getOriginalPrompt(result),
+    transcript: formatTranscriptForJudge(entries),
+    finalResult: finalResult ?? "(no final result)",
+    rubric,
+  });
 }
 
 function buildArrayRubricPrompt(
@@ -161,42 +136,15 @@ function buildArrayRubricPrompt(
   rubric: RubricCriterion[],
 ): string {
   const rubricText = rubric.map((r, i) => `${i}. "${r.check}" (weight: ${r.weight!})`).join("\n");
+  const { goal_array_rubric } = getPromptTemplates();
 
-  return `You are an expert evaluator for an AI agent testing framework called AXIS.
-
-An AI agent was given a task. You must evaluate how well it performed by reviewing its transcript AND by independently verifying the results yourself.
-
-SCENARIO: ${result.scenarioName}
-
-TASK GIVEN TO AGENT:
-${getOriginalPrompt(result)}
-
----
-
-AGENT TRANSCRIPT (condensed):
-${formatTranscriptForJudge(entries)}
-
----
-
-AGENT'S FINAL RESULT:
-${finalResult ?? "(no final result)"}
-
----
-
-RUBRIC CRITERIA:
-${rubricText}
-
----
-
-INSTRUCTIONS:
-1. Review the transcript to understand what the agent did.
-2. Where possible, independently verify the results — visit URLs, check endpoints, confirm that the claimed outcomes actually exist. Do not trust the transcript alone.
-3. For each criterion, provide a score from 0 to 10 and a brief rationale.
-
-Score guide: 0 = not met at all, 5 = partially met, 10 = fully met.
-
-When done, respond with ONLY valid JSON on its own line:
-{"grades": [{"criterion_index": 0, "score": <0-10>, "rationale": "<string>"}, ...]}`;
+  return interpolate(goal_array_rubric.template, {
+    scenarioName: result.scenarioName,
+    prompt: getOriginalPrompt(result),
+    transcript: formatTranscriptForJudge(entries),
+    finalResult: finalResult ?? "(no final result)",
+    rubricText,
+  });
 }
 
 function getOriginalPrompt(result: RunResult): string {

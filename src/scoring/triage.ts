@@ -11,6 +11,7 @@ import type {
   TriageResult,
 } from "../types/scoring.js";
 import { parseJsonFromText } from "./parse-json.js";
+import { getPromptTemplates, interpolate } from "./prompt-templates.js";
 
 /** Maximum interactions to flag for deep evaluation. */
 const MAX_FLAGS = 30;
@@ -33,66 +34,20 @@ export async function runTriage(result: RunResult, sparseIndex: SparseIndex): Pr
 
 function buildTriagePrompt(result: RunResult, sparseIndex: SparseIndex): string {
   const { stats } = sparseIndex;
+  const { triage } = getPromptTemplates();
 
-  return `You are an expert evaluator for AXIS, an AI agent testing framework.
-
-You are analyzing an agent's execution trace to identify areas that need deeper evaluation.
-
-SCENARIO: ${result.scenarioName}
-
-TASK GIVEN TO AGENT:
-${result.prompt}
-
-SPARSE INDEX (${stats.totalInteractions} interactions):
-${truncateSparseIndex(sparseIndex.lines)}
-
-STATS:
-- Environment interactions: ${stats.byCategory.environment}
-- Service interactions: ${stats.byCategory.service}
-- Agent interactions: ${stats.byCategory.agent}
-- Errors: ${stats.totalErrors}
-- Total duration: ${stats.totalDurationMs}ms
-
-CONTEXT FOR EVALUATION:
-- Tool discovery (e.g., ToolSearch, ListTools) and agent configuration reads are required infrastructure — do not flag as unnecessary unless genuinely redundant (same query repeated).
-- Byte counts in sparse lines show total I/O transferred, not file content size. Small results are normal for write/edit confirmations.
-- Tool durations include system overhead (SDK roundtrips, sandbox setup, process spawning) — do not flag interactions solely for being slow unless the agent caused the slowness through redundant or unnecessary work.
-- If a service call (API request, web fetch) returned structured, usable content and the agent used it to complete the task, do not flag it for concerns about hypothetical missing content or page size.
-
-INSTRUCTIONS:
-Analyze this agent execution trace and identify areas of concern.
-
-For each interaction you want to flag for deep evaluation, specify:
-1. The interaction ID (#N)
-2. Why it needs deeper review
-3. Which dimensions to evaluate: success, speed, weight, relevance, necessity
-
-Also identify any patterns across interactions:
-- Repeated failures or retries
-- Redundant service calls (same endpoint called multiple times)
-- Excessive environment operations for simple tasks
-- Wasted agent reasoning that didn't lead to progress
-- Unnecessary interactions given prior context
-
-Respond with ONLY valid JSON:
-{
-  "flaggedInteractions": [
-    {"id": 1, "reason": "description of concern", "concerns": ["success", "relevance"]},
-    ...
-  ],
-  "patterns": [
-    {"description": "pattern description", "interactionIds": [1, 2, 3], "severity": "high"},
-    ...
-  ],
-  "categoryNotes": {
-    "environment": "summary of environment interaction quality",
-    "service": "summary of service interaction quality",
-    "agent": "summary of agent reasoning quality"
-  }
-}
-
-Flag at most ${MAX_FLAGS} interactions. Focus on the most significant issues.
-Non-flagged interactions will receive default passing scores.`;
+  return interpolate(triage.template, {
+    scenarioName: result.scenarioName,
+    prompt: result.prompt,
+    totalInteractions: stats.totalInteractions,
+    sparseLines: truncateSparseIndex(sparseIndex.lines),
+    envInteractions: stats.byCategory.environment,
+    svcInteractions: stats.byCategory.service,
+    agentInteractions: stats.byCategory.agent,
+    totalErrors: stats.totalErrors,
+    totalDurationMs: stats.totalDurationMs,
+    maxFlags: MAX_FLAGS,
+  });
 }
 
 async function callJudge(runResult: RunResult, prompt: string): Promise<string> {
