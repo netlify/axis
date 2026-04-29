@@ -8,28 +8,34 @@ import type {
 
 // --- Dimension weights per category ---
 
-/** How each audit dimension contributes to a category's raw score. */
+/**
+ * How each audit dimension contributes to a category's raw score.
+ *
+ * Environment and service evaluate EXECUTION QUALITY only (success + speed).
+ * The agent's choice of what to invoke, with what parameters, and whether
+ * it was necessary is evaluated under the agent dimension.
+ */
 export const CATEGORY_DIMENSION_WEIGHTS: Record<InteractionCategory, Record<string, number>> = {
   environment: {
-    success: 0.35, // env tool failures are critical
-    speed: 0.15, // speed matters less for env
-    weight: 0.15, // output size is somewhat relevant
-    relevance: 0.15, // was the output useful
-    necessity: 0.2, // did we need to do this at all
+    success: 0.7, // did the tool execute correctly?
+    speed: 0.3, // was the tool responsive?
+    weight: 0, // agent's decision — evaluated under agent
+    relevance: 0, // agent's decision — evaluated under agent
+    necessity: 0, // agent's decision — evaluated under agent
   },
   service: {
-    success: 0.25, // service failures matter
-    speed: 0.15, // API latency
-    weight: 0.2, // did we fetch too much / too little
-    relevance: 0.2, // was the API data actionable
-    necessity: 0.2, // were these calls needed
+    success: 0.7, // did the API call succeed?
+    speed: 0.3, // was the service responsive?
+    weight: 0, // agent's decision — evaluated under agent
+    relevance: 0, // agent's decision — evaluated under agent
+    necessity: 0, // agent's decision — evaluated under agent
   },
   agent: {
-    success: 0.15, // agent rarely "fails" explicitly
-    speed: 0.15, // thinking time
-    weight: 0.2, // was the reasoning concise
-    relevance: 0.25, // was the reasoning productive
-    necessity: 0.25, // was the reasoning needed
+    success: 0.1, // was reasoning productive?
+    speed: 0.1, // thinking speed
+    weight: 0.2, // were invocations right-sized?
+    relevance: 0.2, // was retrieved info used effectively?
+    necessity: 0.4, // were ALL interactions necessary? (spans all categories)
   },
 };
 

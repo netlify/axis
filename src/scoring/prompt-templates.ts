@@ -60,40 +60,49 @@ export function interpolate(template: string, vars: Record<string, string | numb
 // Template definitions
 // ---------------------------------------------------------------------------
 
-/** Per-category evaluation guidance for focused judge prompts. */
+/**
+ * Per-category evaluation guidance for focused judge prompts.
+ *
+ * Environment and service focus on EXECUTION QUALITY — did the tools/services
+ * work correctly? The agent dimension evaluates DECISION QUALITY — did the
+ * agent make good choices about what to invoke and how?
+ */
 export const CATEGORY_GUIDANCE: Record<string, string> = {
   environment: `You are evaluating ENVIRONMENT interactions — file system operations, shell commands, code edits, and local workspace manipulation.
 
+Focus on EXECUTION QUALITY — did the tools work correctly? The agent's choice of what tools to invoke and with what parameters is evaluated separately under the agent dimension.
+
 Key considerations:
-- File reads/writes: Was the operation necessary? Was it right-sized (not reading entire files when a section would suffice)?
-- Shell commands: Did they succeed? Were they idempotent or did they cause side effects?
-- Code edits: Were they precise (targeted edits vs. rewriting entire files)?
-- Error recovery: Did the agent handle file-not-found, permission errors, or failed commands well?
-- Workspace hygiene: Did the agent clean up temp files, avoid polluting the workspace?`,
+- Execution success: Did operations complete without errors? Were results correct?
+- Error handling: Were file-not-found, permission errors, or failed commands surfaced clearly?
+- Result correctness: Did tools return valid, usable results for what was requested?
+- System reliability: Were there unexpected failures, crashes, or timeouts?`,
 
   service: `You are evaluating SERVICE interactions — API calls, web fetches, external service requests, and network operations.
 
-Key considerations:
-- API calls: Were they well-formed? Did the agent handle rate limits, auth errors, and timeouts?
-- Web fetches: Did the agent fetch relevant pages? Were redundant fetches avoided?
-- Data handling: Was response data used effectively or was it fetched and ignored?
-- Error recovery: Did the agent retry appropriately on transient failures?
-- Efficiency: Were batch operations used when available instead of multiple individual calls?`,
+Focus on EXECUTION QUALITY — did the services respond correctly? The agent's choice of what APIs to call is evaluated separately under the agent dimension.
 
-  agent: `You are evaluating AGENT interactions — the agent's own reasoning, planning, tool discovery, and communication.
+Key considerations:
+- API success: Did calls return valid responses?
+- Error handling: Were rate limits, auth errors, and timeouts surfaced clearly?
+- Response quality: Did services return correct, complete data for what was requested?
+- Reliability: Were there unexpected service failures or degraded responses?`,
+
+  agent: `You are evaluating AGENT interactions — the agent's reasoning, planning, and decision-making quality.
 
 Key considerations:
 - Planning: Did the agent form a clear plan before acting, or did it thrash?
-- Tool discovery: Was tool/capability lookup necessary, or was it redundant exploration?
-- Reasoning quality: Was the agent's reasoning focused and productive?
-- Human interaction: Were questions to the user clear and necessary, or could the agent have proceeded independently?
-- Self-correction: When the agent detected errors, did it adjust its approach efficiently?`,
+- Tool selection: Did the agent choose appropriate tools and parameters? Were invocations right-sized (not reading entire files when sections suffice, not using verbose flags unnecessarily)?
+- Necessity: Were ALL interactions across ALL categories necessary? Did the agent invoke tools it didn't need?
+- Information use: Did the agent effectively use the information it retrieved?
+- Self-correction: When the agent detected errors, did it adjust efficiently?
+- Tool discovery: Was tool/capability lookup necessary, or redundant exploration?`,
 };
 
 const CATEGORY_EVAL_TEMPLATE: PromptTemplate = {
   name: "category_eval",
   description:
-    "Per-category evaluation of interactions for success, weight, contextRelevance, necessity, and patterns. Run once per category (environment, service, agent) in parallel.",
+    "Per-category evaluation of interactions. Environment/service evaluate execution quality (success only). Agent evaluates decision quality (success, weight, contextRelevance, necessity). Run once per category in parallel.",
   stage: "deep_eval",
   template: `You are an expert evaluator for AXIS, an AI agent testing framework.
 
@@ -119,13 +128,9 @@ RAW DATA FILES (for additional detail if needed):
 NOTE: Content shown above may be truncated for evaluation purposes. This does NOT mean the agent's actual tool results were truncated — evaluate based on the quality and structure of what is shown, not on apparent truncation boundaries.
 
 EVALUATION DIMENSIONS (score each 0.0 to 1.0):
-- success: Did the interaction complete without errors? Were the results correct and usable? Evaluate based on the actual content returned, not assumptions about what a "complete" result should look like.
-- weight: Was the tool invocation right-sized for the operation? Evaluate whether the agent sent an appropriate amount of data to the tool and received a proportionate response. (1.0 = right-sized, 0.3 = bloated/wasteful)
-- contextRelevance: Was the tool's output relevant and usable for the task? If the tool succeeded and the agent used the output to make progress, score 1.0. Only reduce this score if the output was genuinely irrelevant noise that the agent could not use. (1.0 = all useful/necessary, 0.0 = all noise)
+{{evaluationDimensions}}
 
-Also evaluate NECESSITY for the {{categoryName}} category as a whole:
-- necessity (0.0 to 1.0): Were the {{categoryName}} interactions necessary for the task? Evaluate only what the agent actually did — do not penalize for hypothetical steps it could have taken. 1.0 = all interactions were necessary, 0.0 = all were unnecessary.
-- List any interaction IDs that were unnecessary.
+{{necessitySection}}
 
 Identify any patterns within {{categoryName}} interactions:
 - Repeated failures or retries
@@ -137,24 +142,17 @@ CONTEXT FOR EVALUATION:
 - Tool discovery (e.g., ToolSearch, ListTools) and agent configuration reads are required infrastructure — do not flag as unnecessary unless genuinely redundant (same query repeated).
 - Byte counts in sparse lines show total I/O transferred, not file content size. Small results are normal for write/edit confirmations.
 
-Respond with ONLY valid JSON:
-{
-  "audits": [
-    {"id": 1, "success": 0.9, "weight": 0.8, "contextRelevance": 0.6, "rationale": "brief explanation"},
-    ...
-  ],
-  "necessity": {"score": 0.85, "unnecessaryIds": [4], "rationale": "brief explanation"},
-  "patterns": [
-    {"description": "pattern description", "interactionIds": [1, 2, 3], "severity": "high"},
-    ...
-  ]
-}
+{{responseFormat}}
 
 Include an audit for EVERY {{categoryName}} interaction listed in the details above.`,
   variables: [
     { name: "scenarioName", description: "Name of the test scenario", type: "string" },
     { name: "prompt", description: "The original task prompt given to the agent", type: "text" },
-    { name: "categoryName", description: "The category being evaluated (environment, service, or agent)", type: "string" },
+    {
+      name: "categoryName",
+      description: "The category being evaluated (environment, service, or agent)",
+      type: "string",
+    },
     { name: "totalInteractions", description: "Total number of interactions across all categories", type: "number" },
     {
       name: "categoryInteractionCount",
@@ -173,6 +171,22 @@ Include an audit for EVERY {{categoryName}} interaction listed in the details ab
       description: "Path to the report directory containing raw data files",
       type: "string",
       optional: true,
+    },
+    {
+      name: "evaluationDimensions",
+      description: "Per-category dimension descriptions (success-only for env/service, all for agent)",
+      type: "text",
+    },
+    {
+      name: "necessitySection",
+      description: "Necessity evaluation instructions (present for agent, empty for env/service)",
+      type: "text",
+      optional: true,
+    },
+    {
+      name: "responseFormat",
+      description: "Expected JSON response format (varies by category)",
+      type: "text",
     },
   ],
 };

@@ -158,9 +158,7 @@ function buildCategoryEvalPrompt(
   const interactionContent = buildCategoryInteractionContent(categoryInteractions, normalized);
 
   // Build data dir reference
-  const dataDir = reportDir
-    ? `${reportDir}/scenarios/${result.scenarioKey}`
-    : "(not available)";
+  const dataDir = reportDir ? `${reportDir}/scenarios/${result.scenarioKey}` : "(not available)";
 
   const { category_eval } = getPromptTemplates();
 
@@ -174,7 +172,78 @@ function buildCategoryEvalPrompt(
     categoryGuidance: CATEGORY_GUIDANCE[category] ?? "",
     interactionContent,
     dataDir,
+    evaluationDimensions: getEvaluationDimensions(category),
+    necessitySection: getNecessitySection(category),
+    responseFormat: getResponseFormat(category),
   });
+}
+
+// --- Per-category prompt content ---
+
+/**
+ * Env/service: only evaluate execution success.
+ * Agent: evaluate success + decision quality (weight, contextRelevance).
+ */
+function getEvaluationDimensions(category: InteractionCategory): string {
+  if (category === "agent") {
+    return `- success: Was the reasoning productive and focused? Did it lead to progress on the task?
+- weight: Were tool invocations right-sized for the operation? Evaluate whether the agent sent an appropriate amount of data to the tool and received a proportionate response. (1.0 = right-sized, 0.3 = bloated/wasteful)
+- contextRelevance: Was the tool's output relevant and usable for the task? If the tool succeeded and the agent used the output to make progress, score 1.0. Only reduce this score if the output was genuinely irrelevant noise that the agent could not use. (1.0 = all useful/necessary, 0.0 = all noise)`;
+  }
+
+  // Environment and service: execution quality only
+  return `- success: Did the interaction complete without errors? Were the results correct and usable? Evaluate based on the actual content returned, not assumptions about what a "complete" result should look like.
+
+NOTE: Only evaluate whether the tool/service EXECUTED correctly. The agent's choice of what to invoke and with what parameters is evaluated separately under the agent dimension.`;
+}
+
+/**
+ * Agent: necessity spans ALL categories (the agent decides what to invoke).
+ * Env/service: no necessity evaluation (they just execute what they're told).
+ */
+function getNecessitySection(category: InteractionCategory): string {
+  if (category === "agent") {
+    return `Also evaluate NECESSITY for the agent's overall execution across ALL categories:
+- necessity (0.0 to 1.0): Were the agent's interactions necessary for the task? Consider interactions across ALL categories (environment, service, agent) — the agent is responsible for deciding what tools to invoke. Evaluate only what the agent actually did — do not penalize for hypothetical steps it could have taken. 1.0 = all interactions were necessary, 0.0 = all were unnecessary.
+- List any interaction IDs (from any category) that were unnecessary.`;
+  }
+
+  return "";
+}
+
+/**
+ * Build the expected JSON response format based on category.
+ * Env/service: audits with success only, no necessity.
+ * Agent: audits with full dimensions + necessity.
+ */
+function getResponseFormat(category: InteractionCategory): string {
+  if (category === "agent") {
+    return `Respond with ONLY valid JSON:
+{
+  "audits": [
+    {"id": 1, "success": 0.9, "weight": 0.8, "contextRelevance": 0.6, "rationale": "brief explanation"},
+    ...
+  ],
+  "necessity": {"score": 0.85, "unnecessaryIds": [4], "rationale": "brief explanation"},
+  "patterns": [
+    {"description": "pattern description", "interactionIds": [1, 2, 3], "severity": "high"},
+    ...
+  ]
+}`;
+  }
+
+  // Environment and service: success-only audits, no necessity
+  return `Respond with ONLY valid JSON:
+{
+  "audits": [
+    {"id": 1, "success": 0.9, "rationale": "brief explanation"},
+    ...
+  ],
+  "patterns": [
+    {"description": "pattern description", "interactionIds": [1, 2, 3], "severity": "high"},
+    ...
+  ]
+}`;
 }
 
 /**
@@ -472,8 +541,10 @@ function parseCategoryAudits(
       categories: interaction.categories,
       success: clamp01(obj.success),
       speed: DEFAULT_AUDIT_SCORES.speed, // placeholder — overridden by heuristic
-      weight: clamp01(obj.weight),
-      contextRelevance: clamp01(obj.contextRelevance),
+      // weight/contextRelevance may be absent for env/service (success-only responses)
+      weight: typeof obj.weight === "number" ? clamp01(obj.weight) : DEFAULT_AUDIT_SCORES.weight,
+      contextRelevance:
+        typeof obj.contextRelevance === "number" ? clamp01(obj.contextRelevance) : DEFAULT_AUDIT_SCORES.contextRelevance,
       rationale: typeof obj.rationale === "string" ? obj.rationale : "",
     });
   }

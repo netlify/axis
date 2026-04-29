@@ -94,9 +94,10 @@ describe("template content regression", () => {
     expect(t).toContain("COMPLETE SPARSE INDEX");
     expect(t).toContain("INTERACTION DETAILS");
     expect(t).toContain("EVALUATION DIMENSIONS");
-    expect(t).toContain("Respond with ONLY valid JSON:");
+    expect(t).toContain("{{evaluationDimensions}}");
+    expect(t).toContain("{{necessitySection}}");
+    expect(t).toContain("{{responseFormat}}");
     expect(t).toContain("Include an audit for EVERY");
-    expect(t).toContain('"patterns"');
     expect(t).toContain("CATEGORY GUIDANCE");
     expect(t).toContain("{{categoryName}}");
   });
@@ -120,7 +121,7 @@ describe("template content regression", () => {
     expect(t).toContain('"grades"');
   });
 
-  it("category_eval template can be interpolated with representative values", () => {
+  it("category_eval template can be interpolated with representative values (env)", () => {
     const result = interpolate(templates.category_eval.template, {
       scenarioName: "Eval Scenario",
       prompt: "Build a site",
@@ -131,10 +132,34 @@ describe("template content regression", () => {
       categoryGuidance: "Evaluate file ops and shell commands",
       interactionContent: "---\n#1 | Category: environment\ncontent\n---",
       dataDir: "/tmp/axis/reports/2025-01-01/scenarios/test/agent",
+      evaluationDimensions: "- success: Did the operation complete without errors?",
+      necessitySection: "",
+      responseFormat: 'Respond with ONLY valid JSON:\n{"audits": [...], "patterns": [...]}',
     });
     expect(result).toContain("SCENARIO: Eval Scenario");
     expect(result).toContain("Build a site");
     expect(result).toContain("environment");
+    expect(result).not.toContain("{{");
+  });
+
+  it("category_eval template can be interpolated with representative values (agent)", () => {
+    const result = interpolate(templates.category_eval.template, {
+      scenarioName: "Eval Scenario",
+      prompt: "Build a site",
+      categoryName: "agent",
+      totalInteractions: 5,
+      categoryInteractionCount: 3,
+      sparseLines: "#1 agent Assistant ...",
+      categoryGuidance: "Evaluate reasoning and planning",
+      interactionContent: "---\n#1 | Category: agent\ncontent\n---",
+      dataDir: "/tmp/axis/reports/2025-01-01/scenarios/test/agent",
+      evaluationDimensions: "- success: ...\n- weight: ...\n- contextRelevance: ...",
+      necessitySection: "Also evaluate NECESSITY for the agent's overall execution...",
+      responseFormat: 'Respond with ONLY valid JSON:\n{"audits": [...], "necessity": {...}, "patterns": [...]}',
+    });
+    expect(result).toContain("SCENARIO: Eval Scenario");
+    expect(result).toContain("agent");
+    expect(result).toContain("NECESSITY");
     expect(result).not.toContain("{{");
   });
 
