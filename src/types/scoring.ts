@@ -67,37 +67,7 @@ export interface SparseIndex {
   };
 }
 
-// --- Triage (LLM call 1) ---
-
-export interface TriageFlaggedInteraction {
-  /** Interaction ID (matches Interaction.id). */
-  id: number;
-  /** Why this interaction was flagged for deep evaluation. */
-  reason: string;
-  /** The concern areas to evaluate in depth. */
-  concerns: ("success" | "speed" | "weight" | "relevance" | "necessity")[];
-}
-
-export interface TriagePattern {
-  /** Pattern description (e.g., "Repeated failed attempts at deployment"). */
-  description: string;
-  /** Interaction IDs involved. */
-  interactionIds: number[];
-  /** Severity: how much this pattern should affect the score. */
-  severity: "low" | "medium" | "high";
-}
-
-/** Output of the triage LLM pass. */
-export interface TriageResult {
-  /** Per-interaction triage notes. Only populated for flagged interactions. */
-  flaggedInteractions: TriageFlaggedInteraction[];
-  /** High-level patterns the triage pass identified. */
-  patterns: TriagePattern[];
-  /** Per-category preliminary notes. */
-  categoryNotes: Record<InteractionCategory, string>;
-}
-
-// --- Deep Evaluation (LLM call 2) ---
+// --- Deep Evaluation ---
 
 /** Per-interaction audit result from the deep evaluation pass. */
 export interface InteractionAudit {
@@ -127,12 +97,24 @@ export interface NecessityJudgment {
   rationale: string;
 }
 
+/** A cross-interaction pattern identified during evaluation. */
+export interface EvalPattern {
+  /** Pattern description (e.g., "Repeated failed attempts at deployment"). */
+  description: string;
+  /** Interaction IDs involved. */
+  interactionIds: number[];
+  /** Severity: how much this pattern should affect the score. */
+  severity: "low" | "medium" | "high";
+}
+
 /** Full deep evaluation output. */
 export interface DeepEvalResult {
-  /** Per-interaction audits (only for flagged interactions + sampled unflagged). */
+  /** Per-interaction audits. */
   audits: InteractionAudit[];
   /** Per-category necessity scores. */
   necessity: NecessityJudgment[];
+  /** Cross-interaction patterns identified during evaluation. */
+  patterns: EvalPattern[];
 }
 
 // --- Category scores ---

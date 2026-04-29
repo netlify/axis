@@ -42,8 +42,8 @@ describe("interpolate", () => {
 describe("getPromptTemplates", () => {
   const templates = getPromptTemplates();
 
-  it("returns exactly 4 templates", () => {
-    expect(Object.keys(templates)).toEqual(["triage", "deep_eval", "goal_string_rubric", "goal_array_rubric"]);
+  it("returns exactly 3 templates", () => {
+    expect(Object.keys(templates)).toEqual(["deep_eval", "goal_string_rubric", "goal_array_rubric"]);
   });
 
   it("each template has required fields", () => {
@@ -51,7 +51,7 @@ describe("getPromptTemplates", () => {
       expect(tmpl.name).toBe(key);
       expect(typeof tmpl.description).toBe("string");
       expect(tmpl.description.length).toBeGreaterThan(0);
-      expect(["triage", "deep_eval", "goal_achievement"]).toContain(tmpl.stage);
+      expect(["deep_eval", "goal_achievement"]).toContain(tmpl.stage);
       expect(typeof tmpl.template).toBe("string");
       expect(tmpl.template.length).toBeGreaterThan(0);
       expect(Array.isArray(tmpl.variables)).toBe(true);
@@ -88,17 +88,6 @@ describe("getPromptTemplates", () => {
 describe("template content regression", () => {
   const templates = getPromptTemplates();
 
-  it("triage template contains expected sections", () => {
-    const t = templates.triage.template;
-    expect(t).toContain("SCENARIO: {{scenarioName}}");
-    expect(t).toContain("TASK GIVEN TO AGENT:");
-    expect(t).toContain("SPARSE INDEX ({{totalInteractions}} interactions):");
-    expect(t).toContain("CONTEXT FOR EVALUATION:");
-    expect(t).toContain("Respond with ONLY valid JSON:");
-    expect(t).toContain("Flag at most {{maxFlags}} interactions.");
-    expect(t).toContain("You are an expert evaluator for AXIS");
-  });
-
   it("deep_eval template contains expected sections", () => {
     const t = templates.deep_eval.template;
     expect(t).toContain("SCENARIO: {{scenarioName}}");
@@ -107,7 +96,8 @@ describe("template content regression", () => {
     expect(t).toContain("EVALUATION DIMENSIONS");
     expect(t).toContain("Respond with ONLY valid JSON:");
     expect(t).toContain("Include an audit for EVERY interaction");
-    expect(t).toContain("{{triageSection}}");
+    expect(t).toContain('"patterns"');
+    expect(t).toContain("cross-interaction patterns");
   });
 
   it("goal_string_rubric template contains expected sections", () => {
@@ -129,31 +119,10 @@ describe("template content regression", () => {
     expect(t).toContain('"grades"');
   });
 
-  it("triage template can be interpolated with representative values", () => {
-    const result = interpolate(templates.triage.template, {
-      scenarioName: "Test Scenario",
-      prompt: "Do the thing",
-      totalInteractions: 10,
-      sparseLines: "#1 env Read ...",
-      envInteractions: 3,
-      svcInteractions: 2,
-      agentInteractions: 5,
-      totalErrors: 1,
-      totalDurationMs: 5000,
-      maxFlags: 30,
-    });
-    expect(result).toContain("SCENARIO: Test Scenario");
-    expect(result).toContain("Do the thing");
-    expect(result).toContain("Environment interactions: 3");
-    expect(result).toContain("Flag at most 30 interactions");
-    expect(result).not.toContain("{{");
-  });
-
   it("deep_eval template can be interpolated with representative values", () => {
     const result = interpolate(templates.deep_eval.template, {
       scenarioName: "Eval Scenario",
       prompt: "Build a site",
-      triageSection: "",
       totalInteractions: 5,
       sparseLines: "#1 env Write ...",
       envInteractions: 2,

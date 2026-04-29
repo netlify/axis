@@ -523,6 +523,88 @@ describe("parseDeepEvalResponse", () => {
     });
   });
 
+  describe("patterns parsing", () => {
+    it("parses valid patterns from LLM response", () => {
+      const sparseIndex = makeSparseIndex([{ id: 1, categories: ["environment"] }]);
+      const response = JSON.stringify({
+        audits: [{ id: 1, success: 0.9, weight: 0.7, contextRelevance: 0.6, rationale: "OK" }],
+        necessity: [],
+        patterns: [
+          { description: "Redundant file reads", interactionIds: [1], severity: "medium" },
+          { description: "Retried after failure", interactionIds: [1], severity: "high" },
+        ],
+      });
+
+      const result = parseDeepEvalResponse(response, sparseIndex);
+      expect(result.patterns).toHaveLength(2);
+      expect(result.patterns[0].description).toBe("Redundant file reads");
+      expect(result.patterns[0].severity).toBe("medium");
+      expect(result.patterns[1].severity).toBe("high");
+    });
+
+    it("returns empty patterns when field is missing", () => {
+      const sparseIndex = makeSparseIndex([{ id: 1, categories: ["agent"] }]);
+      const response = JSON.stringify({ audits: [], necessity: [] });
+
+      const result = parseDeepEvalResponse(response, sparseIndex);
+      expect(result.patterns).toEqual([]);
+    });
+
+    it("returns empty patterns when field is not an array", () => {
+      const sparseIndex = makeSparseIndex([]);
+      const response = JSON.stringify({ audits: [], necessity: [], patterns: "not-array" });
+
+      const result = parseDeepEvalResponse(response, sparseIndex);
+      expect(result.patterns).toEqual([]);
+    });
+
+    it("skips pattern entries without description", () => {
+      const sparseIndex = makeSparseIndex([]);
+      const response = JSON.stringify({
+        audits: [],
+        necessity: [],
+        patterns: [
+          { interactionIds: [1], severity: "low" },
+          { description: "Valid pattern", interactionIds: [2], severity: "high" },
+        ],
+      });
+
+      const result = parseDeepEvalResponse(response, sparseIndex);
+      expect(result.patterns).toHaveLength(1);
+      expect(result.patterns[0].description).toBe("Valid pattern");
+    });
+
+    it("defaults severity to medium for invalid values", () => {
+      const sparseIndex = makeSparseIndex([]);
+      const response = JSON.stringify({
+        audits: [],
+        necessity: [],
+        patterns: [{ description: "A pattern", interactionIds: [], severity: "critical" }],
+      });
+
+      const result = parseDeepEvalResponse(response, sparseIndex);
+      expect(result.patterns[0].severity).toBe("medium");
+    });
+
+    it("filters non-number interactionIds in patterns", () => {
+      const sparseIndex = makeSparseIndex([]);
+      const response = JSON.stringify({
+        audits: [],
+        necessity: [],
+        patterns: [{ description: "Mixed IDs", interactionIds: [1, "two", 3, null], severity: "low" }],
+      });
+
+      const result = parseDeepEvalResponse(response, sparseIndex);
+      expect(result.patterns[0].interactionIds).toEqual([1, 3]);
+    });
+
+    it("returns empty patterns for invalid JSON", () => {
+      const sparseIndex = makeSparseIndex([{ id: 1, categories: ["agent"] }]);
+      const result = parseDeepEvalResponse("not valid json", sparseIndex);
+      expect(result.patterns).toEqual([]);
+    });
+  });
+
   describe("JSON wrapped in markdown", () => {
     it("parses response wrapped in markdown fences", () => {
       const sparseIndex = makeSparseIndex([{ id: 1, categories: ["service"] }]);

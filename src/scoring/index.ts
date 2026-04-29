@@ -4,7 +4,6 @@ import type { ScoredOutput, ScoredRunResult, ScoreResult, ScoringOptions } from 
 import { normalizeTranscript, toTranscriptAnalysis } from "../transcript/normalize.js";
 import { scoreGoalAchievement } from "./goal-achievement.js";
 import { buildSparseIndex, populateInteractionContent } from "./sparse-index.js";
-import { runTriage } from "./triage.js";
 import { runDeepEval } from "./deep-eval.js";
 import { computeCategoryScore } from "./category-score.js";
 import { computeComposite } from "./composite.js";
@@ -18,7 +17,7 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
 
 /**
  * Score a single run result using the interaction-based evaluation pipeline:
- * normalize → sparse index → triage → deep eval → category score → goal achievement → composite
+ * normalize → sparse index → (deep eval || goal achievement) → category score → composite
  */
 export async function scoreRunResult(result: RunResult, options?: ScoringOptions): Promise<ScoredRunResult> {
   const weights = options?.weights ?? DEFAULT_WEIGHTS;
@@ -35,14 +34,11 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   const sparseIndex = buildSparseIndex(normalized);
   populateInteractionContent(sparseIndex, normalized);
 
-  // Step 3 + 4: Triage → Deep eval (LLM calls), run in parallel with goal achievement
-  const [triageResult, goalAchievement] = await Promise.all([
-    runTriage(result, sparseIndex),
+  // Step 3: Deep eval + goal achievement in parallel
+  const [deepEvalResult, goalAchievement] = await Promise.all([
+    runDeepEval(result, sparseIndex, normalized),
     scoreGoalAchievement(result, normalized.entries),
   ]);
-
-  // Step 4 continued: Deep eval needs triage results
-  const deepEvalResult = await runDeepEval(result, sparseIndex, triageResult, normalized);
 
   // Step 5: Compute category scores
   const necessityMap = new Map(deepEvalResult.necessity.map((n) => [n.category, n]));

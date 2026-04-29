@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { CategoryScore, DeepEvalResult, SparseIndex, TriageResult } from "../../../src/types/scoring.js";
+import type { CategoryScore, DeepEvalResult, SparseIndex } from "../../../src/types/scoring.js";
 
 // --- Hoisted mock data (available inside vi.mock factories) ---
 
-const { mockSparseIndex, mockTriageResult, mockDeepEvalResult, makeCategoryScore } = vi.hoisted(() => {
+const { mockSparseIndex, mockDeepEvalResult, makeCategoryScore } = vi.hoisted(() => {
   const mockSparseIndex: SparseIndex = {
     lines: ["#1    agent    assistant   Done"],
     interactions: [
@@ -28,12 +28,6 @@ const { mockSparseIndex, mockTriageResult, mockDeepEvalResult, makeCategoryScore
     },
   };
 
-  const mockTriageResult: TriageResult = {
-    flaggedInteractions: [],
-    patterns: [],
-    categoryNotes: { environment: "", service: "", agent: "" },
-  };
-
   const mockDeepEvalResult: DeepEvalResult = {
     audits: [
       {
@@ -51,6 +45,7 @@ const { mockSparseIndex, mockTriageResult, mockDeepEvalResult, makeCategoryScore
       { category: "service", score: 0.8, unnecessaryIds: [], rationale: "default" },
       { category: "agent", score: 0.8, unnecessaryIds: [], rationale: "default" },
     ],
+    patterns: [],
   };
 
   function makeCategoryScore(overrides: Partial<CategoryScore> = {}): CategoryScore {
@@ -65,7 +60,7 @@ const { mockSparseIndex, mockTriageResult, mockDeepEvalResult, makeCategoryScore
     };
   }
 
-  return { mockSparseIndex, mockTriageResult, mockDeepEvalResult, makeCategoryScore };
+  return { mockSparseIndex, mockDeepEvalResult, makeCategoryScore };
 });
 
 // --- Mocks ---
@@ -82,10 +77,6 @@ vi.mock("../../../src/scoring/sparse-index.js", () => ({
   populateInteractionContent: vi.fn(),
 }));
 
-vi.mock("../../../src/scoring/triage.js", () => ({
-  runTriage: vi.fn().mockResolvedValue(mockTriageResult),
-}));
-
 vi.mock("../../../src/scoring/deep-eval.js", () => ({
   runDeepEval: vi.fn().mockResolvedValue(mockDeepEvalResult),
 }));
@@ -97,7 +88,6 @@ vi.mock("../../../src/scoring/category-score.js", () => ({
 
 import { scoreResults } from "../../../src/scoring/index.js";
 import { buildSparseIndex } from "../../../src/scoring/sparse-index.js";
-import { runTriage } from "../../../src/scoring/triage.js";
 import { runDeepEval } from "../../../src/scoring/deep-eval.js";
 import { computeCategoryScore } from "../../../src/scoring/category-score.js";
 import type { RunOutput } from "../../../src/types/output.js";
@@ -141,7 +131,6 @@ describe("scoreResults", () => {
     vi.clearAllMocks();
     // Reset mocks to default return values
     vi.mocked(buildSparseIndex).mockReturnValue(mockSparseIndex);
-    vi.mocked(runTriage).mockResolvedValue(mockTriageResult);
     vi.mocked(runDeepEval).mockResolvedValue(mockDeepEvalResult);
     vi.mocked(computeCategoryScore).mockReturnValue(makeCategoryScore());
   });
@@ -160,20 +149,15 @@ describe("scoreResults", () => {
     expect(scored.results[0].score.agent).toBeDefined();
   });
 
-  it("calls the new scoring pipeline in order", async () => {
+  it("calls the scoring pipeline in order", async () => {
     await scoreResults(makeRunOutput());
 
     // buildSparseIndex is called with normalized transcript
     expect(buildSparseIndex).toHaveBeenCalledTimes(1);
 
-    // runTriage is called with the run result and sparse index
-    expect(runTriage).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(runTriage).mock.calls[0][1]).toBe(mockSparseIndex);
-
-    // runDeepEval is called with the run result, sparse index, and triage result
+    // runDeepEval is called with the run result, sparse index, and normalized transcript
     expect(runDeepEval).toHaveBeenCalledTimes(1);
     expect(vi.mocked(runDeepEval).mock.calls[0][1]).toBe(mockSparseIndex);
-    expect(vi.mocked(runDeepEval).mock.calls[0][2]).toBe(mockTriageResult);
 
     // computeCategoryScore is called once per category (environment, service, agent)
     expect(computeCategoryScore).toHaveBeenCalledTimes(3);

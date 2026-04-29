@@ -6,12 +6,12 @@ import type { NormalizedEntry, NormalizedTranscript } from "../transcript/types.
 import type { RunResult } from "../types/output.js";
 import type {
   DeepEvalResult,
+  EvalPattern,
   Interaction,
   InteractionAudit,
   InteractionCategory,
   NecessityJudgment,
   SparseIndex,
-  TriageResult,
 } from "../types/scoring.js";
 import { DEFAULT_AUDIT_SCORES } from "./category-score.js";
 import { parseJsonFromText } from "./parse-json.js";
@@ -36,7 +36,6 @@ const MAX_SPARSE_INDEX_CHARS = 60_000;
 export async function runDeepEval(
   result: RunResult,
   sparseIndex: SparseIndex,
-  triage: TriageResult,
   normalized: NormalizedTranscript,
 ): Promise<DeepEvalResult> {
   // If there are no interactions at all, return defaults
@@ -45,7 +44,7 @@ export async function runDeepEval(
   }
 
   // Always call LLM to evaluate all interactions
-  const prompt = buildDeepEvalPrompt(result, sparseIndex, triage, normalized);
+  const prompt = buildDeepEvalPrompt(result, sparseIndex, normalized);
   const responseText = await callJudge(result, prompt);
   const deepResult = parseDeepEvalResponse(responseText, sparseIndex);
 
@@ -104,43 +103,18 @@ export function computeHeuristicSpeed(interaction: Interaction): number {
 function buildDeepEvalPrompt(
   result: RunResult,
   sparseIndex: SparseIndex,
-  triage: TriageResult,
   normalized: NormalizedTranscript,
 ): string {
   const { stats } = sparseIndex;
 
-  // Always include the full sparse index
   const sparseLines = truncateSparseLines(sparseIndex.lines);
-
-  // Include full content for ALL interactions (within budget)
-  const interactionContent = buildInteractionContent(sparseIndex, triage, normalized);
-
-  // Include triage context when available
-  let triageSection = "";
-  if (triage.patterns.length > 0 || Object.values(triage.categoryNotes).some((n) => n)) {
-    const patternsText = triage.patterns
-      .map((p) => `- ${p.description} (severity: ${p.severity}, interactions: #${p.interactionIds.join(", #")})`)
-      .join("\n");
-
-    const categories: InteractionCategory[] = ["environment", "service", "agent"];
-    const categoryNotesText = categories
-      .filter((c) => triage.categoryNotes[c])
-      .map((c) => `${c}: ${triage.categoryNotes[c]}`)
-      .join("\n");
-
-    triageSection = `
-TRIAGE ANALYSIS:
-${categoryNotesText || "(none)"}
-${patternsText ? `\nPATTERNS:\n${patternsText}` : ""}
-`;
-  }
+  const interactionContent = buildInteractionContent(sparseIndex, normalized);
 
   const { deep_eval } = getPromptTemplates();
 
   return interpolate(deep_eval.template, {
     scenarioName: result.scenarioName,
     prompt: result.prompt,
-    triageSection,
     totalInteractions: stats.totalInteractions,
     sparseLines,
     envInteractions: stats.byCategory.environment,
@@ -156,20 +130,13 @@ ${patternsText ? `\nPATTERNS:\n${patternsText}` : ""}
  * Build the full content section for ALL interactions.
  * Includes as much content as fits within the total budget.
  */
-function buildInteractionContent(
-  sparseIndex: SparseIndex,
-  triage: TriageResult,
-  normalized: NormalizedTranscript,
-): string {
+function buildInteractionContent(sparseIndex: SparseIndex, normalized: NormalizedTranscript): string {
   const sections: string[] = [];
   let totalChars = 0;
-
-  const flagMap = new Map(triage.flaggedInteractions.map((f) => [f.id, f]));
 
   for (let idx = 0; idx < sparseIndex.interactions.length; idx++) {
     const interaction = sparseIndex.interactions[idx];
 
-    // Build full content from the normalized entries
     const fullContent = interaction.entryIndices.map((i) => formatFullEntry(normalized.entries[i])).join("\n");
 
     const truncatedContent =
@@ -184,11 +151,8 @@ function buildInteractionContent(
       break;
     }
 
-    const flag = flagMap.get(interaction.id);
-    const triageNote = flag ? ` | Triage: ${flag.reason}` : "";
-
     sections.push(`---
-#${interaction.id} | Category: ${interaction.categories.join(", ")}${triageNote}
+#${interaction.id} | Category: ${interaction.categories.join(", ")}
 ${truncatedContent}
 ---`);
 
@@ -268,10 +232,12 @@ export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseI
 
   let llmAudits: InteractionAudit[] = [];
   let llmNecessity: NecessityJudgment[] = [];
+  let llmPatterns: EvalPattern[] = [];
 
   if (parsed) {
     llmAudits = parseAudits(parsed.audits, sparseIndex);
     llmNecessity = parseNecessity(parsed.necessity);
+    llmPatterns = parsePatterns(parsed.patterns);
   }
 
   // Build complete audit list: LLM-scored where available, defaults for any the LLM missed
@@ -309,7 +275,7 @@ export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseI
     };
   });
 
-  return { audits: allAudits, necessity: allNecessity };
+  return { audits: allAudits, necessity: allNecessity, patterns: llmPatterns };
 }
 
 function parseAudits(raw: unknown, sparseIndex: SparseIndex): InteractionAudit[] {
@@ -368,6 +334,33 @@ function parseNecessity(raw: unknown): NecessityJudgment[] {
   return judgments;
 }
 
+function parsePatterns(raw: unknown): EvalPattern[] {
+  if (!Array.isArray(raw)) return [];
+
+  const validSeverities = new Set(["low", "medium", "high"]);
+  const patterns: EvalPattern[] = [];
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+
+    if (typeof obj.description !== "string") continue;
+
+    const interactionIds = Array.isArray(obj.interactionIds)
+      ? obj.interactionIds.filter((id): id is number => typeof id === "number")
+      : [];
+
+    const severity =
+      typeof obj.severity === "string" && validSeverities.has(obj.severity)
+        ? (obj.severity as EvalPattern["severity"])
+        : "medium";
+
+    patterns.push({ description: obj.description, interactionIds, severity });
+  }
+
+  return patterns;
+}
+
 function buildDefaultResult(sparseIndex: SparseIndex): DeepEvalResult {
   const audits: InteractionAudit[] = sparseIndex.interactions.map((interaction) => ({
     id: interaction.id,
@@ -387,7 +380,7 @@ function buildDefaultResult(sparseIndex: SparseIndex): DeepEvalResult {
     rationale: "default",
   }));
 
-  return { audits, necessity };
+  return { audits, necessity, patterns: [] };
 }
 
 function truncateSparseLines(lines: string[]): string {

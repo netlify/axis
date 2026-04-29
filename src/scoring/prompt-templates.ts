@@ -30,7 +30,7 @@ export interface PromptTemplate {
   /** Human-readable description of what the prompt does. */
   description: string;
   /** Which scoring pipeline stage uses this prompt. */
-  stage: "triage" | "deep_eval" | "goal_achievement";
+  stage: "deep_eval" | "goal_achievement";
   /** The template string with `{{variable}}` placeholders. */
   template: string;
   /** Metadata about each placeholder the template accepts. */
@@ -60,88 +60,10 @@ export function interpolate(template: string, vars: Record<string, string | numb
 // Template definitions
 // ---------------------------------------------------------------------------
 
-const TRIAGE_TEMPLATE: PromptTemplate = {
-  name: "triage",
-  description:
-    "Scans the compressed transcript for patterns, classifies interactions, and flags areas of concern for deep evaluation.",
-  stage: "triage",
-  template: `You are an expert evaluator for AXIS, an AI agent testing framework.
-
-You are analyzing an agent's execution trace to identify areas that need deeper evaluation.
-
-SCENARIO: {{scenarioName}}
-
-TASK GIVEN TO AGENT:
-{{prompt}}
-
-SPARSE INDEX ({{totalInteractions}} interactions):
-{{sparseLines}}
-
-STATS:
-- Environment interactions: {{envInteractions}}
-- Service interactions: {{svcInteractions}}
-- Agent interactions: {{agentInteractions}}
-- Errors: {{totalErrors}}
-- Total duration: {{totalDurationMs}}ms
-
-CONTEXT FOR EVALUATION:
-- Tool discovery (e.g., ToolSearch, ListTools) and agent configuration reads are required infrastructure — do not flag as unnecessary unless genuinely redundant (same query repeated).
-- Byte counts in sparse lines show total I/O transferred, not file content size. Small results are normal for write/edit confirmations.
-- Tool durations include system overhead (SDK roundtrips, sandbox setup, process spawning) — do not flag interactions solely for being slow unless the agent caused the slowness through redundant or unnecessary work.
-- If a service call (API request, web fetch) returned structured, usable content and the agent used it to complete the task, do not flag it for concerns about hypothetical missing content or page size.
-
-INSTRUCTIONS:
-Analyze this agent execution trace and identify areas of concern.
-
-For each interaction you want to flag for deep evaluation, specify:
-1. The interaction ID (#N)
-2. Why it needs deeper review
-3. Which dimensions to evaluate: success, speed, weight, relevance, necessity
-
-Also identify any patterns across interactions:
-- Repeated failures or retries
-- Redundant service calls (same endpoint called multiple times)
-- Excessive environment operations for simple tasks
-- Wasted agent reasoning that didn't lead to progress
-- Unnecessary interactions given prior context
-
-Respond with ONLY valid JSON:
-{
-  "flaggedInteractions": [
-    {"id": 1, "reason": "description of concern", "concerns": ["success", "relevance"]},
-    ...
-  ],
-  "patterns": [
-    {"description": "pattern description", "interactionIds": [1, 2, 3], "severity": "high"},
-    ...
-  ],
-  "categoryNotes": {
-    "environment": "summary of environment interaction quality",
-    "service": "summary of service interaction quality",
-    "agent": "summary of agent reasoning quality"
-  }
-}
-
-Flag at most {{maxFlags}} interactions. Focus on the most significant issues.
-Non-flagged interactions will receive default passing scores.`,
-  variables: [
-    { name: "scenarioName", description: "Name of the test scenario", type: "string" },
-    { name: "prompt", description: "The original task prompt given to the agent", type: "text" },
-    { name: "totalInteractions", description: "Total number of interactions in the sparse index", type: "number" },
-    { name: "sparseLines", description: "Truncated sparse index content", type: "text" },
-    { name: "envInteractions", description: "Count of environment interactions", type: "number" },
-    { name: "svcInteractions", description: "Count of service interactions", type: "number" },
-    { name: "agentInteractions", description: "Count of agent interactions", type: "number" },
-    { name: "totalErrors", description: "Total error count", type: "number" },
-    { name: "totalDurationMs", description: "Total execution duration in milliseconds", type: "number" },
-    { name: "maxFlags", description: "Maximum interactions to flag for deep review", type: "number" },
-  ],
-};
-
 const DEEP_EVAL_TEMPLATE: PromptTemplate = {
   name: "deep_eval",
   description:
-    "Comprehensive evaluation of ALL interactions for success, weight, contextRelevance, and necessity per category.",
+    "Comprehensive evaluation of ALL interactions for success, weight, contextRelevance, necessity per category, and cross-interaction patterns.",
   stage: "deep_eval",
   template: `You are an expert evaluator for AXIS, an AI agent testing framework.
 
@@ -151,7 +73,7 @@ SCENARIO: {{scenarioName}}
 
 TASK GIVEN TO AGENT:
 {{prompt}}
-{{triageSection}}
+
 COMPLETE SPARSE INDEX ({{totalInteractions}} interactions):
 {{sparseLines}}
 
@@ -176,6 +98,12 @@ For each CATEGORY present, also evaluate necessity:
 - necessity (0.0 to 1.0): Were the interactions that the agent performed in this category necessary? Evaluate only what the agent actually did — do not penalize for hypothetical steps it could have taken. 1.0 = all interactions were necessary, 0.0 = all were unnecessary.
 - List any interaction IDs that were unnecessary.
 
+Also identify any cross-interaction patterns:
+- Repeated failures or retries
+- Redundant service calls (same endpoint called multiple times)
+- Excessive environment operations for simple tasks
+- Wasted agent reasoning that didn't lead to progress
+
 CONTEXT FOR EVALUATION:
 - Tool discovery (e.g., ToolSearch, ListTools) and agent configuration reads are required infrastructure — do not flag as unnecessary unless genuinely redundant (same query repeated).
 - Byte counts in sparse lines show total I/O transferred, not file content size. Small results are normal for write/edit confirmations.
@@ -191,6 +119,10 @@ Respond with ONLY valid JSON:
     {"category": "environment", "score": 0.85, "unnecessaryIds": [4], "rationale": "brief explanation"},
     {"category": "service", "score": 0.7, "unnecessaryIds": [5, 6], "rationale": "brief explanation"},
     {"category": "agent", "score": 0.95, "unnecessaryIds": [], "rationale": "brief explanation"}
+  ],
+  "patterns": [
+    {"description": "pattern description", "interactionIds": [1, 2, 3], "severity": "high"},
+    ...
   ]
 }
 
@@ -198,12 +130,6 @@ Include an audit for EVERY interaction listed above.`,
   variables: [
     { name: "scenarioName", description: "Name of the test scenario", type: "string" },
     { name: "prompt", description: "The original task prompt given to the agent", type: "text" },
-    {
-      name: "triageSection",
-      description: "Formatted triage analysis from the previous pass (empty when no triage data)",
-      type: "text",
-      optional: true,
-    },
     { name: "totalInteractions", description: "Total number of interactions in the sparse index", type: "number" },
     { name: "sparseLines", description: "Complete sparse index content", type: "text" },
     { name: "envInteractions", description: "Count of environment interactions", type: "number" },
@@ -324,7 +250,6 @@ When done, respond with ONLY valid JSON on its own line:
  */
 export function getPromptTemplates(): Record<string, PromptTemplate> {
   return {
-    triage: TRIAGE_TEMPLATE,
     deep_eval: DEEP_EVAL_TEMPLATE,
     goal_string_rubric: GOAL_STRING_RUBRIC_TEMPLATE,
     goal_array_rubric: GOAL_ARRAY_RUBRIC_TEMPLATE,
