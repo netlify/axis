@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { parseDeepEvalResponse, computeHeuristicSpeed } from "../../../src/scoring/deep-eval.js";
-import type { Interaction, InteractionCategory, SparseIndex } from "../../../src/types/scoring.js";
+import {
+  parseDeepEvalResponse,
+  parseCategoryEvalResponse,
+  mergeCategoryResults,
+  buildDefaultCategoryResult,
+  computeHeuristicSpeed,
+} from "../../../src/scoring/deep-eval.js";
+import type { CategoryEvalResult, Interaction, InteractionCategory, SparseIndex } from "../../../src/types/scoring.js";
 
 // Default audit scores from category-score.ts
 const DEFAULTS = { success: 1.0, speed: 1.0, weight: 1.0, contextRelevance: 1.0 };
@@ -761,5 +767,243 @@ describe("computeHeuristicSpeed", () => {
       const interaction = makeInteraction({ categories: ["environment", "agent"], durationMs: 4000 });
       expect(computeHeuristicSpeed(interaction)).toBe(0.8); // environment threshold: 2-5s = 0.8
     });
+  });
+});
+
+describe("parseCategoryEvalResponse", () => {
+  it("parses a valid per-category response", () => {
+    const sparseIndex = makeSparseIndex([
+      { id: 1, categories: ["environment"] },
+      { id: 2, categories: ["environment"] },
+      { id: 3, categories: ["agent"] },
+    ]);
+
+    const response = JSON.stringify({
+      audits: [
+        { id: 1, success: 0.9, weight: 0.8, contextRelevance: 0.7, rationale: "Good write" },
+        { id: 2, success: 0.5, weight: 0.6, contextRelevance: 0.4, rationale: "Failed read" },
+      ],
+      necessity: { score: 0.85, unnecessaryIds: [], rationale: "All needed" },
+      patterns: [{ description: "Redundant reads", interactionIds: [2], severity: "low" }],
+    });
+
+    const result = parseCategoryEvalResponse(response, "environment", sparseIndex);
+
+    expect(result.category).toBe("environment");
+    expect(result.audits).toHaveLength(2); // Only environment interactions
+    expect(result.audits[0].id).toBe(1);
+    expect(result.audits[0].success).toBe(0.9);
+    expect(result.audits[1].id).toBe(2);
+    expect(result.audits[1].success).toBe(0.5);
+    expect(result.necessity.category).toBe("environment");
+    expect(result.necessity.score).toBe(0.85);
+    expect(result.patterns).toHaveLength(1);
+    expect(result.patterns[0].description).toBe("Redundant reads");
+  });
+
+  it("fills defaults for interactions missed by the LLM", () => {
+    const sparseIndex = makeSparseIndex([
+      { id: 1, categories: ["service"] },
+      { id: 2, categories: ["service"] },
+    ]);
+
+    const response = JSON.stringify({
+      audits: [{ id: 1, success: 0.8, weight: 0.7, contextRelevance: 0.9, rationale: "OK" }],
+      necessity: { score: 0.9, unnecessaryIds: [], rationale: "Fine" },
+    });
+
+    const result = parseCategoryEvalResponse(response, "service", sparseIndex);
+
+    expect(result.audits).toHaveLength(2);
+    expect(result.audits[0].id).toBe(1);
+    expect(result.audits[0].success).toBe(0.8);
+    // #2 missed — gets defaults
+    expect(result.audits[1].id).toBe(2);
+    expect(result.audits[1].success).toBe(DEFAULTS.success);
+    expect(result.audits[1].rationale).toBe("default");
+  });
+
+  it("returns defaults for invalid JSON", () => {
+    const sparseIndex = makeSparseIndex([
+      { id: 1, categories: ["agent"] },
+      { id: 2, categories: ["agent"], hasError: true },
+    ]);
+
+    const result = parseCategoryEvalResponse("not json", "agent", sparseIndex);
+
+    expect(result.category).toBe("agent");
+    expect(result.audits).toHaveLength(2);
+    expect(result.audits[0].success).toBe(DEFAULTS.success);
+    expect(result.audits[1].success).toBe(0.3); // hasError default
+    expect(result.necessity.category).toBe("agent");
+    expect(result.necessity.score).toBe(0.8); // default
+    expect(result.patterns).toEqual([]);
+  });
+
+  it("ignores audits for interactions not in this category", () => {
+    const sparseIndex = makeSparseIndex([
+      { id: 1, categories: ["environment"] },
+      { id: 2, categories: ["service"] },
+    ]);
+
+    const response = JSON.stringify({
+      audits: [
+        { id: 1, success: 0.9, weight: 0.8, contextRelevance: 0.7, rationale: "Env" },
+        { id: 2, success: 0.5, weight: 0.5, contextRelevance: 0.5, rationale: "Service" },
+      ],
+      necessity: { score: 0.8, unnecessaryIds: [], rationale: "OK" },
+    });
+
+    // Parse as environment — should only include interaction #1
+    const result = parseCategoryEvalResponse(response, "environment", sparseIndex);
+    expect(result.audits).toHaveLength(1);
+    expect(result.audits[0].id).toBe(1);
+  });
+
+  it("handles necessity as a single object (not array)", () => {
+    const sparseIndex = makeSparseIndex([{ id: 1, categories: ["environment"] }]);
+    const response = JSON.stringify({
+      audits: [],
+      necessity: { score: 0.7, unnecessaryIds: [1], rationale: "One was unnecessary" },
+    });
+
+    const result = parseCategoryEvalResponse(response, "environment", sparseIndex);
+    expect(result.necessity.score).toBe(0.7);
+    expect(result.necessity.unnecessaryIds).toEqual([1]);
+    expect(result.necessity.category).toBe("environment");
+  });
+
+  it("defaults necessity when it's not an object", () => {
+    const sparseIndex = makeSparseIndex([{ id: 1, categories: ["service"] }]);
+    const response = JSON.stringify({ audits: [], necessity: "not-an-object" });
+
+    const result = parseCategoryEvalResponse(response, "service", sparseIndex);
+    expect(result.necessity.score).toBe(1.0);
+    expect(result.necessity.category).toBe("service");
+    expect(result.necessity.rationale).toBe("default");
+  });
+});
+
+describe("mergeCategoryResults", () => {
+  it("merges audits from all categories", () => {
+    const sparseIndex = makeSparseIndex([
+      { id: 1, categories: ["environment"] },
+      { id: 2, categories: ["service"] },
+      { id: 3, categories: ["agent"] },
+    ]);
+
+    const envResult: CategoryEvalResult = {
+      category: "environment",
+      audits: [{ id: 1, categories: ["environment"], success: 0.9, speed: 1.0, weight: 0.8, contextRelevance: 0.7, rationale: "env" }],
+      necessity: { category: "environment", score: 0.85, unnecessaryIds: [], rationale: "env" },
+      patterns: [],
+    };
+
+    const svcResult: CategoryEvalResult = {
+      category: "service",
+      audits: [{ id: 2, categories: ["service"], success: 0.7, speed: 1.0, weight: 0.6, contextRelevance: 0.5, rationale: "svc" }],
+      necessity: { category: "service", score: 0.9, unnecessaryIds: [], rationale: "svc" },
+      patterns: [{ description: "API pattern", interactionIds: [2], severity: "medium" }],
+    };
+
+    const agentResult: CategoryEvalResult = {
+      category: "agent",
+      audits: [{ id: 3, categories: ["agent"], success: 1.0, speed: 1.0, weight: 0.95, contextRelevance: 0.85, rationale: "agent" }],
+      necessity: { category: "agent", score: 0.95, unnecessaryIds: [], rationale: "agent" },
+      patterns: [],
+    };
+
+    const result = mergeCategoryResults([envResult, svcResult, agentResult], sparseIndex);
+
+    expect(result.audits).toHaveLength(3);
+    expect(result.audits[0].id).toBe(1);
+    expect(result.audits[0].success).toBe(0.9);
+    expect(result.audits[1].id).toBe(2);
+    expect(result.audits[1].success).toBe(0.7);
+    expect(result.audits[2].id).toBe(3);
+    expect(result.audits[2].success).toBe(1.0);
+
+    expect(result.necessity).toHaveLength(3);
+    expect(result.necessity[0].category).toBe("environment");
+    expect(result.necessity[1].category).toBe("service");
+    expect(result.necessity[2].category).toBe("agent");
+
+    expect(result.patterns).toHaveLength(1);
+    expect(result.patterns[0].description).toBe("API pattern");
+  });
+
+  it("fills defaults for interactions not covered by any category", () => {
+    const sparseIndex = makeSparseIndex([
+      { id: 1, categories: ["environment"] },
+      { id: 2, categories: ["service"] },
+    ]);
+
+    // Only environment result provided — service interaction #2 should get default
+    const envResult: CategoryEvalResult = {
+      category: "environment",
+      audits: [{ id: 1, categories: ["environment"], success: 0.9, speed: 1.0, weight: 0.8, contextRelevance: 0.7, rationale: "env" }],
+      necessity: { category: "environment", score: 0.85, unnecessaryIds: [], rationale: "env" },
+      patterns: [],
+    };
+
+    const svcResult = buildDefaultCategoryResult("service");
+
+    const result = mergeCategoryResults([envResult, svcResult], sparseIndex);
+
+    expect(result.audits).toHaveLength(2);
+    expect(result.audits[0].success).toBe(0.9); // from env
+    expect(result.audits[1].success).toBe(DEFAULTS.success); // default for #2
+    expect(result.audits[1].rationale).toBe("default");
+  });
+
+  it("handles multi-category interactions with first-write-wins", () => {
+    const sparseIndex = makeSparseIndex([
+      { id: 1, categories: ["service", "environment"] },
+    ]);
+
+    const envResult: CategoryEvalResult = {
+      category: "environment",
+      audits: [{ id: 1, categories: ["service", "environment"], success: 0.5, speed: 1.0, weight: 0.5, contextRelevance: 0.5, rationale: "env view" }],
+      necessity: { category: "environment", score: 0.8, unnecessaryIds: [], rationale: "env" },
+      patterns: [],
+    };
+
+    const svcResult: CategoryEvalResult = {
+      category: "service",
+      audits: [{ id: 1, categories: ["service", "environment"], success: 0.9, speed: 1.0, weight: 0.9, contextRelevance: 0.9, rationale: "svc view" }],
+      necessity: { category: "service", score: 0.9, unnecessaryIds: [], rationale: "svc" },
+      patterns: [],
+    };
+
+    // environment comes first in the array → first-write-wins
+    const result = mergeCategoryResults([envResult, svcResult], sparseIndex);
+    expect(result.audits).toHaveLength(1);
+    expect(result.audits[0].success).toBe(0.5); // env view wins
+    expect(result.audits[0].rationale).toBe("env view");
+  });
+});
+
+describe("buildDefaultCategoryResult", () => {
+  it("returns defaults for a category with no interactions", () => {
+    const result = buildDefaultCategoryResult("environment");
+
+    expect(result.category).toBe("environment");
+    expect(result.audits).toHaveLength(0);
+    expect(result.necessity.category).toBe("environment");
+    expect(result.necessity.score).toBe(0.8);
+    expect(result.patterns).toEqual([]);
+  });
+
+  it("returns defaults for a category with interactions", () => {
+    const interactions = [
+      makeInteraction({ id: 1, categories: ["agent"], hasError: false }),
+      makeInteraction({ id: 2, categories: ["agent"], hasError: true }),
+    ];
+
+    const result = buildDefaultCategoryResult("agent", interactions);
+
+    expect(result.audits).toHaveLength(2);
+    expect(result.audits[0].success).toBe(DEFAULTS.success);
+    expect(result.audits[1].success).toBe(0.3); // hasError
   });
 });

@@ -43,7 +43,7 @@ describe("getPromptTemplates", () => {
   const templates = getPromptTemplates();
 
   it("returns exactly 3 templates", () => {
-    expect(Object.keys(templates)).toEqual(["deep_eval", "goal_string_rubric", "goal_array_rubric"]);
+    expect(Object.keys(templates)).toEqual(["category_eval", "goal_string_rubric", "goal_array_rubric"]);
   });
 
   it("each template has required fields", () => {
@@ -88,16 +88,17 @@ describe("getPromptTemplates", () => {
 describe("template content regression", () => {
   const templates = getPromptTemplates();
 
-  it("deep_eval template contains expected sections", () => {
-    const t = templates.deep_eval.template;
+  it("category_eval template contains expected sections", () => {
+    const t = templates.category_eval.template;
     expect(t).toContain("SCENARIO: {{scenarioName}}");
     expect(t).toContain("COMPLETE SPARSE INDEX");
-    expect(t).toContain("FULL INTERACTION CONTENT:");
+    expect(t).toContain("INTERACTION DETAILS");
     expect(t).toContain("EVALUATION DIMENSIONS");
     expect(t).toContain("Respond with ONLY valid JSON:");
-    expect(t).toContain("Include an audit for EVERY interaction");
+    expect(t).toContain("Include an audit for EVERY");
     expect(t).toContain('"patterns"');
-    expect(t).toContain("cross-interaction patterns");
+    expect(t).toContain("CATEGORY GUIDANCE");
+    expect(t).toContain("{{categoryName}}");
   });
 
   it("goal_string_rubric template contains expected sections", () => {
@@ -119,21 +120,21 @@ describe("template content regression", () => {
     expect(t).toContain('"grades"');
   });
 
-  it("deep_eval template can be interpolated with representative values", () => {
-    const result = interpolate(templates.deep_eval.template, {
+  it("category_eval template can be interpolated with representative values", () => {
+    const result = interpolate(templates.category_eval.template, {
       scenarioName: "Eval Scenario",
       prompt: "Build a site",
+      categoryName: "environment",
       totalInteractions: 5,
+      categoryInteractionCount: 2,
       sparseLines: "#1 env Write ...",
-      envInteractions: 2,
-      svcInteractions: 1,
-      agentInteractions: 2,
-      totalErrors: 0,
-      totalDurationMs: 3000,
+      categoryGuidance: "Evaluate file ops and shell commands",
       interactionContent: "---\n#1 | Category: environment\ncontent\n---",
+      dataDir: "/tmp/axis/reports/2025-01-01/scenarios/test/agent",
     });
     expect(result).toContain("SCENARIO: Eval Scenario");
     expect(result).toContain("Build a site");
+    expect(result).toContain("environment");
     expect(result).not.toContain("{{");
   });
 

@@ -2,6 +2,7 @@ import type { RunOutput, RunResult } from "../types/output.js";
 import type { ScoringWeights } from "../types/config.js";
 import type { ScoredOutput, ScoredRunResult, ScoreResult, ScoringOptions } from "../types/scoring.js";
 import { normalizeTranscript, toTranscriptAnalysis } from "../transcript/normalize.js";
+import { writeScenarioRawData } from "../reports/writer.js";
 import { scoreGoalAchievement } from "./goal-achievement.js";
 import { buildSparseIndex, populateInteractionContent } from "./sparse-index.js";
 import { runDeepEval } from "./deep-eval.js";
@@ -17,7 +18,7 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
 
 /**
  * Score a single run result using the interaction-based evaluation pipeline:
- * normalize → sparse index → (deep eval || goal achievement) → category score → composite
+ * normalize → sparse index → write raw data → (deep eval || goal achievement) → category score → composite
  */
 export async function scoreRunResult(result: RunResult, options?: ScoringOptions): Promise<ScoredRunResult> {
   const weights = options?.weights ?? DEFAULT_WEIGHTS;
@@ -34,9 +35,17 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   const sparseIndex = buildSparseIndex(normalized);
   populateInteractionContent(sparseIndex, normalized);
 
-  // Step 3: Deep eval + goal achievement in parallel
+  // Step 3: Write raw data to report dir so LLM judges can read it
+  if (options?.reportDir) {
+    writeScenarioRawData(options.reportDir, result, sparseIndex);
+  }
+
+  // Step 4: Deep eval + goal achievement in parallel
   const [deepEvalResult, goalAchievement] = await Promise.all([
-    runDeepEval(result, sparseIndex, normalized),
+    runDeepEval(result, sparseIndex, normalized, {
+      weights,
+      reportDir: options?.reportDir,
+    }),
     scoreGoalAchievement(result, normalized.entries),
   ]);
 

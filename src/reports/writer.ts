@@ -2,26 +2,81 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { RunOutput, RunResult } from "../types/output.js";
 import { isScoredResult } from "../types/output.js";
-import type { ScoredOutput, ScoredRunResult } from "../types/scoring.js";
+import type { ScoredOutput, ScoredRunResult, SparseIndex } from "../types/scoring.js";
 import type { ReportManifest, ReportResultEntry } from "../types/report.js";
 import { generateReportHtml } from "./html.js";
 
 const REPORTS_DIR = ".axis/reports";
 
+// --- Phase 1: Create report directory ---
+
 /**
- * Write a run's output to the persistent report store.
- * Returns the reportId (used to recall the report later).
- *
- * Structure:
- *   .axis/reports/{reportId}/report.json
- *   .axis/reports/{reportId}/scenarios/{scenarioKey}/{agentName}.json
+ * Create the report directory for a run.
+ * Call this early — before scoring — so the report dir is available
+ * for writing raw data that judges can read.
  */
-export function writeReportToStore(output: ScoredOutput | RunOutput, configDir: string, name?: string): string {
-  const reportId = generateReportId(output.timestamp);
+export function initReport(
+  timestamp: string,
+  configDir: string,
+): { reportId: string; reportDir: string } {
+  const reportId = generateReportId(timestamp);
   const reportDir = path.join(configDir, REPORTS_DIR, reportId);
-
   fs.mkdirSync(reportDir, { recursive: true });
+  return { reportId, reportDir };
+}
 
+// --- Phase 2: Write raw data (before scoring judges run) ---
+
+/**
+ * Write raw run data for a single scenario×agent to the report directory.
+ * Call this after building the sparse index but before running LLM judges,
+ * so judges can read these files for context.
+ *
+ * Writes:
+ *   - `{agent}.raw.ndjson` — raw agent stdout lines (if available)
+ *   - `{agent}.sparse-index.txt` — human-readable sparse index (always)
+ */
+export function writeScenarioRawData(
+  reportDir: string,
+  result: RunResult | ScoredRunResult,
+  sparseIndex?: SparseIndex,
+): void {
+  const scenarioDir = path.join(reportDir, "scenarios", result.scenarioKey);
+  fs.mkdirSync(scenarioDir, { recursive: true });
+
+  const baseName = result.agentName;
+
+  // Write raw NDJSON (if available)
+  const rawOutput = result.output.rawOutput;
+  if (rawOutput?.length) {
+    const rawPath = path.join(scenarioDir, `${baseName}.raw.ndjson`);
+    fs.writeFileSync(rawPath, rawOutput.join("\n") + "\n");
+  }
+
+  // Write sparse index (always, when available)
+  if (sparseIndex) {
+    const indexPath = path.join(scenarioDir, `${baseName}.sparse-index.txt`);
+    const header = [
+      `# Sparse Index: ${result.scenarioKey} / ${result.agentName}`,
+      `# ${sparseIndex.stats.totalInteractions} interactions | ` +
+        `env: ${sparseIndex.stats.byCategory.environment} | ` +
+        `svc: ${sparseIndex.stats.byCategory.service} | ` +
+        `agent: ${sparseIndex.stats.byCategory.agent} | ` +
+        `errors: ${sparseIndex.stats.totalErrors}`,
+      "",
+    ];
+    fs.writeFileSync(indexPath, header.join("\n") + sparseIndex.lines.join("\n") + "\n");
+  }
+}
+
+// --- Phase 3: Finalize report (after scoring completes) ---
+
+/**
+ * Finalize a report: write scored scenario JSON, manifest, and HTML.
+ * Call this after all scoring is complete.
+ */
+export function finalizeReport(reportDir: string, output: ScoredOutput | RunOutput, name?: string): void {
+  const reportId = path.basename(reportDir);
   const entries: ReportResultEntry[] = [];
 
   for (const result of output.results) {
@@ -30,10 +85,10 @@ export function writeReportToStore(output: ScoredOutput | RunOutput, configDir: 
 
     fs.mkdirSync(path.dirname(absPath), { recursive: true });
 
-    // Strip rawOutput from scenario JSON — written as a separate file
-    const { rawOutput, ...outputWithoutRaw } = result.output;
+    // Strip rawOutput from scenario JSON — written separately in phase 2
+    const { rawOutput: _rawOutput, ...outputWithoutRaw } = result.output;
 
-    // Strip sparseIndex from score — written as a separate file in debug mode
+    // Strip sparseIndex from score — written separately in phase 2
     let resultToWrite: typeof result = { ...result, output: outputWithoutRaw };
     if (isScoredResult(result) && result.score.sparseIndex) {
       const { sparseIndex: _sparseIndex, ...scoreWithoutIndex } = result.score;
@@ -41,28 +96,6 @@ export function writeReportToStore(output: ScoredOutput | RunOutput, configDir: 
     }
 
     fs.writeFileSync(absPath, JSON.stringify(resultToWrite, null, 2));
-
-    if (rawOutput?.length) {
-      const rawPath = absPath.replace(/\.json$/, ".raw.ndjson");
-      fs.writeFileSync(rawPath, rawOutput.join("\n") + "\n");
-    }
-
-    // Write sparse index as a human-readable file in debug mode
-    if (rawOutput && isScoredResult(result) && result.score.sparseIndex) {
-      const indexPath = absPath.replace(/\.json$/, ".sparse-index.txt");
-      const { sparseIndex } = result.score;
-      const header = [
-        `# Sparse Index: ${result.scenarioKey} / ${result.agentName}`,
-        `# ${sparseIndex.stats.totalInteractions} interactions | ` +
-          `env: ${sparseIndex.stats.byCategory.environment} | ` +
-          `svc: ${sparseIndex.stats.byCategory.service} | ` +
-          `agent: ${sparseIndex.stats.byCategory.agent} | ` +
-          `errors: ${sparseIndex.stats.totalErrors}`,
-        "",
-      ];
-      fs.writeFileSync(indexPath, header.join("\n") + sparseIndex.lines.join("\n") + "\n");
-    }
-
     entries.push(buildResultEntry(result, relPath));
   }
 
@@ -83,6 +116,26 @@ export function writeReportToStore(output: ScoredOutput | RunOutput, configDir: 
   } catch {
     /* HTML generation is optional — template may not be built yet */
   }
+}
+
+// --- Convenience wrapper (backward compat) ---
+
+/**
+ * Write a run's output to the persistent report store in a single call.
+ * Combines initReport + writeScenarioRawData + finalizeReport.
+ * Returns the reportId.
+ */
+export function writeReportToStore(output: ScoredOutput | RunOutput, configDir: string, name?: string): string {
+  const { reportId, reportDir } = initReport(output.timestamp, configDir);
+
+  // Write raw data for each result
+  for (const result of output.results) {
+    const sparseIndex = isScoredResult(result) ? result.score.sparseIndex : undefined;
+    writeScenarioRawData(reportDir, result, sparseIndex);
+  }
+
+  // Finalize with scored results, manifest, and HTML
+  finalizeReport(reportDir, output, name);
 
   return reportId;
 }

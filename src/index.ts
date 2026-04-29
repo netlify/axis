@@ -25,7 +25,7 @@ export type {
   EntryAnalysis,
   TranscriptAnalysis,
 } from "./transcript/index.js";
-export { writeReportToStore } from "./reports/writer.js";
+export { writeReportToStore, initReport, writeScenarioRawData, finalizeReport } from "./reports/writer.js";
 export { listReports, readReport, readScenarioResult } from "./reports/reader.js";
 export { generateReportHtml } from "./reports/html.js";
 export {

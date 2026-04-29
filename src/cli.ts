@@ -7,7 +7,7 @@ import { Command } from "commander";
 import { run } from "./runner/runner.js";
 import { loadConfig } from "./config/loader.js";
 import { scoreRunResult, buildScoredOutput } from "./scoring/index.js";
-import { writeReportToStore } from "./reports/writer.js";
+import { initReport, finalizeReport } from "./reports/writer.js";
 import { listReports, readReport, readScenarioResults } from "./reports/reader.js";
 import { setBaseline, readBaseline, listBaselines, deleteBaseline, DEFAULT_BASELINE_NAME } from "./baselines/store.js";
 import { compareBaseline } from "./baselines/compare.js";
@@ -84,6 +84,9 @@ async function executeRunPipeline(
 
   const concurrency = opts.concurrency ?? config.settings?.concurrency;
 
+  // Create report directory early so scoring can write raw data for judges to read
+  const { reportId, reportDir } = initReport(new Date().toISOString(), configDir);
+
   const runOutput = await run({
     configPath: opts.configPath,
     scenarioFilter: opts.scenario ? [opts.scenario] : undefined,
@@ -98,6 +101,7 @@ async function executeRunPipeline(
           const scoring = scoreRunResult(result, {
             weights: config.settings?.scoring_weights,
             logger,
+            reportDir,
             onProgress: (scenarioKey, agentName, phase) => {
               if (phase === "start") onScoringStart?.(scenarioKey, agentName);
             },
@@ -120,7 +124,8 @@ async function executeRunPipeline(
     output = runOutput;
   }
 
-  const reportId = writeReportToStore(output, configDir, config.name);
+  // Finalize: write scenario JSON, manifest, and HTML
+  finalizeReport(reportDir, output, config.name);
 
   if (opts.outputDir) {
     const reportPath = writeReportFile(output, opts.outputDir);

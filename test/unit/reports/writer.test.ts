@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { writeReportToStore } from "../../../src/reports/writer.js";
+import { writeReportToStore, initReport, writeScenarioRawData, finalizeReport } from "../../../src/reports/writer.js";
 import type { RunOutput } from "../../../src/types/output.js";
 import type { ScoredOutput } from "../../../src/types/scoring.js";
-import type { CategoryScore } from "../../../src/types/scoring.js";
+import type { CategoryScore, SparseIndex } from "../../../src/types/scoring.js";
 
 function mockCategoryScore(score: number): CategoryScore {
   return {
@@ -209,9 +209,8 @@ describe("writeReportToStore", () => {
     expect(result.output.result).toBe("Completed");
   });
 
-  it("writes .sparse-index.txt in debug mode for scored results", () => {
+  it("writes .sparse-index.txt when sparseIndex is present", () => {
     const scored = makeScoredOutput();
-    scored.results[0].output.rawOutput = ['{"type":"result"}'];
     scored.results[0].score.sparseIndex = {
       lines: [
         "#1    agent    assistant   Planning approach",
@@ -247,8 +246,9 @@ describe("writeReportToStore", () => {
     expect(content).toContain("#3    service  tool_use   WebFetch(https://api.example.com) → 200, 2.1KB");
   });
 
-  it("does not write .sparse-index.txt without debug mode", () => {
+  it("writes .sparse-index.txt even without rawOutput", () => {
     const scored = makeScoredOutput();
+    // No rawOutput set — sparse index should still be written
     scored.results[0].score.sparseIndex = {
       lines: ["#1    agent    assistant   Done"],
       interactions: [],
@@ -269,8 +269,10 @@ describe("writeReportToStore", () => {
       "scenarios/cms/create-post/claude-code.sparse-index.txt",
     );
 
-    // No rawOutput = not debug mode, so no sparse index file
-    expect(fs.existsSync(indexPath)).toBe(false);
+    expect(fs.existsSync(indexPath)).toBe(true);
+    const content = fs.readFileSync(indexPath, "utf-8");
+    expect(content).toContain("# Sparse Index: cms/create-post / claude-code");
+    expect(content).toContain("#1    agent    assistant   Done");
   });
 
   it("writes report.html alongside report.json", () => {
@@ -321,5 +323,187 @@ describe("writeReportToStore", () => {
     expect(result.score.axisScore).toBe(85);
     expect(result.score.goalAchievement.score).toBe(90);
     expect(result.score.environment).toBeDefined();
+  });
+});
+
+describe("initReport", () => {
+  it("creates report directory and returns reportId and reportDir", () => {
+    const { reportId, reportDir } = initReport("2025-04-13T18:30:42.000Z", tmpDir);
+
+    expect(reportId).toBe("2025-04-13-183042");
+    expect(reportDir).toBe(path.join(tmpDir, ".axis/reports/2025-04-13-183042"));
+    expect(fs.existsSync(reportDir)).toBe(true);
+  });
+
+  it("is idempotent for same timestamp", () => {
+    const first = initReport("2025-04-13T18:30:42.000Z", tmpDir);
+    const second = initReport("2025-04-13T18:30:42.000Z", tmpDir);
+
+    expect(first.reportId).toBe(second.reportId);
+    expect(fs.existsSync(first.reportDir)).toBe(true);
+  });
+});
+
+describe("writeScenarioRawData", () => {
+  it("writes raw.ndjson when rawOutput is present", () => {
+    const { reportDir } = initReport("2025-04-13T18:30:42.000Z", tmpDir);
+    const result = makeRunOutput().results[0];
+    result.output.rawOutput = ['{"type":"assistant","message":"hello"}', '{"type":"result","result":"done"}'];
+
+    writeScenarioRawData(reportDir, result);
+
+    const rawPath = path.join(reportDir, "scenarios/hello-world/claude-code.raw.ndjson");
+    expect(fs.existsSync(rawPath)).toBe(true);
+    expect(fs.readFileSync(rawPath, "utf-8")).toBe(
+      '{"type":"assistant","message":"hello"}\n{"type":"result","result":"done"}\n',
+    );
+  });
+
+  it("does not write raw.ndjson when rawOutput is absent", () => {
+    const { reportDir } = initReport("2025-04-13T18:30:42.000Z", tmpDir);
+    const result = makeRunOutput().results[0];
+
+    writeScenarioRawData(reportDir, result);
+
+    const rawPath = path.join(reportDir, "scenarios/hello-world/claude-code.raw.ndjson");
+    expect(fs.existsSync(rawPath)).toBe(false);
+  });
+
+  it("writes sparse-index.txt when sparseIndex is provided", () => {
+    const { reportDir } = initReport("2025-04-13T18:30:42.000Z", tmpDir);
+    const result = makeRunOutput().results[0];
+    const sparseIndex: SparseIndex = {
+      lines: ["#1    agent    assistant   Done"],
+      interactions: [],
+      stats: {
+        totalInteractions: 1,
+        byCategory: { environment: 0, service: 0, agent: 1 },
+        totalErrors: 0,
+        totalDurationMs: 0,
+        wallClockMs: 0,
+      },
+    };
+
+    writeScenarioRawData(reportDir, result, sparseIndex);
+
+    const indexPath = path.join(reportDir, "scenarios/hello-world/claude-code.sparse-index.txt");
+    expect(fs.existsSync(indexPath)).toBe(true);
+    const content = fs.readFileSync(indexPath, "utf-8");
+    expect(content).toContain("# Sparse Index: hello-world / claude-code");
+    expect(content).toContain("#1    agent    assistant   Done");
+  });
+
+  it("does not write sparse-index.txt when sparseIndex is not provided", () => {
+    const { reportDir } = initReport("2025-04-13T18:30:42.000Z", tmpDir);
+    const result = makeRunOutput().results[0];
+
+    writeScenarioRawData(reportDir, result);
+
+    const indexPath = path.join(reportDir, "scenarios/hello-world/claude-code.sparse-index.txt");
+    expect(fs.existsSync(indexPath)).toBe(false);
+  });
+});
+
+describe("finalizeReport", () => {
+  it("writes scenario JSON, manifest, and HTML", () => {
+    const output = makeScoredOutput();
+    const { reportDir } = initReport(output.timestamp, tmpDir);
+
+    finalizeReport(reportDir, output);
+
+    expect(fs.existsSync(path.join(reportDir, "report.json"))).toBe(true);
+    expect(fs.existsSync(path.join(reportDir, "scenarios/cms/create-post/claude-code.json"))).toBe(true);
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(reportDir, "report.json"), "utf-8"));
+    expect(manifest.reportId).toBe("2025-04-13-183042");
+    expect(manifest.results).toHaveLength(1);
+    expect(manifest.results[0].score.axisScore).toBe(85);
+  });
+
+  it("includes name in manifest when provided", () => {
+    const output = makeRunOutput();
+    const { reportDir } = initReport(output.timestamp, tmpDir);
+
+    finalizeReport(reportDir, output, "My Project");
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(reportDir, "report.json"), "utf-8"));
+    expect(manifest.name).toBe("My Project");
+  });
+
+  it("strips rawOutput and sparseIndex from scenario JSON", () => {
+    const scored = makeScoredOutput();
+    scored.results[0].output.rawOutput = ['{"type":"result"}'];
+    scored.results[0].score.sparseIndex = {
+      lines: ["#1    agent    assistant   Done"],
+      interactions: [],
+      stats: {
+        totalInteractions: 1,
+        byCategory: { environment: 0, service: 0, agent: 1 },
+        totalErrors: 0,
+        totalDurationMs: 0,
+        wallClockMs: 0,
+      },
+    };
+
+    const { reportDir } = initReport(scored.timestamp, tmpDir);
+    finalizeReport(reportDir, scored);
+
+    const result = JSON.parse(
+      fs.readFileSync(path.join(reportDir, "scenarios/cms/create-post/claude-code.json"), "utf-8"),
+    );
+    expect(result.output.rawOutput).toBeUndefined();
+    expect(result.score.sparseIndex).toBeUndefined();
+    expect(result.score.axisScore).toBe(85);
+  });
+
+  it("three-phase pipeline produces same output as writeReportToStore", () => {
+    const output = makeScoredOutput();
+    output.results[0].output.rawOutput = ['{"type":"result"}'];
+    output.results[0].score.sparseIndex = {
+      lines: ["#1    agent    assistant   Done"],
+      interactions: [],
+      stats: {
+        totalInteractions: 1,
+        byCategory: { environment: 0, service: 0, agent: 1 },
+        totalErrors: 0,
+        totalDurationMs: 0,
+        wallClockMs: 0,
+      },
+    };
+
+    // Write via convenience wrapper
+    const reportId = writeReportToStore(output, tmpDir, "Test");
+
+    // Write via three-phase pipeline in a separate dir
+    const tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "axis-writer-test-phase-"));
+    try {
+      const { reportDir } = initReport(output.timestamp, tmpDir2);
+      for (const result of output.results) {
+        const sparseIndex = "score" in result ? (result as any).score.sparseIndex : undefined;
+        writeScenarioRawData(reportDir, result, sparseIndex);
+      }
+      finalizeReport(reportDir, output, "Test");
+
+      // Compare manifests
+      const manifest1 = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, ".axis/reports", reportId, "report.json"), "utf-8"),
+      );
+      const manifest2 = JSON.parse(fs.readFileSync(path.join(reportDir, "report.json"), "utf-8"));
+      expect(manifest1).toEqual(manifest2);
+
+      // Compare scenario JSONs
+      const scenario1 = JSON.parse(
+        fs.readFileSync(
+          path.join(tmpDir, ".axis/reports", reportId, "scenarios/cms/create-post/claude-code.json"),
+          "utf-8",
+        ),
+      );
+      const scenario2 = JSON.parse(
+        fs.readFileSync(path.join(reportDir, "scenarios/cms/create-post/claude-code.json"), "utf-8"),
+      );
+      expect(scenario1).toEqual(scenario2);
+    } finally {
+      fs.rmSync(tmpDir2, { recursive: true, force: true });
+    }
   });
 });

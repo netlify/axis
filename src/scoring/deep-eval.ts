@@ -1,10 +1,8 @@
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { getAdapter } from "../adapters/registry.js";
 import type { NormalizedEntry, NormalizedTranscript } from "../transcript/types.js";
 import type { RunResult } from "../types/output.js";
+import type { ScoringWeights } from "../types/config.js";
 import type {
+  CategoryEvalResult,
   DeepEvalResult,
   EvalPattern,
   Interaction,
@@ -14,8 +12,9 @@ import type {
   SparseIndex,
 } from "../types/scoring.js";
 import { DEFAULT_AUDIT_SCORES } from "./category-score.js";
+import { callJudge } from "./judge.js";
 import { parseJsonFromText } from "./parse-json.js";
-import { getPromptTemplates, interpolate } from "./prompt-templates.js";
+import { CATEGORY_GUIDANCE, getPromptTemplates, interpolate } from "./prompt-templates.js";
 
 /** Max characters of full content to include per interaction. */
 const MAX_CONTENT_PER_INTERACTION = 3_000;
@@ -26,37 +25,63 @@ const MAX_TOTAL_CONTENT = 40_000;
 /** Max characters for the sparse index in the evaluation prompt. */
 const MAX_SPARSE_INDEX_CHARS = 60_000;
 
+/** Options for the deep evaluation pass. */
+export interface DeepEvalOptions {
+  /** Scoring weights — categories with weight 0 are skipped. */
+  weights?: ScoringWeights;
+  /** Report directory containing raw data files for judges. */
+  reportDir?: string;
+}
+
 /**
- * Run the deep evaluation LLM pass.
+ * Run the deep evaluation as parallel per-category judge calls.
  *
+ * Each category (environment, service, agent) gets its own focused LLM judge.
+ * Categories with no interactions or zero weight are skipped (default scores used).
  * Speed is always computed heuristically from interaction timing data (no LLM needed).
- * The LLM evaluates ALL interactions for success, weight, contextRelevance,
- * and necessity per category.
  */
 export async function runDeepEval(
   result: RunResult,
   sparseIndex: SparseIndex,
   normalized: NormalizedTranscript,
+  options?: DeepEvalOptions,
 ): Promise<DeepEvalResult> {
   // If there are no interactions at all, return defaults
   if (sparseIndex.interactions.length === 0) {
     return buildDefaultResult(sparseIndex);
   }
 
-  // Always call LLM to evaluate all interactions
-  const prompt = buildDeepEvalPrompt(result, sparseIndex, normalized);
-  const responseText = await callJudge(result, prompt);
-  const deepResult = parseDeepEvalResponse(responseText, sparseIndex);
+  const categories: InteractionCategory[] = ["environment", "service", "agent"];
+
+  // Run per-category judges in parallel
+  const categoryResults = await Promise.all(
+    categories.map(async (category) => {
+      // Skip categories with no interactions
+      if (sparseIndex.stats.byCategory[category] === 0) {
+        return buildDefaultCategoryResult(category);
+      }
+
+      // Skip categories with zero weight
+      if (options?.weights && options.weights[category] === 0) {
+        return buildDefaultCategoryResult(category);
+      }
+
+      return runCategoryEval(result, sparseIndex, normalized, category, options?.reportDir);
+    }),
+  );
+
+  // Merge per-category results into a single DeepEvalResult
+  const merged = mergeCategoryResults(categoryResults, sparseIndex);
 
   // Inject heuristic speed into ALL audits — speed is always deterministic
-  for (const audit of deepResult.audits) {
+  for (const audit of merged.audits) {
     const interaction = sparseIndex.interactions.find((i) => i.id === audit.id);
     if (interaction) {
       audit.speed = computeHeuristicSpeed(interaction);
     }
   }
 
-  return deepResult;
+  return merged;
 }
 
 /**
@@ -100,42 +125,71 @@ export function computeHeuristicSpeed(interaction: Interaction): number {
   return 0.4;
 }
 
-function buildDeepEvalPrompt(
+// --- Per-category judge ---
+
+async function runCategoryEval(
   result: RunResult,
   sparseIndex: SparseIndex,
   normalized: NormalizedTranscript,
+  category: InteractionCategory,
+  reportDir?: string,
+): Promise<CategoryEvalResult> {
+  const prompt = buildCategoryEvalPrompt(result, sparseIndex, normalized, category, reportDir);
+  const responseText = await callJudge(result, prompt, {
+    scenarioKey: `__${category}_eval__`,
+    scenarioName: `AXIS ${category} Evaluation`,
+  });
+
+  return parseCategoryEvalResponse(responseText, category, sparseIndex);
+}
+
+function buildCategoryEvalPrompt(
+  result: RunResult,
+  sparseIndex: SparseIndex,
+  normalized: NormalizedTranscript,
+  category: InteractionCategory,
+  reportDir?: string,
 ): string {
   const { stats } = sparseIndex;
-
   const sparseLines = truncateSparseLines(sparseIndex.lines);
-  const interactionContent = buildInteractionContent(sparseIndex, normalized);
 
-  const { deep_eval } = getPromptTemplates();
+  // Filter interactions to this category and build content
+  const categoryInteractions = sparseIndex.interactions.filter((i) => i.categories.includes(category));
+  const interactionContent = buildCategoryInteractionContent(categoryInteractions, normalized);
 
-  return interpolate(deep_eval.template, {
+  // Build data dir reference
+  const dataDir = reportDir
+    ? `${reportDir}/scenarios/${result.scenarioKey}`
+    : "(not available)";
+
+  const { category_eval } = getPromptTemplates();
+
+  return interpolate(category_eval.template, {
     scenarioName: result.scenarioName,
     prompt: result.prompt,
+    categoryName: category,
     totalInteractions: stats.totalInteractions,
+    categoryInteractionCount: categoryInteractions.length,
     sparseLines,
-    envInteractions: stats.byCategory.environment,
-    svcInteractions: stats.byCategory.service,
-    agentInteractions: stats.byCategory.agent,
-    totalErrors: stats.totalErrors,
-    totalDurationMs: stats.totalDurationMs,
+    categoryGuidance: CATEGORY_GUIDANCE[category] ?? "",
     interactionContent,
+    dataDir,
   });
 }
 
 /**
- * Build the full content section for ALL interactions.
+ * Build the full content section for interactions in a specific category.
  * Includes as much content as fits within the total budget.
  */
-function buildInteractionContent(sparseIndex: SparseIndex, normalized: NormalizedTranscript): string {
+function buildCategoryInteractionContent(
+  interactions: Interaction[],
+  normalized: NormalizedTranscript,
+): string {
   const sections: string[] = [];
   let totalChars = 0;
 
-  for (let idx = 0; idx < sparseIndex.interactions.length; idx++) {
-    const interaction = sparseIndex.interactions[idx];
+  for (let idx = 0; idx < interactions.length; idx++) {
+    const interaction = interactions[idx];
 
     const fullContent = interaction.entryIndices.map((i) => formatFullEntry(normalized.entries[i])).join("\n");
 
@@ -146,7 +200,7 @@ function buildInteractionContent(sparseIndex: SparseIndex, normalized: Normalize
 
     if (totalChars + truncatedContent.length > MAX_TOTAL_CONTENT) {
       sections.push(
-        `\n... (remaining ${sparseIndex.interactions.length - idx} interactions shown only in sparse index above)`,
+        `\n... (remaining ${interactions.length - idx} interactions shown only in sparse index above)`,
       );
       break;
     }
@@ -180,9 +234,9 @@ function formatFullEntry(entry: NormalizedEntry): string {
     case "tool_result":
       parts.push(`[TOOL_RESULT]`);
       if (entry.toolResultText) {
-        const result =
+        const resultText =
           entry.toolResultText.length > 2000 ? entry.toolResultText.slice(0, 2000) + "..." : entry.toolResultText;
-        parts.push(`  Result: ${result}`);
+        parts.push(`  Result: ${resultText}`);
       }
       break;
     case "error":
@@ -195,37 +249,55 @@ function formatFullEntry(entry: NormalizedEntry): string {
   return parts.join("\n");
 }
 
-async function callJudge(runResult: RunResult, prompt: string): Promise<string> {
-  const adapter = getAdapter(runResult.agentConfig.adapter);
-
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "axis-deep-eval-"));
-  try {
-    const output = await adapter.run({
-      prompt,
-      config: runResult.agentConfig,
-      scenario: {
-        key: "__deep_eval__",
-        name: "AXIS Deep Evaluation",
-        prompt,
-        rubric: [],
-      },
-      workingDirectory: workspace,
-    });
-    return output.result ?? "";
-  } finally {
-    try {
-      fs.rmSync(workspace, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
 // --- Response parsing ---
 
 /**
- * Parse the deep eval LLM response.
- * Fills in default audits for interactions the LLM missed and default necessity for missing categories.
+ * Parse a per-category judge response into a CategoryEvalResult.
+ * Fills in default audits for interactions the LLM missed.
+ */
+export function parseCategoryEvalResponse(
+  responseText: string,
+  category: InteractionCategory,
+  sparseIndex: SparseIndex,
+): CategoryEvalResult {
+  const parsed = parseJsonFromText(responseText);
+
+  const categoryInteractions = sparseIndex.interactions.filter((i) => i.categories.includes(category));
+
+  if (!parsed) {
+    return buildDefaultCategoryResult(category, categoryInteractions);
+  }
+
+  // Parse audits
+  const llmAudits = parseCategoryAudits(parsed.audits, category, sparseIndex);
+  const auditMap = new Map(llmAudits.map((a) => [a.id, a]));
+
+  const allAudits: InteractionAudit[] = categoryInteractions.map((interaction) => {
+    const existing = auditMap.get(interaction.id);
+    if (existing) return existing;
+    return {
+      id: interaction.id,
+      categories: interaction.categories,
+      success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
+      speed: DEFAULT_AUDIT_SCORES.speed,
+      weight: DEFAULT_AUDIT_SCORES.weight,
+      contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
+      rationale: "default",
+    };
+  });
+
+  // Parse necessity (single object, not array)
+  const necessity = parseSingleNecessity(parsed.necessity, category);
+
+  // Parse patterns
+  const patterns = parsePatterns(parsed.patterns);
+
+  return { category, audits: allAudits, necessity, patterns };
+}
+
+/**
+ * Parse the legacy deep eval LLM response (all categories in one call).
+ * Kept for backward compatibility with existing tests and any code that uses it.
  */
 export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseIndex): DeepEvalResult {
   const parsed = parseJsonFromText(responseText);
@@ -236,7 +308,7 @@ export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseI
 
   if (parsed) {
     llmAudits = parseAudits(parsed.audits, sparseIndex);
-    llmNecessity = parseNecessity(parsed.necessity);
+    llmNecessity = parseNecessityArray(parsed.necessity);
     llmPatterns = parsePatterns(parsed.patterns);
   }
 
@@ -278,6 +350,157 @@ export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseI
   return { audits: allAudits, necessity: allNecessity, patterns: llmPatterns };
 }
 
+// --- Merge per-category results ---
+
+/**
+ * Merge per-category results into a single DeepEvalResult.
+ * Interactions that appear in multiple categories get the audit from the first
+ * category that evaluated them (multi-category interactions are rare).
+ */
+export function mergeCategoryResults(
+  categoryResults: CategoryEvalResult[],
+  sparseIndex: SparseIndex,
+): DeepEvalResult {
+  const auditMap = new Map<number, InteractionAudit>();
+
+  // Collect all audits, first-write-wins for multi-category interactions
+  for (const catResult of categoryResults) {
+    for (const audit of catResult.audits) {
+      if (!auditMap.has(audit.id)) {
+        auditMap.set(audit.id, audit);
+      }
+    }
+  }
+
+  // Ensure every interaction has an audit (some may be uncategorized or missed)
+  const allAudits: InteractionAudit[] = sparseIndex.interactions.map((interaction) => {
+    const existing = auditMap.get(interaction.id);
+    if (existing) return existing;
+    return {
+      id: interaction.id,
+      categories: interaction.categories,
+      success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
+      speed: DEFAULT_AUDIT_SCORES.speed,
+      weight: DEFAULT_AUDIT_SCORES.weight,
+      contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
+      rationale: "default",
+    };
+  });
+
+  // Collect necessity and patterns from each category
+  const necessity: NecessityJudgment[] = categoryResults.map((r) => r.necessity);
+  const patterns: EvalPattern[] = categoryResults.flatMap((r) => r.patterns);
+
+  return { audits: allAudits, necessity, patterns };
+}
+
+// --- Default builders ---
+
+function buildDefaultResult(sparseIndex: SparseIndex): DeepEvalResult {
+  const audits: InteractionAudit[] = sparseIndex.interactions.map((interaction) => ({
+    id: interaction.id,
+    categories: interaction.categories,
+    success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
+    speed: DEFAULT_AUDIT_SCORES.speed,
+    weight: DEFAULT_AUDIT_SCORES.weight,
+    contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
+    rationale: "default",
+  }));
+
+  const categories: InteractionCategory[] = ["environment", "service", "agent"];
+  const necessity: NecessityJudgment[] = categories.map((cat) => ({
+    category: cat,
+    score: 0.8,
+    unnecessaryIds: [],
+    rationale: "default",
+  }));
+
+  return { audits, necessity, patterns: [] };
+}
+
+export function buildDefaultCategoryResult(
+  category: InteractionCategory,
+  interactions?: Interaction[],
+): CategoryEvalResult {
+  const audits: InteractionAudit[] = (interactions ?? []).map((interaction) => ({
+    id: interaction.id,
+    categories: interaction.categories,
+    success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
+    speed: DEFAULT_AUDIT_SCORES.speed,
+    weight: DEFAULT_AUDIT_SCORES.weight,
+    contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
+    rationale: "default",
+  }));
+
+  return {
+    category,
+    audits,
+    necessity: {
+      category,
+      score: 0.8,
+      unnecessaryIds: [],
+      rationale: "default",
+    },
+    patterns: [],
+  };
+}
+
+// --- Parsing helpers ---
+
+function parseCategoryAudits(
+  raw: unknown,
+  category: InteractionCategory,
+  sparseIndex: SparseIndex,
+): InteractionAudit[] {
+  if (!Array.isArray(raw)) return [];
+
+  const categoryInteractions = sparseIndex.interactions.filter((i) => i.categories.includes(category));
+  const interactionMap = new Map(categoryInteractions.map((i) => [i.id, i]));
+  const audits: InteractionAudit[] = [];
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const obj = item as Record<string, unknown>;
+
+    if (typeof obj.id !== "number") continue;
+
+    const interaction = interactionMap.get(obj.id);
+    if (!interaction) continue;
+
+    audits.push({
+      id: obj.id,
+      categories: interaction.categories,
+      success: clamp01(obj.success),
+      speed: DEFAULT_AUDIT_SCORES.speed, // placeholder — overridden by heuristic
+      weight: clamp01(obj.weight),
+      contextRelevance: clamp01(obj.contextRelevance),
+      rationale: typeof obj.rationale === "string" ? obj.rationale : "",
+    });
+  }
+
+  return audits;
+}
+
+function parseSingleNecessity(raw: unknown, category: InteractionCategory): NecessityJudgment {
+  if (!raw || typeof raw !== "object") {
+    return { category, score: 1.0, unnecessaryIds: [], rationale: "default" };
+  }
+
+  const obj = raw as Record<string, unknown>;
+
+  const unnecessaryIds = Array.isArray(obj.unnecessaryIds)
+    ? obj.unnecessaryIds.filter((id): id is number => typeof id === "number")
+    : [];
+
+  return {
+    category,
+    score: clamp01(obj.score),
+    unnecessaryIds,
+    rationale: typeof obj.rationale === "string" ? obj.rationale : "",
+  };
+}
+
+/** Parse audits from legacy all-in-one deep eval response. */
 function parseAudits(raw: unknown, sparseIndex: SparseIndex): InteractionAudit[] {
   if (!Array.isArray(raw)) return [];
 
@@ -307,7 +530,8 @@ function parseAudits(raw: unknown, sparseIndex: SparseIndex): InteractionAudit[]
   return audits;
 }
 
-function parseNecessity(raw: unknown): NecessityJudgment[] {
+/** Parse necessity array from legacy all-in-one deep eval response. */
+function parseNecessityArray(raw: unknown): NecessityJudgment[] {
   if (!Array.isArray(raw)) return [];
 
   const validCategories = new Set<InteractionCategory>(["environment", "service", "agent"]);
@@ -359,28 +583,6 @@ function parsePatterns(raw: unknown): EvalPattern[] {
   }
 
   return patterns;
-}
-
-function buildDefaultResult(sparseIndex: SparseIndex): DeepEvalResult {
-  const audits: InteractionAudit[] = sparseIndex.interactions.map((interaction) => ({
-    id: interaction.id,
-    categories: interaction.categories,
-    success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
-    speed: DEFAULT_AUDIT_SCORES.speed,
-    weight: DEFAULT_AUDIT_SCORES.weight,
-    contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
-    rationale: "default",
-  }));
-
-  const categories: InteractionCategory[] = ["environment", "service", "agent"];
-  const necessity: NecessityJudgment[] = categories.map((cat) => ({
-    category: cat,
-    score: 0.8,
-    unnecessaryIds: [],
-    rationale: "default",
-  }));
-
-  return { audits, necessity, patterns: [] };
 }
 
 function truncateSparseLines(lines: string[]): string {

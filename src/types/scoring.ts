@@ -117,6 +117,18 @@ export interface DeepEvalResult {
   patterns: EvalPattern[];
 }
 
+/** Result from a single per-category evaluation judge. */
+export interface CategoryEvalResult {
+  /** The category this judge evaluated. */
+  category: InteractionCategory;
+  /** Per-interaction audits (only for this category's interactions). */
+  audits: InteractionAudit[];
+  /** Necessity judgment for this category. */
+  necessity: NecessityJudgment;
+  /** Patterns identified within this category. */
+  patterns: EvalPattern[];
+}
+
 // --- Category scores ---
 
 /** Score for a single process-quality category (environment, service, agent). */
@@ -187,4 +199,6 @@ export interface ScoringOptions {
   logger?: Logger;
   /** Called when scoring starts/finishes for a result. */
   onProgress?: (scenarioKey: string, agentName: string, phase: "start" | "done") => void;
+  /** Report directory for writing raw data before judges run. */
+  reportDir?: string;
 }

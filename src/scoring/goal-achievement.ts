@@ -1,11 +1,8 @@
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { getAdapter } from "../adapters/registry.js";
 import type { NormalizedEntry } from "../transcript/types.js";
 import type { RubricCriterion } from "../types/scenario.js";
 import type { RunResult } from "../types/output.js";
 import type { GoalAchievementScore, CriterionGrade } from "../types/scoring.js";
+import { callJudge } from "./judge.js";
 import { parseJsonFromText } from "./parse-json.js";
 import { getPromptTemplates, interpolate } from "./prompt-templates.js";
 
@@ -34,7 +31,10 @@ async function scoreStringRubric(
   finalResult: string | null,
 ): Promise<GoalAchievementScore> {
   const prompt = buildStringRubricPrompt(runResult, entries, finalResult, rubric);
-  const responseText = await callJudge(runResult, prompt);
+  const responseText = await callJudge(runResult, prompt, {
+    scenarioKey: "__judge__",
+    scenarioName: "AXIS Judge",
+  });
 
   const parsed = parseJsonFromText(responseText);
   if (!parsed || typeof parsed.score !== "number") {
@@ -72,7 +72,10 @@ async function scoreArrayRubric(
   finalResult: string | null,
 ): Promise<GoalAchievementScore> {
   const prompt = buildArrayRubricPrompt(runResult, entries, finalResult, rubric);
-  const responseText = await callJudge(runResult, prompt);
+  const responseText = await callJudge(runResult, prompt, {
+    scenarioKey: "__judge__",
+    scenarioName: "AXIS Judge",
+  });
 
   const criteria = parseArrayJudgeResponse(responseText, rubric);
   const score = computeWeightedScore(criteria);
@@ -80,31 +83,6 @@ async function scoreArrayRubric(
   return { score, criteria };
 }
 
-async function callJudge(runResult: RunResult, prompt: string): Promise<string> {
-  const adapter = getAdapter(runResult.agentConfig.adapter);
-
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "axis-judge-"));
-  try {
-    const output = await adapter.run({
-      prompt,
-      config: runResult.agentConfig,
-      scenario: {
-        key: "__judge__",
-        name: "AXIS Judge",
-        prompt,
-        rubric: [],
-      },
-      workingDirectory: workspace,
-    });
-    return output.result ?? "";
-  } finally {
-    try {
-      fs.rmSync(workspace, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
-  }
-}
 
 /** Max characters for the condensed transcript section. */
 const MAX_TRANSCRIPT_CHARS = 50_000;

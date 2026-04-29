@@ -60,84 +60,120 @@ export function interpolate(template: string, vars: Record<string, string | numb
 // Template definitions
 // ---------------------------------------------------------------------------
 
-const DEEP_EVAL_TEMPLATE: PromptTemplate = {
-  name: "deep_eval",
+/** Per-category evaluation guidance for focused judge prompts. */
+export const CATEGORY_GUIDANCE: Record<string, string> = {
+  environment: `You are evaluating ENVIRONMENT interactions — file system operations, shell commands, code edits, and local workspace manipulation.
+
+Key considerations:
+- File reads/writes: Was the operation necessary? Was it right-sized (not reading entire files when a section would suffice)?
+- Shell commands: Did they succeed? Were they idempotent or did they cause side effects?
+- Code edits: Were they precise (targeted edits vs. rewriting entire files)?
+- Error recovery: Did the agent handle file-not-found, permission errors, or failed commands well?
+- Workspace hygiene: Did the agent clean up temp files, avoid polluting the workspace?`,
+
+  service: `You are evaluating SERVICE interactions — API calls, web fetches, external service requests, and network operations.
+
+Key considerations:
+- API calls: Were they well-formed? Did the agent handle rate limits, auth errors, and timeouts?
+- Web fetches: Did the agent fetch relevant pages? Were redundant fetches avoided?
+- Data handling: Was response data used effectively or was it fetched and ignored?
+- Error recovery: Did the agent retry appropriately on transient failures?
+- Efficiency: Were batch operations used when available instead of multiple individual calls?`,
+
+  agent: `You are evaluating AGENT interactions — the agent's own reasoning, planning, tool discovery, and communication.
+
+Key considerations:
+- Planning: Did the agent form a clear plan before acting, or did it thrash?
+- Tool discovery: Was tool/capability lookup necessary, or was it redundant exploration?
+- Reasoning quality: Was the agent's reasoning focused and productive?
+- Human interaction: Were questions to the user clear and necessary, or could the agent have proceeded independently?
+- Self-correction: When the agent detected errors, did it adjust its approach efficiently?`,
+};
+
+const CATEGORY_EVAL_TEMPLATE: PromptTemplate = {
+  name: "category_eval",
   description:
-    "Comprehensive evaluation of ALL interactions for success, weight, contextRelevance, necessity per category, and cross-interaction patterns.",
+    "Per-category evaluation of interactions for success, weight, contextRelevance, necessity, and patterns. Run once per category (environment, service, agent) in parallel.",
   stage: "deep_eval",
   template: `You are an expert evaluator for AXIS, an AI agent testing framework.
 
-You are performing a comprehensive evaluation of ALL interactions from an agent execution.
+You are evaluating the {{categoryName}} dimension of an agent execution. Focus ONLY on {{categoryName}} interactions, but use the full transcript context to understand the agent's overall behavior.
 
 SCENARIO: {{scenarioName}}
 
 TASK GIVEN TO AGENT:
 {{prompt}}
 
-COMPLETE SPARSE INDEX ({{totalInteractions}} interactions):
+COMPLETE SPARSE INDEX ({{totalInteractions}} total interactions, {{categoryInteractionCount}} are {{categoryName}}):
 {{sparseLines}}
 
-STATS:
-- Environment interactions: {{envInteractions}}
-- Service interactions: {{svcInteractions}}
-- Agent interactions: {{agentInteractions}}
-- Errors: {{totalErrors}}
-- Total duration: {{totalDurationMs}}ms
+{{categoryName}} CATEGORY GUIDANCE:
+{{categoryGuidance}}
 
-FULL INTERACTION CONTENT:
+{{categoryName}} INTERACTION DETAILS ({{categoryInteractionCount}} interactions):
 {{interactionContent}}
+
+RAW DATA FILES (for additional detail if needed):
+{{dataDir}}
 
 NOTE: Content shown above may be truncated for evaluation purposes. This does NOT mean the agent's actual tool results were truncated — evaluate based on the quality and structure of what is shown, not on apparent truncation boundaries.
 
 EVALUATION DIMENSIONS (score each 0.0 to 1.0):
-- success: Did the interaction complete without errors? Were the results correct and usable? Evaluate based on the actual content returned, not assumptions about what a "complete" result should look like. For service calls (API requests, web fetches), if the call returned structured, usable content and the agent used it successfully, score success high — do not speculate about content that might be missing or hypothesize about JS-gated pages or truncation.
-- weight: Was the tool invocation right-sized for the operation? Evaluate whether the agent sent an appropriate amount of data to the tool and received a proportionate response. For environment tools (file writes, edits, shell commands), judge the tool operation — not the semantic quality of the content the agent chose to write. A 2KB file write is right-sized if the agent intended to write 2KB of content. For service calls, if the call returned the data the agent needed, it is right-sized — do not penalize because a page returned fewer bytes than expected. (1.0 = right-sized, 0.3 = bloated/wasteful)
-- contextRelevance: Was the tool's output relevant and usable for the task? If the tool succeeded and the agent used the output to make progress, score 1.0. Only reduce this score if the output was genuinely irrelevant noise that the agent could not use. Do NOT reduce this score for content quality judgments (e.g., whether a summary was condensed enough, whether fetched content was comprehensive enough) — those are evaluated by goal achievement, not here. Agent-internal operations (tool discovery, planning) are necessary infrastructure — score based on whether they were needed. (1.0 = all useful/necessary, 0.0 = all noise)
+- success: Did the interaction complete without errors? Were the results correct and usable? Evaluate based on the actual content returned, not assumptions about what a "complete" result should look like.
+- weight: Was the tool invocation right-sized for the operation? Evaluate whether the agent sent an appropriate amount of data to the tool and received a proportionate response. (1.0 = right-sized, 0.3 = bloated/wasteful)
+- contextRelevance: Was the tool's output relevant and usable for the task? If the tool succeeded and the agent used the output to make progress, score 1.0. Only reduce this score if the output was genuinely irrelevant noise that the agent could not use. (1.0 = all useful/necessary, 0.0 = all noise)
 
-For each CATEGORY present, also evaluate necessity:
-- necessity (0.0 to 1.0): Were the interactions that the agent performed in this category necessary? Evaluate only what the agent actually did — do not penalize for hypothetical steps it could have taken. 1.0 = all interactions were necessary, 0.0 = all were unnecessary.
+Also evaluate NECESSITY for the {{categoryName}} category as a whole:
+- necessity (0.0 to 1.0): Were the {{categoryName}} interactions necessary for the task? Evaluate only what the agent actually did — do not penalize for hypothetical steps it could have taken. 1.0 = all interactions were necessary, 0.0 = all were unnecessary.
 - List any interaction IDs that were unnecessary.
 
-Also identify any cross-interaction patterns:
+Identify any patterns within {{categoryName}} interactions:
 - Repeated failures or retries
-- Redundant service calls (same endpoint called multiple times)
-- Excessive environment operations for simple tasks
-- Wasted agent reasoning that didn't lead to progress
+- Redundant operations (same action performed multiple times)
+- Excessive operations for simple tasks
+- Wasted effort that didn't lead to progress
 
 CONTEXT FOR EVALUATION:
 - Tool discovery (e.g., ToolSearch, ListTools) and agent configuration reads are required infrastructure — do not flag as unnecessary unless genuinely redundant (same query repeated).
 - Byte counts in sparse lines show total I/O transferred, not file content size. Small results are normal for write/edit confirmations.
-- If a service call (API request, web fetch) returned structured, usable content and the agent used it to complete the task, do not flag it for concerns about hypothetical missing content or page size.
 
 Respond with ONLY valid JSON:
 {
   "audits": [
-    {"id": 1, "category": "environment", "success": 0.9, "weight": 0.8, "contextRelevance": 0.6, "rationale": "brief explanation"},
+    {"id": 1, "success": 0.9, "weight": 0.8, "contextRelevance": 0.6, "rationale": "brief explanation"},
     ...
   ],
-  "necessity": [
-    {"category": "environment", "score": 0.85, "unnecessaryIds": [4], "rationale": "brief explanation"},
-    {"category": "service", "score": 0.7, "unnecessaryIds": [5, 6], "rationale": "brief explanation"},
-    {"category": "agent", "score": 0.95, "unnecessaryIds": [], "rationale": "brief explanation"}
-  ],
+  "necessity": {"score": 0.85, "unnecessaryIds": [4], "rationale": "brief explanation"},
   "patterns": [
     {"description": "pattern description", "interactionIds": [1, 2, 3], "severity": "high"},
     ...
   ]
 }
 
-Include an audit for EVERY interaction listed above.`,
+Include an audit for EVERY {{categoryName}} interaction listed in the details above.`,
   variables: [
     { name: "scenarioName", description: "Name of the test scenario", type: "string" },
     { name: "prompt", description: "The original task prompt given to the agent", type: "text" },
-    { name: "totalInteractions", description: "Total number of interactions in the sparse index", type: "number" },
-    { name: "sparseLines", description: "Complete sparse index content", type: "text" },
-    { name: "envInteractions", description: "Count of environment interactions", type: "number" },
-    { name: "svcInteractions", description: "Count of service interactions", type: "number" },
-    { name: "agentInteractions", description: "Count of agent interactions", type: "number" },
-    { name: "totalErrors", description: "Total error count", type: "number" },
-    { name: "totalDurationMs", description: "Total execution duration in milliseconds", type: "number" },
-    { name: "interactionContent", description: "Full formatted content for all interactions", type: "text" },
+    { name: "categoryName", description: "The category being evaluated (environment, service, or agent)", type: "string" },
+    { name: "totalInteractions", description: "Total number of interactions across all categories", type: "number" },
+    {
+      name: "categoryInteractionCount",
+      description: "Number of interactions in this specific category",
+      type: "number",
+    },
+    { name: "sparseLines", description: "Complete sparse index content (all categories)", type: "text" },
+    { name: "categoryGuidance", description: "Category-specific evaluation guidance", type: "text" },
+    {
+      name: "interactionContent",
+      description: "Full formatted content for this category's interactions only",
+      type: "text",
+    },
+    {
+      name: "dataDir",
+      description: "Path to the report directory containing raw data files",
+      type: "string",
+      optional: true,
+    },
   ],
 };
 
@@ -250,7 +286,7 @@ When done, respond with ONLY valid JSON on its own line:
  */
 export function getPromptTemplates(): Record<string, PromptTemplate> {
   return {
-    deep_eval: DEEP_EVAL_TEMPLATE,
+    category_eval: CATEGORY_EVAL_TEMPLATE,
     goal_string_rubric: GOAL_STRING_RUBRIC_TEMPLATE,
     goal_array_rubric: GOAL_ARRAY_RUBRIC_TEMPLATE,
   };
