@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/netlify/axis/compare/v1.0.0...v1.1.0) (2026-04-29)
+
+
+### Features
+
+* monolithic scoring to multi-category scoring ([d191417](https://github.com/netlify/axis/commit/d191417a25a71bfd90392b849be369e390231d07))
+
+
+### Bug Fixes
+
+* drop the triage phase for now ([11abff5](https://github.com/netlify/axis/commit/11abff50bac303c31fcac9bcd099254f81019181))
+
 ## 1.0.0 (2026-04-29)
 
 
