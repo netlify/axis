@@ -7,7 +7,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <p class="lead">
     AXIS produces a composite 0 to 100 AXIS Result by evaluating four independent dimensions
     of agent performance. Each dimension captures a different aspect of how the agent interacted
-    with your system.
+    with your system, giving you a clear picture of where to improve.
   </p>
 
   <h2>The Four Dimensions</h2>
@@ -74,23 +74,55 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <pre><code>AXIS Result = (Goal Achievement x 0.4) + (Environment x 0.2) + (Service x 0.2) + (Agent x 0.2)</code></pre>
   <p>
     All dimension scores are 0 to 100. The composite result is rounded to the nearest whole number.
+    Weights are configurable in your <a href="/configuration">axis.config.json</a> and must sum to 1.0.
   </p>
 
   <h2 id="goal-achievement">Goal Achievement</h2>
   <p>
-    Goal Achievement is evaluated by a Judge that reads the full agent transcript and compares
+    Goal Achievement is evaluated by a judge that reads the full agent transcript and compares
     the outcome against the rubric checks you defined in the scenario. Each check receives a
     score from 0 to 10, which is scaled to 0 to 100 and combined using the check weights.
   </p>
   <p>
     This is the only dimension driven entirely by your rubric. The other three dimensions are
-    calculated from the agent's interaction transcript.
+    calculated from the agent's interaction transcript using a separate evaluation pipeline.
+  </p>
+  <p>
+    Goal Achievement carries the highest default weight (40%) because the most fundamental question
+    is whether the agent accomplished what you asked it to do. The other three dimensions measure
+    <em>how</em> it got there.
   </p>
 
-  <h2 id="interaction-signals">Interaction Signals</h2>
+  <h2 id="interaction-dimensions">The Interaction Dimensions</h2>
   <p>
-    The Environment, Service, and Agent dimensions are scored by analyzing every tool interaction
-    in the agent's transcript. Each interaction is evaluated on five signals.
+    Environment, Service, and Agent are scored by analyzing every tool interaction in the agent's
+    transcript. Each interaction is classified into a category, then evaluated on a set of signals.
+  </p>
+  <p>
+    A key design decision in AXIS is <strong>separating execution quality from decision quality</strong>.
+    When an agent runs <code>npm install</code> and it takes 10 seconds, there are two distinct
+    questions:
+  </p>
+  <ol>
+    <li>Was the <em>execution</em> good? Did npm succeed? Was it fast?</li>
+    <li>Was the <em>decision</em> good? Was running npm necessary? Was it the right call?</li>
+  </ol>
+  <p>
+    Environment and Service answer the first question. Agent answers the second. This separation
+    matters because the two problems have different solutions. If your Service score is low, the
+    issue is with your APIs or external tools — they are failing or slow. If your Agent score is
+    low, the issue is with how the agent chose to use those tools — making unnecessary calls,
+    reading irrelevant files, or overscoping requests.
+  </p>
+  <p>
+    If both dimensions evaluated both qualities, a low Environment score would be ambiguous: is
+    the filesystem slow, or is the agent reading too many files? Keeping them separate gives you
+    actionable information.
+  </p>
+
+  <h3 id="interaction-signals">Interaction Signals</h3>
+  <p>
+    Every tool interaction is evaluated on five signals.
   </p>
   <table>
     <thead>
@@ -131,12 +163,15 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <p>
     <strong>Judge</strong> signals are evaluated by an LLM that reads the full content of each tool
     call and its result. <strong>Heuristic</strong> signals are computed deterministically from
-    measured values like duration, with no LLM involved.
+    measured values like duration, with no LLM involved. Speed is always heuristic-based because
+    duration is an objective measurement that does not benefit from LLM judgment.
   </p>
 
-  <h3>Signal Weights by Category</h3>
+  <h3>Signal Weights by Dimension</h3>
   <p>
-    Each category emphasizes different signals based on what matters most for that type of interaction.
+    Not all signals apply equally to every dimension. Environment and Service only evaluate
+    execution quality, so they use just two signals. Agent evaluates decision quality across
+    all five.
   </p>
   <table>
     <thead>
@@ -150,49 +185,60 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     <tbody>
       <tr>
         <td>Success</td>
-        <td>0.35</td>
-        <td>0.25</td>
-        <td>0.15</td>
+        <td>0.7</td>
+        <td>0.7</td>
+        <td>0.1</td>
       </tr>
       <tr>
         <td>Speed</td>
-        <td>0.15</td>
-        <td>0.15</td>
-        <td>0.15</td>
+        <td>0.3</td>
+        <td>0.3</td>
+        <td>0.1</td>
       </tr>
       <tr>
         <td>Weight</td>
-        <td>0.15</td>
-        <td>0.20</td>
-        <td>0.20</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>0.2</td>
       </tr>
       <tr>
         <td>Relevance</td>
-        <td>0.15</td>
-        <td>0.20</td>
-        <td>0.25</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>0.2</td>
       </tr>
       <tr>
         <td>Necessity</td>
-        <td>0.20</td>
-        <td>0.20</td>
-        <td>0.25</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>0.4</td>
       </tr>
     </tbody>
   </table>
+
+  <h4>Why these weights?</h4>
   <p>
-    Environment scores weight Success most heavily because failed shell commands or file operations
-    are the most direct signal of a poor interaction. Speed is weighted equally across all categories
-    at 0.15 — the category-specific speed thresholds (below) handle the fact that different operation
-    types have different expected durations. Agent scores weight Necessity, Weight, and Relevance more
-    heavily because self-organization quality is best measured by whether the agent's own actions were
-    purposeful and well-scoped.
+    <strong>Environment and Service</strong> use only Success (0.7) and Speed (0.3). These
+    dimensions measure how well the tools and services <em>performed</em>, not whether the agent
+    should have called them. Success is weighted higher because a failed command or erroring API is
+    a more severe problem than a slow one. Weight, Relevance, and Necessity are zero because those
+    are questions about agent decision-making, which belongs in the Agent dimension.
+  </p>
+  <p>
+    <strong>Agent</strong> uses all five signals, with Necessity carrying the most weight at 0.4.
+    Necessity answers the most fundamental question about decision quality: should this interaction
+    have happened at all? An agent that makes fewer, more targeted interactions is fundamentally
+    better than one that shotguns commands hoping something works. Weight (0.2) and Relevance (0.2)
+    refine the picture — were the calls right-sized, and was the output actually useful? Success and
+    Speed are low (0.1 each) for the Agent dimension because execution outcomes are already captured
+    by Environment and Service.
   </p>
 
   <h3>Speed Thresholds</h3>
   <p>
     Speed scores are based on how long each interaction took. Thresholds vary by category because
-    different types of operations have different expected durations.
+    different types of operations have different expected durations. A file read that takes 2 seconds
+    is slow; an API call that takes 2 seconds is normal.
   </p>
   <table>
     <thead>
@@ -235,25 +281,40 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 
   <h2>Score Calibration</h2>
   <p>
-    Raw signal scores are mapped to a 0 to 100 scale using an S-curve rather than linear scaling.
-    This means:
+    Raw signal scores are mapped to a 0 to 100 scale using a log-normal S-curve rather than
+    linear scaling.
+  </p>
+  <h4>Why an S-curve?</h4>
+  <p>
+    Linear scaling would mean going from 80 to 90 is exactly as hard as going from 20 to 30.
+    That does not match reality. Fixing obvious problems — broken commands, missing files, erroring
+    APIs — is straightforward. But squeezing out the last few points of efficiency, eliminating
+    every unnecessary interaction and optimizing every call, requires real sophistication. The
+    S-curve reflects this: easy gains at the bottom, diminishing returns at the top.
   </p>
   <ul>
+    <li>A score of <strong>50</strong> represents median performance for that dimension.</li>
     <li>Improving from 20 to 50 is relatively easy (fixing obvious problems).</li>
     <li>Improving from 80 to 95 requires significant quality gains.</li>
-    <li>A score of 50 represents median performance for that category.</li>
   </ul>
+
+  <h4>Speed aggregation</h4>
   <p>
-    Speed is aggregated using a <strong>severity-weighted average</strong>: slow interactions pull the
-    score down disproportionately rather than being hidden by many fast interactions. Other signals
-    (success, weight, relevance) are weighted by context size, so a failed API call that returns a
-    large error response influences the score more than a trivial file read.
+    Speed is aggregated using a <strong>severity-weighted average</strong> rather than a simple mean.
+    Slow interactions pull the score down disproportionately rather than being hidden by many fast
+    interactions. If you have 100 fast file reads and 1 API call that takes 30 seconds, a simple
+    average would bury the problem. Severity weighting ensures that one slow call visibly impacts
+    the score.
+  </p>
+  <p>
+    Other signals (success, weight, relevance) are weighted by context size, so a failed API call
+    that returns a large error response influences the score more than a trivial file read.
   </p>
 
   <h2>Transcript Categorization</h2>
   <p>
-    Every tool interaction is classified into a category based on the tool name. This classification
-    determines which dimension the interaction contributes to.
+    Every tool interaction in the transcript is classified into a category based on the tool name.
+    This classification determines which dimension the interaction contributes to.
   </p>
 
   <h3 id="environment">Environment</h3>

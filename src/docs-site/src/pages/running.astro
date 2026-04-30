@@ -1,17 +1,11 @@
 ---
 import DocsLayout from "../layouts/DocsLayout.astro";
-
-const ciExample = `# GitHub Actions example
-- name: Run AXIS tests
-  env:
-    ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
-  run: npx @netlify/axis run --json --compare-baseline`;
 ---
 
-<DocsLayout title="Running Tests" active="running">
-  <h1>Running AXIS Tests</h1>
+<DocsLayout title="Execution & Agents" active="running">
+  <h1>Execution & Agents</h1>
   <p class="lead">
-    How AXIS executes scenarios, manages agent processes, and produces reports.
+    How AXIS executes scenarios, manages agent processes, and isolates workspaces.
   </p>
 
   <h2>Execution Model</h2>
@@ -24,23 +18,28 @@ const ciExample = `# GitHub Actions example
     Each job follows the same lifecycle:
   </p>
   <ol>
-    <li>Run setup actions (if defined in the scenario).</li>
-    <li>Spawn the agent process in an isolated workspace.</li>
-    <li>Stream and capture the full interaction transcript.</li>
-    <li>Score the transcript against the rubric (unless <code>--no-score</code> is set).</li>
-    <li>Run teardown actions (if defined).</li>
-    <li>Save the result to the report.</li>
+    <li><strong>Setup</strong> — Run setup actions defined in the scenario (if any).</li>
+    <li><strong>Spawn</strong> — Start the agent process in an isolated workspace.</li>
+    <li><strong>Capture</strong> — Stream and record the full interaction transcript.</li>
+    <li><strong>Score</strong> — Evaluate the transcript against the rubric and interaction signals (unless <code>--no-score</code> is set).</li>
+    <li><strong>Teardown</strong> — Run teardown actions (if any).</li>
+    <li><strong>Save</strong> — Write the result to the report.</li>
   </ol>
-
-  <h2>Built-in Adapters</h2>
   <p>
-    AXIS ships with adapters for popular AI coding agents. Each adapter handles CLI resolution,
-    process spawning, transcript capture, and output normalization.
+    The agent has a 10-minute timeout by default. If the agent does not finish within the timeout,
+    AXIS sends SIGTERM, waits briefly, then SIGKILL. Timed-out runs are marked as failed with a
+    timeout error.
+  </p>
+
+  <h2>Supported Agents</h2>
+  <p>
+    AXIS ships with built-in support for popular AI coding agents. Each agent integration handles
+    CLI resolution, process spawning, transcript capture, and output normalization.
   </p>
   <table>
     <thead>
       <tr>
-        <th>Adapter</th>
+        <th>Agent</th>
         <th>CLI Binary</th>
         <th>Required Env</th>
         <th>Default Flags</th>
@@ -87,13 +86,14 @@ const ciExample = `# GitHub Actions example
   </table>
   <p>
     CLI binaries are resolved automatically. If not found locally, AXIS falls back to
-    <code>npx --yes &lt;package&gt;</code> silently.
+    <code>npx --yes &lt;package&gt;</code> silently. Default flags are applied unless you
+    override them in your <a href="/configuration">agent configuration</a>.
   </p>
 
-  <h2>Custom Adapters</h2>
+  <h2>Custom Agents</h2>
   <p>
-    Create a custom adapter module using <code>createAgentAdapter()</code> and register it in your
-    <a href="/configuration">config</a>.
+    You can test any agent by creating a custom agent module. Use the <code>createAgentAdapter()</code>
+    factory and register the module in your <a href="/configuration">config</a>.
   </p>
   <pre><code>{`// adapters/my-agent.ts
 import { createAgentAdapter } from "@netlify/axis";
@@ -114,66 +114,49 @@ export default createAgentAdapter<{ stdout: string }>({
   }),
 });`}</code></pre>
   <p>
-    Adapters support two stream modes: <strong>lines</strong> (NDJSON, one JSON object per stdout
-    line) and <strong>aggregate</strong> (raw chunks accumulated in state). The module must export
-    an <code>AgentAdapter</code> as default or as a named <code>adapter</code> export.
+    Register it in <code>axis.config.json</code>:
+  </p>
+  <pre><code>{`{
+  "adapters": {
+    "my-agent": "./adapters/my-agent.ts"
+  },
+  "agents": ["my-agent"]
+}`}</code></pre>
+
+  <h3>Stream Modes</h3>
+  <p>
+    Custom agents support two modes for processing output:
+  </p>
+  <ul>
+    <li>
+      <strong>Lines mode</strong> — For agents that emit NDJSON (one JSON object per line). AXIS
+      parses each line and passes the parsed object to your <code>onLine</code> handler. The
+      built-in Claude Code, Codex, and Gemini agents all use this mode.
+    </li>
+    <li>
+      <strong>Aggregate mode</strong> — For agents that emit plain text or non-JSON output. Raw
+      chunks are passed to <code>onChunk</code> and accumulated in state. Use this for agents with
+      custom output formats or simple stdout capture.
+    </li>
+  </ul>
+  <p>
+    The module must export an <code>AgentAdapter</code> as the default export or as a named
+    <code>adapter</code> export.
   </p>
 
   <h2>Workspace Isolation</h2>
   <p>
-    Each agent run gets a fresh temporary directory as its workspace. AXIS isolates the following.
+    Each agent run gets a fresh temporary directory as its workspace. AXIS isolates the following
+    to prevent configuration leakage and cross-run interference:
   </p>
   <ul>
     <li><strong>HOME directory:</strong> Set to the workspace to prevent global config leakage.</li>
-    <li><strong>Adapter-specific dirs:</strong> <code>CLAUDE_CONFIG_DIR</code>, <code>CODEX_HOME</code>, <code>GEMINI_CLI_HOME</code>.</li>
-    <li><strong>Environment variables:</strong> Only explicitly listed vars and system essentials are passed through.</li>
+    <li><strong>Agent-specific dirs:</strong> <code>CLAUDE_CONFIG_DIR</code>, <code>CODEX_HOME</code>, <code>GEMINI_CLI_HOME</code> are all set to isolated paths.</li>
+    <li><strong>Environment variables:</strong> Only explicitly listed vars and system essentials (<code>PATH</code>, <code>USER</code>, <code>SHELL</code>, <code>LANG</code>, <code>TERM</code>, <code>TMPDIR</code>) are passed through.</li>
   </ul>
-
-  <h2>Reports</h2>
   <p>
-    Every run automatically saves a report to <code>.axis/reports/</code>.
+    MCP server configuration files are written into each workspace before the agent spawns, in the
+    format native to each agent CLI. See <a href="/configuration#mcp-servers">MCP Servers</a> in
+    the configuration reference.
   </p>
-  <pre><code>{`.axis/reports/{reportId}/
-  report.json                          # Manifest with summary + metadata
-  scenarios/{key}/{agent}.json         # Full result with transcript
-  scenarios/{key}/{agent}.raw.ndjson   # Raw stdout (--debug only)
-  scenarios/{key}/{agent}.sparse-index.txt  # Scoring reference`}</code></pre>
-  <p>
-    Use <code>axis reports</code> to list, view, and export reports. See the
-    <a href="/cli">CLI reference</a> for all available options.
-  </p>
-
-  <h2>Baselines</h2>
-  <p>
-    Baselines let you snapshot scores and detect regressions in future runs. They are stored in
-    <code>.axis/baselines/</code> and designed to be checked into version control.
-  </p>
-  <pre><code>{`# 1. Run your scenarios
-axis run
-
-# 2. Save the results as a baseline
-axis baseline set
-
-# 3. In future runs, compare against the baseline
-axis run --compare-baseline
-
-# 4. Or diff explicitly
-axis baseline diff`}</code></pre>
-  <p>
-    Baseline diff uses a noise tolerance of 1 point. Score deltas of 0 to 1 are reported
-    as unchanged. The diff command exits with code 1 if any regressions are detected, making it
-    suitable for CI gating.
-  </p>
-
-  <h2>CI Integration</h2>
-  <p>
-    AXIS is designed to work in CI environments. Key patterns:
-  </p>
-  <ul>
-    <li>Use <code>--json</code> for machine-readable output.</li>
-    <li>Use <code>--compare-baseline</code> to gate on regressions (exit code 1).</li>
-    <li>Set <code>--concurrency</code> to control resource usage.</li>
-    <li>Pass API keys via environment variables.</li>
-  </ul>
-  <pre><code>{ciExample}</code></pre>
 </DocsLayout>

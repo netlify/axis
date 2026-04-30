@@ -21,14 +21,14 @@ const mcpExample = `{
 <DocsLayout title="Configuration" active="configuration">
   <h1>Configuration Reference</h1>
   <p class="lead">
-    Complete reference for <code>axis.config.json</code> and scenario files.
+    Complete reference for <code>axis.config.json</code>.
   </p>
 
-  <h2>axis.config.json</h2>
+  <h2>Full Example</h2>
   <p>
-    AXIS is configured via an <code>axis.config.json</code> file in your project root.
+    AXIS is configured via an <code>axis.config.json</code> file in your project root. Here is an
+    example showing all available fields:
   </p>
-
   <pre><code>{`{
   "scenarios": "./scenarios",
   "agents": [
@@ -63,12 +63,13 @@ const mcpExample = `{
   }
 }`}</code></pre>
 
-  <h3>Top-Level Fields</h3>
-  <table>
+  <h2>Top-Level Fields</h2>
+  <table class="table-fields">
     <thead>
       <tr>
         <th>Field</th>
         <th>Type</th>
+        <th>Required</th>
         <th>Description</th>
       </tr>
     </thead>
@@ -76,50 +77,59 @@ const mcpExample = `{
       <tr>
         <td><code>scenarios</code></td>
         <td><code>string</code></td>
-        <td>Path to the scenarios directory (required).</td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Path to the scenarios directory.</td>
       </tr>
       <tr>
         <td><code>agents</code></td>
         <td><code>(string | AgentConfig)[]</code></td>
-        <td>Adapter names or full agent configurations (required).</td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Agent names or full agent configurations.</td>
       </tr>
       <tr>
         <td><code>settings</code></td>
         <td><code>object</code></td>
-        <td>Concurrency and scoring weight configuration.</td>
+        <td><span class="req-no">No</span></td>
+        <td>Concurrency and scoring weight overrides.</td>
       </tr>
       <tr>
         <td><code>env</code></td>
         <td><code>string[]</code></td>
-        <td>Environment variables to pass through to agent processes.</td>
+        <td><span class="req-no">No</span></td>
+        <td>Additional environment variables to pass through to agent processes.</td>
       </tr>
       <tr>
         <td><code>mcp_servers</code></td>
         <td><code>object</code></td>
+        <td><span class="req-no">No</span></td>
         <td>MCP servers available to all agents.</td>
       </tr>
       <tr>
         <td><code>skills</code></td>
         <td><code>string[]</code></td>
-        <td>Skills available to all agents (local paths, GitHub shorthand, or URLs).</td>
+        <td><span class="req-no">No</span></td>
+        <td>Skills available to all agents.</td>
       </tr>
       <tr>
         <td><code>adapters</code></td>
         <td><code>object</code></td>
-        <td>Custom adapter module paths, keyed by adapter name.</td>
+        <td><span class="req-no">No</span></td>
+        <td>Custom agent module paths, keyed by agent name.</td>
       </tr>
     </tbody>
   </table>
 
-  <h3>Agent Configuration</h3>
+  <h2>Agent Configuration</h2>
   <p>
-    Agents can be specified as a simple string (adapter name) or a full configuration object.
+    Each entry in the <code>agents</code> array can be a simple string (agent name with defaults)
+    or a full configuration object.
   </p>
-  <table>
+  <table class="table-fields">
     <thead>
       <tr>
         <th>Field</th>
         <th>Type</th>
+        <th>Required</th>
         <th>Description</th>
       </tr>
     </thead>
@@ -127,72 +137,209 @@ const mcpExample = `{
       <tr>
         <td><code>adapter</code></td>
         <td><code>string</code></td>
-        <td>Adapter type (required): <code>claude-code</code>, <code>codex</code>, <code>gemini</code>, etc.</td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Agent name: <code>claude-code</code>, <code>codex</code>, <code>gemini</code>, <code>goose</code>, etc.</td>
       </tr>
       <tr>
         <td><code>model</code></td>
         <td><code>string</code></td>
+        <td><span class="req-no">No</span></td>
         <td>Model override passed to the agent CLI.</td>
       </tr>
       <tr>
         <td><code>scenarios</code></td>
         <td><code>string[]</code></td>
-        <td>Subset of scenarios to run (supports glob patterns like <code>cms/*</code>).</td>
+        <td><span class="req-no">No</span></td>
+        <td>Subset of scenarios to run. Supports glob patterns like <code>cms/*</code>.</td>
       </tr>
       <tr>
         <td><code>skills</code></td>
         <td><code>string[]</code></td>
+        <td><span class="req-no">No</span></td>
         <td>Agent-specific skills (merged with top-level skills).</td>
       </tr>
       <tr>
         <td><code>flags</code></td>
         <td><code>object</code></td>
-        <td>CLI flags passed to the agent (for example, <code>{`{"full-auto": true}`}</code>).</td>
+        <td><span class="req-no">No</span></td>
+        <td>CLI flags passed to the agent, e.g. <code>&#123;"full-auto": true&#125;</code>.</td>
       </tr>
       <tr>
         <td><code>command</code></td>
         <td><code>string</code></td>
-        <td>Custom CLI command (for custom adapters).</td>
+        <td><span class="req-no">No</span></td>
+        <td>Custom CLI command (for custom agents).</td>
       </tr>
     </tbody>
   </table>
 
-  <h3>Scoring Weights</h3>
+  <h2>Scoring Weights</h2>
   <p>
     Override the default dimension weights under <code>settings.scoring_weights</code>. Values
-    must sum to 1.0.
+    must sum to 1.0. See <a href="/scoring">Scoring Framework</a> for what each dimension measures.
   </p>
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Required</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>goal_achievement</code></td>
+        <td><code>number</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Goal Achievement weight. Default: <code>0.4</code>.</td>
+      </tr>
+      <tr>
+        <td><code>environment</code></td>
+        <td><code>number</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Environment weight. Default: <code>0.2</code>.</td>
+      </tr>
+      <tr>
+        <td><code>service</code></td>
+        <td><code>number</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Service weight. Default: <code>0.2</code>.</td>
+      </tr>
+      <tr>
+        <td><code>agent</code></td>
+        <td><code>number</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Agent weight. Default: <code>0.2</code>.</td>
+      </tr>
+    </tbody>
+  </table>
   <pre><code>{`{
   "settings": {
     "scoring_weights": {
-      "goal_achievement": 0.4,
+      "goal_achievement": 0.5,
       "environment": 0.2,
       "service": 0.2,
-      "agent": 0.2
+      "agent": 0.1
     }
   }
 }`}</code></pre>
 
-  <h3>MCP Servers</h3>
+  <h2 id="mcp-servers">MCP Servers</h2>
   <p>
     Configure Model Context Protocol servers that are automatically wired into each agent
     environment. AXIS supports both stdio (local process) and HTTP (remote endpoint) servers.
   </p>
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Required</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>type</code></td>
+        <td><code>"stdio" | "http"</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Server transport type.</td>
+      </tr>
+      <tr>
+        <td><code>command</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Command to start the server process (stdio only).</td>
+      </tr>
+      <tr>
+        <td><code>args</code></td>
+        <td><code>string[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Arguments passed to the command.</td>
+      </tr>
+      <tr>
+        <td><code>env</code></td>
+        <td><code>object</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Environment variables for the server process.</td>
+      </tr>
+      <tr>
+        <td><code>url</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Remote server endpoint URL (http only).</td>
+      </tr>
+      <tr>
+        <td><code>headers</code></td>
+        <td><code>object</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>HTTP headers (supports <code>$&#123;VAR&#125;</code> env interpolation).</td>
+      </tr>
+    </tbody>
+  </table>
   <pre><code>{mcpExample}</code></pre>
   <p>
-    Each adapter writes MCP configuration in its native format before spawning the agent.
+    Each agent writes MCP configuration in its native format before spawning:
   </p>
-  <ul>
-    <li><strong>Claude Code:</strong> <code>.mcp.json</code> in workspace root.</li>
-    <li><strong>Codex:</strong> <code>config.toml</code> in <code>CODEX_HOME</code>.</li>
-    <li><strong>Gemini:</strong> <code>settings.json</code> in <code>GEMINI_CLI_HOME</code>.</li>
-  </ul>
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Agent</th>
+        <th>Config File</th>
+        <th>Location</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>claude-code</code></td>
+        <td><code>.mcp.json</code></td>
+        <td>Workspace root</td>
+      </tr>
+      <tr>
+        <td><code>codex</code></td>
+        <td><code>config.toml</code></td>
+        <td><code>CODEX_HOME</code></td>
+      </tr>
+      <tr>
+        <td><code>gemini</code></td>
+        <td><code>settings.json</code></td>
+        <td><code>GEMINI_CLI_HOME</code></td>
+      </tr>
+    </tbody>
+  </table>
 
-  <h3>Skills</h3>
+  <h2>Skills</h2>
   <p>
     Skills extend agent capabilities with reusable instruction sets. Specify them at the top level
-    (shared), per agent, or per scenario.
+    (shared across all agents), per agent, or per scenario.
   </p>
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Format</th>
+        <th>Example</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Local path</td>
+        <td><code>./skills/deploy</code></td>
+        <td>Relative to the config file.</td>
+      </tr>
+      <tr>
+        <td>GitHub shorthand</td>
+        <td><code>netlify/axis-skill-deploy</code></td>
+        <td><code>owner/repo</code> format, cloned automatically.</td>
+      </tr>
+      <tr>
+        <td>Full URL</td>
+        <td><code>https://github.com/owner/repo</code></td>
+        <td>GitHub repository URL, cloned automatically.</td>
+      </tr>
+    </tbody>
+  </table>
   <pre><code>{`{
   "skills": [
     "./skills/deploy",
@@ -200,107 +347,46 @@ const mcpExample = `{
     "https://github.com/owner/repo"
   ]
 }`}</code></pre>
-  <ul>
-    <li><strong>Local paths:</strong> Relative to the config file.</li>
-    <li><strong>GitHub shorthand:</strong> <code>owner/repo</code> format.</li>
-    <li><strong>Full URLs:</strong> GitHub repository URLs.</li>
-  </ul>
   <p>
     Remote skills are cached in <code>.axis/skills-cache/</code>. Use <code>--refresh-skills</code>
     to force re-clone.
   </p>
 
-  <h3>Environment Variables</h3>
+  <h2>Environment Variables</h2>
   <p>
     The <code>env</code> field lists additional environment variables to pass through to agent
     processes. The following are always passed through by default:
   </p>
-  <ul>
-    <li><code>ANTHROPIC_API_KEY</code>, <code>CODEX_API_KEY</code>, <code>GEMINI_API_KEY</code></li>
-    <li>System essentials: <code>PATH</code>, <code>USER</code>, <code>SHELL</code>, <code>LANG</code>, <code>TERM</code>, <code>TMPDIR</code></li>
-  </ul>
-
-  <h2>Scenarios</h2>
-  <p>
-    Scenarios are JSON files in the configured scenarios directory. The filename (without <code>.json</code>)
-    becomes the scenario key. Nested directories create namespaced keys.
-  </p>
-  <ul>
-    <li><code>scenarios/hello-world.json</code> maps to key <code>hello-world</code>.</li>
-    <li><code>scenarios/cms/create-post.json</code> maps to key <code>cms/create-post</code>.</li>
-  </ul>
-
-  <h3>Scenario Schema</h3>
-  <pre><code>{`{
-  "name": "Debug and fix a broken script",
-  "prompt": "There is a JavaScript file at /tmp/app/add.js that has a bug. Find it, fix it, and verify.",
-  "rubric": [
-    { "check": "Agent identified the bug", "weight": 0.3 },
-    { "check": "Agent fixed the bug", "weight": 0.4 },
-    { "check": "Agent verified the fix", "weight": 0.3 }
-  ],
-  "setup": [
-    { "action": "run_script", "command": "mkdir -p /tmp/app" },
-    { "action": "run_script", "command": "echo 'function add(a,b) { return a-b; }' > /tmp/app/add.js" }
-  ],
-  "teardown": [
-    { "action": "run_script", "command": "rm -rf /tmp/app" }
-  ],
-  "agents": ["claude-code"]
-}`}</code></pre>
-
-  <table>
+  <table class="table-fields">
     <thead>
       <tr>
-        <th>Field</th>
-        <th>Type</th>
-        <th>Description</th>
+        <th>Category</th>
+        <th>Variables</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><code>name</code></td>
-        <td><code>string</code></td>
-        <td>Human-readable scenario title (required).</td>
+        <td>API keys</td>
+        <td><code>ANTHROPIC_API_KEY</code>, <code>CODEX_API_KEY</code>, <code>GEMINI_API_KEY</code></td>
       </tr>
       <tr>
-        <td><code>prompt</code></td>
-        <td><code>string</code></td>
-        <td>Task description sent to the agent (required).</td>
-      </tr>
-      <tr>
-        <td><code>rubric</code></td>
-        <td><code>string | object[]</code></td>
-        <td>Success criteria: a string or array of checks with optional weights (required).</td>
-      </tr>
-      <tr>
-        <td><code>setup</code></td>
-        <td><code>object[]</code></td>
-        <td>Lifecycle actions run before the agent.</td>
-      </tr>
-      <tr>
-        <td><code>teardown</code></td>
-        <td><code>object[]</code></td>
-        <td>Lifecycle actions run after scoring.</td>
-      </tr>
-      <tr>
-        <td><code>agents</code></td>
-        <td><code>string[]</code></td>
-        <td>Override which agents run this scenario.</td>
-      </tr>
-      <tr>
-        <td><code>skills</code></td>
-        <td><code>string[]</code></td>
-        <td>Scenario-specific skills.</td>
+        <td>System</td>
+        <td><code>PATH</code>, <code>USER</code>, <code>SHELL</code>, <code>LANG</code>, <code>TERM</code>, <code>TMPDIR</code></td>
       </tr>
     </tbody>
   </table>
+  <pre><code>{`{
+  "env": ["MY_CUSTOM_TOKEN", "DATABASE_URL"]
+}`}</code></pre>
 
-  <div class="callout callout-info">
-    <div class="callout-title">Setup and Teardown</div>
-    <p>
-      Lifecycle actions run sequentially with a 30-second timeout per action. Setup failures abort
-      the job. Teardown failures are logged but do not block subsequent jobs.
-    </p>
-  </div>
+  <h2>Scenarios</h2>
+  <p>
+    Scenarios are JSON files in the configured scenarios directory. The filename (without <code>.json</code>)
+    becomes the scenario key. Nested directories create namespaced keys — for example,
+    <code>scenarios/cms/create-post.json</code> maps to key <code>cms/create-post</code>.
+  </p>
+  <p>
+    See <a href="/scenarios">Writing Scenarios</a> for the complete scenario schema, rubric design
+    guidance, and example scenarios.
+  </p>
 </DocsLayout>

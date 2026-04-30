@@ -1,0 +1,173 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+
+const ciExample = `# GitHub Actions example
+- name: Run AXIS tests
+  env:
+    ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+  run: npx @netlify/axis run --json --compare-baseline`;
+---
+
+<DocsLayout title="Reports & Baselines" active="reports">
+  <h1>Reports & Baselines</h1>
+  <p class="lead">
+    Every AXIS run produces a report with full scoring breakdowns and interaction transcripts.
+    Baselines let you snapshot scores and detect regressions over time.
+  </p>
+
+  <h2>Understanding Reports</h2>
+  <p>
+    Every run automatically saves a report to <code>.axis/reports/</code>. Each report is a
+    directory containing a manifest and per-scenario result files.
+  </p>
+  <pre><code>{`.axis/reports/{reportId}/
+  report.json                          # Manifest with summary + metadata
+  report.html                          # Visual report (after scoring)
+  scenarios/{key}/{agent}.json         # Full result with transcript + scores
+  scenarios/{key}/{agent}.raw.ndjson   # Raw agent stdout
+  scenarios/{key}/{agent}.sparse-index.txt  # Compressed transcript for scoring`}</code></pre>
+
+  <h3>The manifest</h3>
+  <p>
+    <code>report.json</code> contains the run metadata and a summary of every scenario/agent result:
+    the composite AXIS Result, per-dimension scores, token usage, duration, and any error messages.
+    This is the file you read when scripting against AXIS output.
+  </p>
+
+  <h3>Scenario files</h3>
+  <p>
+    Each <code>{`{agent}.json`}</code> file under <code>scenarios/</code> contains the full result
+    for one scenario/agent combination: the complete interaction transcript, judge evaluations,
+    per-interaction signal scores, and the rubric assessment.
+  </p>
+
+  <h2>Viewing Reports</h2>
+  <pre><code>{`# List all reports
+npx @netlify/axis reports
+
+# View the latest report summary
+npx @netlify/axis reports latest
+
+# View a specific scenario detail
+npx @netlify/axis reports latest hello-world
+
+# Filter by agent
+npx @netlify/axis reports latest --agent claude-code`}</code></pre>
+
+  <h3>HTML reports</h3>
+  <p>
+    Open the visual report in your browser for the richest view:
+  </p>
+  <pre><code>npx @netlify/axis reports latest --html</code></pre>
+  <p>
+    The HTML report includes:
+  </p>
+  <ul>
+    <li>Composite and per-dimension score breakdowns with visual indicators.</li>
+    <li>The full interaction transcript with tool calls and results.</li>
+    <li>Judge evaluations for each rubric check and interaction signal.</li>
+    <li>Score insights identifying the weakest signals for low-scoring dimensions.</li>
+  </ul>
+
+  <h3>JSON output</h3>
+  <p>
+    For scripting and CI integration, use <code>--json</code> to get machine-readable output:
+  </p>
+  <pre><code>npx @netlify/axis reports latest --json</code></pre>
+
+  <h2>Baselines</h2>
+  <p>
+    Baselines snapshot your scores at a point in time. You compare future runs against a baseline
+    to detect regressions — scores that dropped by more than the noise tolerance (1 point).
+  </p>
+
+  <h3>Setting a baseline</h3>
+  <pre><code>{`# Save from the latest report
+npx @netlify/axis baseline set
+
+# Save with a name (for multiple baselines)
+npx @netlify/axis baseline set v1.0
+
+# Save from a specific report
+npx @netlify/axis baseline set --from 20260415-143022`}</code></pre>
+
+  <h3>Comparing against a baseline</h3>
+  <pre><code>{`# Compare during a run (automatic)
+npx @netlify/axis run --compare-baseline
+
+# Compare explicitly after a run
+npx @netlify/axis baseline compare
+
+# Compare against a named baseline
+npx @netlify/axis baseline compare v1.0`}</code></pre>
+  <p>
+    The comparison shows deltas for each score. Score changes within the noise tolerance (0 to 1
+    point) are reported as unchanged. Regressions are highlighted and the command exits with
+    code 1 if any are detected.
+  </p>
+
+  <h3>When to set baselines</h3>
+  <ul>
+    <li>
+      <strong>After establishing a good score:</strong> Run your scenarios, review the results, and
+      if you are satisfied, save the baseline. This becomes your quality floor.
+    </li>
+    <li>
+      <strong>After intentional changes:</strong> If you change your project structure, APIs, or
+      agent configuration and scores change as expected, update the baseline to reflect the new
+      normal.
+    </li>
+    <li>
+      <strong>Named baselines for releases:</strong> Use named baselines (<code>baseline set v2.0</code>)
+      to track scores across major versions.
+    </li>
+  </ul>
+
+  <h3>Managing baselines</h3>
+  <pre><code>{`# List all baselines
+npx @netlify/axis baseline list
+
+# View baseline contents
+npx @netlify/axis baseline show
+
+# Delete a baseline
+npx @netlify/axis baseline delete v1.0`}</code></pre>
+
+  <h2>CI Integration</h2>
+  <p>
+    AXIS is designed to run in CI environments. The key patterns:
+  </p>
+  <ul>
+    <li>
+      <strong><code>--json</code></strong> — Machine-readable output to stdout. No live terminal
+      display, no color codes. Suitable for piping to other tools or saving as artifacts.
+    </li>
+    <li>
+      <strong><code>--compare-baseline</code></strong> — Exits with code 1 if regressions are
+      detected. Use this as a CI gate: the build fails if agent experience degrades.
+    </li>
+    <li>
+      <strong><code>--concurrency</code></strong> — Control resource usage in constrained CI
+      environments.
+    </li>
+    <li>
+      <strong>API keys via environment</strong> — Pass <code>ANTHROPIC_API_KEY</code>,
+      <code>CODEX_API_KEY</code>, or <code>GEMINI_API_KEY</code> as CI secrets.
+    </li>
+  </ul>
+
+  <h3>GitHub Actions example</h3>
+  <pre><code>{ciExample}</code></pre>
+
+  <h2>Report Storage</h2>
+  <p>
+    Baselines are stored in <code>.axis/baselines/</code> and designed to be checked into version
+    control so your team shares the same regression thresholds.
+  </p>
+  <p>
+    Reports and cached skills should not be committed:
+  </p>
+  <pre><code>{`# .gitignore
+.axis/reports/
+.axis/skills-cache/`}</code></pre>
+</DocsLayout>

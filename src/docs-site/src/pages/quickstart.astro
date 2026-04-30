@@ -5,8 +5,8 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 <DocsLayout title="Quick Start" active="quickstart">
   <h1>Quick Start</h1>
   <p class="lead">
-    Get AXIS running in your project in a few minutes. This guide walks through creating a config,
-    writing your first scenario, and viewing the results.
+    Get AXIS running in your project. This guide walks through creating a config,
+    writing your first scenario, running it, and understanding the results.
   </p>
 
   <h2>Prerequisites</h2>
@@ -24,35 +24,66 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   "scenarios": "./scenarios",
   "agents": ["claude-code"]
 }`}</code></pre>
+  <p>
+    See <a href="/configuration">Configuration Reference</a> for the full set of options, including
+    scoring weights, MCP servers, and custom agents.
+  </p>
 
   <h2>2. Write a Scenario</h2>
   <p>
     Create a <code>scenarios/</code> directory and add your first scenario as a JSON file. Each
-    scenario needs a name, a prompt (the task for the agent), and a rubric (your success criteria).
+    scenario needs three things: a <strong>name</strong>, a <strong>prompt</strong> (the task for
+    the agent), and a <strong>rubric</strong> (how to judge whether it succeeded).
   </p>
   <pre><code>{`{
   "name": "Create a greeting file",
   "prompt": "Create a file called hello.txt with the content 'Hello from AXIS'.",
   "rubric": [
-    { "check": "File hello.txt exists", "weight": 0.5 },
-    { "check": "File contains 'Hello from AXIS'", "weight": 0.5 }
+    { "check": "File hello.txt exists in the workspace", "weight": 0.5 },
+    { "check": "File contains exactly 'Hello from AXIS'", "weight": 0.5 }
   ]
 }`}</code></pre>
   <p>
     Save this as <code>scenarios/hello-world.json</code>. The filename (without <code>.json</code>)
     becomes the scenario key used in reports and CLI commands.
   </p>
+  <p>
+    A few things that make scenarios work well:
+  </p>
+  <ul>
+    <li><strong>Specific prompts</strong> — tell the agent exactly what to do. Vague prompts lead to inconsistent results.</li>
+    <li><strong>Observable rubric checks</strong> — each check should describe something a judge can verify from the transcript and workspace state.</li>
+    <li><strong>Weighted checks</strong> — distribute weight based on importance. If the file existing matters more than its content, weight it higher.</li>
+  </ul>
+  <p>
+    See <a href="/scenarios">Writing Scenarios</a> for a deeper guide on prompts, rubrics, setup/teardown, and examples.
+  </p>
 
   <h2>3. Run It</h2>
   <pre><code>npx @netlify/axis run</code></pre>
   <p>
     AXIS spawns the agent in an isolated workspace, captures the full interaction transcript, scores
-    the result against your rubric, and displays a report in your terminal.
+    the result against your rubric, and displays a summary in your terminal.
   </p>
+
+  <h3>What to Expect</h3>
+  <p>
+    The terminal displays a live progress view while the agent runs. You will see each
+    scenario/agent combination with its current status (running, scoring, done, or failed) and a
+    live token counter showing how many tokens the agent has consumed.
+  </p>
+  <p>
+    Once scoring completes, AXIS prints a summary table showing:
+  </p>
+  <ul>
+    <li>The <strong>composite AXIS Result</strong> (0 to 100) for each scenario/agent pair.</li>
+    <li>Breakdowns for each of the four scoring dimensions: Goal Achievement, Environment, Service, and Agent.</li>
+    <li><strong>Score insights</strong> for any dimension that scored below 75, identifying the weakest signal.</li>
+  </ul>
 
   <h2>4. View the Report</h2>
   <p>
-    Every run saves a report to <code>.axis/reports/</code>. You can view it again at any time.
+    Every run saves a report to <code>.axis/reports/</code>. You can revisit it at any time.
   </p>
   <pre><code>{`# View the latest report summary
 npx @netlify/axis reports latest
@@ -62,11 +93,53 @@ npx @netlify/axis reports latest --html
 
 # Get JSON output for scripting
 npx @netlify/axis reports latest --json`}</code></pre>
-
-  <h2>5. Set a Baseline</h2>
   <p>
-    Once you have a run you are happy with, save it as a baseline. Future runs can diff against it
-    to detect regressions.
+    The HTML report includes the full scoring breakdown, interaction transcript, and judge
+    evaluations. See <a href="/reports">Reports & Baselines</a> for details on report contents
+    and storage.
+  </p>
+
+  <h2>5. Interpret Your Results</h2>
+  <p>
+    The AXIS Result is a composite of four dimensions, each measuring a different aspect of the
+    agent's interaction with your system.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Dimension</th>
+        <th>What It Tells You</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Goal Achievement</strong></td>
+        <td>Did the agent complete the task? Scored against your rubric checks.</td>
+      </tr>
+      <tr>
+        <td><strong>Environment</strong></td>
+        <td>How well did shell commands, file operations, and dev tools work?</td>
+      </tr>
+      <tr>
+        <td><strong>Service</strong></td>
+        <td>How effectively were APIs, MCP tools, and external services used?</td>
+      </tr>
+      <tr>
+        <td><strong>Agent</strong></td>
+        <td>How well did the agent reason and plan? Were its actions necessary and well-scoped?</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    A score of 50 represents median performance. Scores above 75 are good; above 90 is excellent.
+    See <a href="/scoring">Scoring Framework</a> for the full explanation of how each dimension
+    is calculated and why.
+  </p>
+
+  <h2>6. Set a Baseline</h2>
+  <p>
+    Once you have a run you are satisfied with, save it as a baseline. Future runs can diff against
+    it to detect regressions.
   </p>
   <pre><code>{`# Save the latest report as a baseline
 npx @netlify/axis baseline set
@@ -74,13 +147,23 @@ npx @netlify/axis baseline set
 # Compare future runs automatically
 npx @netlify/axis run --compare-baseline`}</code></pre>
   <p>
-    The diff command exits with code 1 if any regressions are detected, making it suitable for CI
-    gating.
+    The comparison exits with code 1 if any regressions are detected, making it suitable for CI
+    gating. See <a href="/reports">Reports & Baselines</a> for baseline workflows.
   </p>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Gitignore</div>
+    <p>
+      Add <code>.axis/reports/</code> and <code>.axis/skills-cache/</code> to your
+      <code>.gitignore</code>. Baselines (<code>.axis/baselines/</code>) are designed to be
+      committed so the whole team shares the same regression thresholds.
+    </p>
+  </div>
 
   <h2>Next Steps</h2>
   <ul>
-    <li><a href="/scoring">Scoring Framework</a> explains how the four dimensions are calculated and what signals drive each score.</li>
-    <li><a href="/running">Running Tests</a> covers the full config reference, CLI commands, custom adapters, MCP servers, and CI integration.</li>
+    <li><a href="/scoring">Scoring Framework</a> — how the four dimensions are calculated, what signals drive each score, and why the scoring works the way it does.</li>
+    <li><a href="/scenarios">Writing Scenarios</a> — how to write effective prompts, design rubrics, and use setup/teardown actions.</li>
+    <li><a href="/running">Execution & Agents</a> — how AXIS runs scenarios, supported and custom agents, and workspace isolation.</li>
   </ul>
 </DocsLayout>

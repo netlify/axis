@@ -3,7 +3,7 @@ import "../styles/docs.css";
 
 interface Props {
   title: string;
-  active: "overview" | "quickstart" | "scoring" | "running" | "cli" | "configuration";
+  active: "overview" | "quickstart" | "scoring" | "scenarios" | "running" | "reports" | "cli" | "configuration";
 }
 
 const { title, active } = Astro.props;
@@ -35,9 +35,12 @@ const { title, active } = Astro.props;
           <div class="sidebar-section-label">Getting Started</div>
           <a href="/" class:list={["sidebar-link", { active: active === "overview" }]}>What is AXIS</a>
           <a href="/quickstart" class:list={["sidebar-link", { active: active === "quickstart" }]}>Quick Start</a>
-          <div class="sidebar-section-label">How It Works</div>
+          <div class="sidebar-section-label">Core Concepts</div>
           <a href="/scoring" class:list={["sidebar-link", { active: active === "scoring" }]}>Scoring Framework</a>
-          <a href="/running" class:list={["sidebar-link", { active: active === "running" }]}>Running Tests</a>
+          <a href="/scenarios" class:list={["sidebar-link", { active: active === "scenarios" }]}>Writing Scenarios</a>
+          <div class="sidebar-section-label">Running Tests</div>
+          <a href="/running" class:list={["sidebar-link", { active: active === "running" }]}>Execution & Agents</a>
+          <a href="/reports" class:list={["sidebar-link", { active: active === "reports" }]}>Reports & Baselines</a>
           <div class="sidebar-section-label">Reference</div>
           <a href="/cli" class:list={["sidebar-link", { active: active === "cli" }]}>CLI</a>
           <a href="/configuration" class:list={["sidebar-link", { active: active === "configuration" }]}>Configuration</a>
@@ -64,6 +67,21 @@ const { title, active } = Astro.props;
 
       btn.addEventListener("click", toggle);
       backdrop.addEventListener("click", toggle);
+
+      // Auto-generate heading IDs and anchor links
+      document.querySelectorAll(".main-content h2, .main-content h3, .main-content h4").forEach(function (heading) {
+        if (!heading.id) {
+          heading.id = heading.textContent.trim().toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "");
+        }
+        var link = document.createElement("a");
+        link.href = "#" + heading.id;
+        link.className = "heading-anchor";
+        link.setAttribute("aria-label", "Link to " + heading.textContent.trim());
+        link.textContent = "#";
+        heading.appendChild(link);
+      });
     </script>
   </body>
 </html>

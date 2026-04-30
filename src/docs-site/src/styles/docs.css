@@ -12,7 +12,7 @@
 
   /* Text — all pass 4.5:1 on --bg */
   --text: #1a1a2e;             /* ~16:1 on bg   */
-  --text-secondary: #4a5568;   /* ~7.2:1 on bg  */
+  --text-secondary: #374151;   /* ~10:1 on bg   */
   --text-muted: #637083;       /* ~4.8:1 on bg  */
 
   /* Borders */
@@ -279,6 +279,34 @@ h4 {
   margin-bottom: 8px;
 }
 
+/* Heading anchor links */
+.heading-anchor {
+  margin-left: 8px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity var(--transition);
+  -webkit-text-fill-color: var(--text-muted);
+}
+
+h2:hover .heading-anchor,
+h3:hover .heading-anchor,
+h4:hover .heading-anchor,
+.heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+.heading-anchor:hover {
+  color: var(--accent);
+  -webkit-text-fill-color: var(--accent);
+}
+
+/* Offset scroll target for sticky header */
+h2[id], h3[id], h4[id] {
+  scroll-margin-top: 72px;
+}
+
 p {
   margin-bottom: 16px;
   color: var(--text-secondary);
@@ -337,11 +365,22 @@ li > ol {
 
 code {
   font-family: var(--font-mono);
-  font-size: 0.8125em;
-  background: var(--accent-light);
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: rgba(1, 104, 103, 0.08);
   padding: 2px 6px;
   border-radius: 4px;
   color: var(--accent);
+}
+
+/* Code inside headings should inherit the heading style */
+h1 code, h2 code, h3 code, h4 code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  -webkit-text-fill-color: inherit;
 }
 
 pre {
@@ -364,6 +403,7 @@ pre code {
   border-radius: 0;
   color: inherit;
   font-size: inherit;
+  font-weight: normal;
 }
 
 /* --- Cards --- */
@@ -436,13 +476,13 @@ table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 24px;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 
 thead th {
   text-align: left;
   padding: 10px 12px;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
@@ -461,8 +501,31 @@ tbody tr:hover {
   background: var(--light-gray);
 }
 
-td code {
+.table-fields td:first-child {
+  white-space: nowrap;
+}
+
+/* Required badge */
+.req-yes,
+.req-no {
+  display: inline-block;
   font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 10px;
+  letter-spacing: 0.02em;
+}
+
+.req-yes {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+.req-no {
+  background: var(--light-gray);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
 }
 
 /* --- Callouts --- */
@@ -616,19 +679,89 @@ td code {
 .cli-flag {
   display: flex;
   gap: 12px;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
 }
 
 .cli-flag-name {
-  font-family: var(--font-mono);
   font-weight: 500;
   color: var(--text);
   flex-shrink: 0;
   min-width: 200px;
 }
 
+.cli-flag-name code {
+  font-size: 0.875rem;
+}
+
 .cli-flag-desc {
   color: var(--text-secondary);
+}
+
+/* --- Collapsible examples --- */
+
+details.example-collapse {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+details.example-collapse:hover {
+  border-color: var(--border-bright);
+}
+
+details.example-collapse[open] {
+  box-shadow: var(--shadow), var(--glow);
+}
+
+details.example-collapse summary {
+  padding: 16px 20px;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+details.example-collapse summary::-webkit-details-marker {
+  display: none;
+}
+
+details.example-collapse summary::before {
+  content: "▶";
+  font-size: 0.625rem;
+  color: var(--accent);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+  position: relative;
+  top: -1px;
+}
+
+details.example-collapse[open] summary::before {
+  transform: rotate(90deg);
+}
+
+details.example-collapse summary strong {
+  font-size: 0.9375rem;
+  color: var(--text);
+}
+
+details.example-collapse summary span {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+details.example-collapse .example-body {
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--border);
+}
+
+details.example-collapse .example-body pre {
+  margin-top: 16px;
+  margin-bottom: 0;
 }
 
 /* --- Footer --- */

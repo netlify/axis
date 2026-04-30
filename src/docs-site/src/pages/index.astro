@@ -4,7 +4,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 
 <DocsLayout title="What is AXIS" active="overview">
   <div class="hero">
-    <h1>AXIS - Agent eXperience Index Score</h1>
+    <h1>AXIS - Agent Experience Index Score</h1>
     <p class="lead">
       AXIS is both an open scoring framework for measuring <strong>agent experience (AX)</strong>
       and a CLI tool that implements it. Think
@@ -19,31 +19,31 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     standardized way to answer: <em>"How well does my system work when an AI agent tries to use it?"</em>
   </p>
   <p>
-    As agents become a primary interface for websites, APIs, and developer platforms, the systems
-    they interact with need to be measured and optimized for that interaction. Just as we optimize
-    for page load time or accessibility, AX is the agent-era equivalent of UX.
+    Without measurement, you are guessing. Maybe agents struggle with your project because the
+    directory structure is confusing. Maybe they waste tokens calling an API that returns unhelpful
+    errors. Maybe they succeed at the task but take three times longer than they should. You
+    cannot fix what you cannot see. AX gives you the same visibility into agent interactions that
+    UX metrics give you for human users.
   </p>
 
   <h2>Our Approach</h2>
   <p>
-    AXIS is built on two core beliefs about how agent experience should be measured.
+    AXIS is built on two core beliefs.
   </p>
   <p>
-    <strong>Measure what matters, where you have leverage.</strong> Agent experience is not a single
-    number. It breaks down into distinct dimensions: how well the agent completes the task, how it
-    uses the environment, how it interacts with services, and how it reasons through problems.
-    Purpose-built tooling that scores each dimension independently gives you a clear picture of
-    where to focus. If your API responses are slowing agents down, you see it in the Service
-    dimension. If your project structure confuses agents, Environment tells you. Generic pass/fail
-    testing does not surface these signals.
+    <strong>Measure each dimension independently.</strong> Agent experience is not a single number.
+    When a score drops, you need to know <em>why</em>. Is your API slow? Is the agent making
+    unnecessary calls? Is the project structure confusing? AXIS scores four independent dimensions
+    so you can pinpoint the problem. A low Service score tells you your APIs are the bottleneck.
+    A low Environment score tells you your filesystem or tooling is tripping agents up. Generic
+    pass/fail testing cannot surface these signals.
   </p>
   <p>
-    <strong>Test against real agent behavior, not theoretical support.</strong> It is not enough to
-    validate that your system publishes the right config files or follows a protocol spec. What
-    matters is whether agents actually discover and use what you provide. AXIS measures this by
-    running real agents against real scenarios and observing what happens: which tools they call,
-    which files they read, which APIs they hit. This tells you what agents <em>do</em>, not what
-    they <em>could</em> do in theory.
+    <strong>Test against real agent behavior.</strong> It is not enough to validate that your system
+    publishes the right config files or follows a protocol spec. What matters is whether agents
+    actually discover and use what you provide. AXIS runs real agents against real scenarios and
+    observes what happens: which tools they call, which files they read, which APIs they hit. This
+    tells you what agents <em>do</em>, not what they <em>could</em> do in theory.
   </p>
 
   <h2>The Scoring Framework</h2>
@@ -101,60 +101,15 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   </p>
   <ul>
     <li><strong>Define scenarios</strong> as JSON files with a prompt, rubric, and optional setup/teardown steps.</li>
-    <li><strong>Run them</strong> against any supported agent (or your own custom adapter) in isolated workspaces.</li>
+    <li><strong>Run them</strong> against any supported agent (or your own) in isolated workspaces.</li>
     <li><strong>Score automatically</strong> using a multi-pass LLM evaluation pipeline that produces per-dimension and composite scores.</li>
     <li><strong>Track over time</strong> with persistent reports, baseline snapshots, and regression detection for CI gating.</li>
   </ul>
 
-  <h3>Built-in Adapters</h3>
+  <h3>Agent Support</h3>
   <p>
-    The CLI ships with adapters for popular AI coding agents. Each adapter handles process spawning,
-    transcript capture, and output normalization for its agent.
+    AXIS ships with built-in support for Claude Code, Codex, Gemini, Goose, and more. You can also
+    bring your own agent using the custom agent API. See
+    <a href="/running">Execution & Agents</a> for the full list and details.
   </p>
-  <table>
-    <thead>
-      <tr>
-        <th>Adapter</th>
-        <th>Agent</th>
-        <th>Required Env</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>claude-code</code></td>
-        <td>Claude Code</td>
-        <td><code>ANTHROPIC_API_KEY</code></td>
-      </tr>
-      <tr>
-        <td><code>codex</code></td>
-        <td>OpenAI Codex</td>
-        <td><code>CODEX_API_KEY</code></td>
-      </tr>
-      <tr>
-        <td><code>gemini</code></td>
-        <td>Google Gemini CLI</td>
-        <td><code>GEMINI_API_KEY</code></td>
-      </tr>
-      <tr>
-        <td><code>goose</code></td>
-        <td>Goose</td>
-        <td>None</td>
-      </tr>
-      <tr>
-        <td><code>claude-sdk</code></td>
-        <td>Claude SDK</td>
-        <td><code>ANTHROPIC_API_KEY</code></td>
-      </tr>
-      <tr>
-        <td><code>gemini-acp</code></td>
-        <td>Gemini (ACP)</td>
-        <td><code>GEMINI_API_KEY</code></td>
-      </tr>
-      <tr>
-        <td>Custom</td>
-        <td>Any agent via <code>createAgentAdapter()</code></td>
-        <td>User-defined</td>
-      </tr>
-    </tbody>
-  </table>
 </DocsLayout>

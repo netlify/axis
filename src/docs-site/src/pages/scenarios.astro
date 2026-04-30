@@ -1,0 +1,347 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Writing Scenarios" active="scenarios">
+  <h1>Writing Scenarios</h1>
+  <p class="lead">
+    Scenarios are the core of AXIS testing. Each scenario defines a task for the agent, criteria
+    for judging success, and optional setup and teardown steps. Well-written scenarios produce
+    consistent, meaningful scores.
+  </p>
+
+  <h2>Anatomy of a Scenario</h2>
+  <p>
+    A scenario is a JSON file in your configured scenarios directory. Here is a complete example:
+  </p>
+  <pre><code>{`{
+  "name": "Debug and fix a broken script",
+  "prompt": "There is a JavaScript file at src/add.js that has a bug. Find it, fix it, and verify the fix by running the test.",
+  "rubric": [
+    { "check": "Agent identified the bug (subtraction instead of addition)", "weight": 0.3 },
+    { "check": "Agent fixed the bug so add(a, b) returns a + b", "weight": 0.4 },
+    { "check": "Agent ran the test and it passed", "weight": 0.3 }
+  ],
+  "setup": [
+    { "action": "run_script", "command": "mkdir -p src && echo 'function add(a,b) { return a-b; }\\nmodule.exports = { add };' > src/add.js" },
+    { "action": "run_script", "command": "mkdir -p test && echo 'const {add} = require(\\\"../src/add\\\");\\nconsole.log(add(2,3) === 5 ? \\\"PASS\\\" : \\\"FAIL\\\");' > test/add.test.js" }
+  ],
+  "teardown": [
+    { "action": "run_script", "command": "rm -rf src test" }
+  ]
+}`}</code></pre>
+
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Required</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>name</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Human-readable title shown in reports and CLI output.</td>
+      </tr>
+      <tr>
+        <td><code>prompt</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>The task description sent to the agent.</td>
+      </tr>
+      <tr>
+        <td><code>rubric</code></td>
+        <td><code>string | object[]</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Success criteria: a plain string or array of weighted checks.</td>
+      </tr>
+      <tr>
+        <td><code>setup</code></td>
+        <td><code>object[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Lifecycle actions run before the agent starts.</td>
+      </tr>
+      <tr>
+        <td><code>teardown</code></td>
+        <td><code>object[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Lifecycle actions run after scoring completes.</td>
+      </tr>
+      <tr>
+        <td><code>agents</code></td>
+        <td><code>string[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Override which agents run this scenario. Defaults to all configured agents.</td>
+      </tr>
+      <tr>
+        <td><code>skills</code></td>
+        <td><code>string[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Scenario-specific skills, merged with top-level and agent-level skills.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Writing Effective Prompts</h2>
+  <p>
+    The prompt is what the agent sees as its task. The quality of your prompt directly affects the
+    consistency and usefulness of your scores.
+  </p>
+  <ul>
+    <li>
+      <strong>Be specific about what to do.</strong> "Fix the bug" is vague. "Find and fix the bug
+      in <code>src/add.js</code> where subtraction is used instead of addition" gives the agent a
+      clear target. Specific prompts produce more consistent results across runs.
+    </li>
+    <li>
+      <strong>Specify the expected output.</strong> If you want a file created, say what it should
+      be called and what it should contain. If you want a test to pass, say which test command to
+      run. Leaving the end state implicit forces the judge to guess what "success" means.
+    </li>
+    <li>
+      <strong>Scope appropriately.</strong> A prompt that asks the agent to "set up a full CI/CD
+      pipeline" tests many things at once and makes it hard to isolate what went wrong. Smaller,
+      focused scenarios produce more actionable scores.
+    </li>
+    <li>
+      <strong>Avoid giving the agent the answer.</strong> The point of testing is to observe how
+      the agent discovers and solves the problem. If you tell the agent exactly which line to
+      change, you are testing its ability to follow instructions, not its ability to debug.
+    </li>
+  </ul>
+
+  <h2>Designing Rubrics</h2>
+  <p>
+    The rubric defines what "success" means. A judge LLM reads the agent's full transcript and
+    evaluates each check on a 0 to 10 scale. Well-designed rubrics produce scores that reflect
+    real quality differences.
+  </p>
+
+  <h3>Start simple: string rubrics</h3>
+  <p>
+    The simplest rubric is a plain string. The judge reads the transcript and gives a single 0 to 10
+    score for how well the agent met the description.
+  </p>
+  <pre><code>{`{
+  "name": "Create an Express server",
+  "prompt": "Create a working Express server that listens on port 3000.",
+  "rubric": "The agent should create a working Express server on port 3000"
+}`}</code></pre>
+  <p>
+    String rubrics work well for simple scenarios where you just want a holistic pass/fail judgment.
+    The downside is that you get a single score with no visibility into what went right or wrong.
+  </p>
+
+  <h3>Add structure: check arrays</h3>
+  <p>
+    For more granular scoring, use an array of checks. Each check is evaluated independently, so you
+    can see exactly which criteria the agent met and which it missed.
+  </p>
+  <pre><code>{`"rubric": [
+  { "check": "Server starts on port 3000" },
+  { "check": "GET / returns a 200 response" },
+  { "check": "Server has error handling middleware" }
+]`}</code></pre>
+  <p>
+    When no <code>weight</code> is specified, AXIS distributes weight equally across all checks.
+    In this example, each check is worth one-third of the Goal Achievement score.
+  </p>
+
+  <h3>Control importance: weighted checks</h3>
+  <p>
+    Add <code>weight</code> to each check to control how much it contributes to the score. This is
+    the recommended approach for most scenarios because it lets you express which outcomes matter most.
+  </p>
+  <pre><code>{`"rubric": [
+  { "check": "Server starts on port 3000", "weight": 0.4 },
+  { "check": "GET / returns a 200 response", "weight": 0.3 },
+  { "check": "Server has error handling middleware", "weight": 0.3 }
+]`}</code></pre>
+  <p>
+    In this example, the server starting is weighted highest because it is the core outcome. You can
+    also mix weighted and unweighted checks — AXIS distributes the remaining weight equally across
+    any checks without an explicit <code>weight</code>.
+  </p>
+
+  <h3>Writing good checks</h3>
+  <ul>
+    <li>
+      <strong>Make checks observable.</strong> The judge evaluates checks by reading the transcript
+      and examining the workspace. "Agent understood the problem" is hard to verify. "Agent modified
+      <code>src/add.js</code> to use addition" is concrete and observable.
+    </li>
+    <li>
+      <strong>One assertion per check.</strong> "Agent fixed the bug and ran the test" is two
+      things. If the agent fixes the bug but skips the test, it is unclear how to score this check.
+      Split compound assertions into separate checks with their own weights.
+    </li>
+    <li>
+      <strong>Weight by importance.</strong> The core outcome (did it work?) should carry more
+      weight than peripheral concerns (did it clean up after itself?). If every check has equal
+      weight, a cosmetic failure impacts the score as much as a functional failure.
+    </li>
+  </ul>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Strong vs Weak Checks</div>
+    <p>
+      <strong>Weak:</strong> "Agent did a good job" — subjective, hard for the judge to score consistently.<br />
+      <strong>Weak:</strong> "Agent used git" — checks behavior, not outcome. What if git was unnecessary?<br />
+      <strong>Strong:</strong> "File <code>output.csv</code> contains at least 10 rows of valid CSV data" — concrete, verifiable.<br />
+      <strong>Strong:</strong> "The test suite passes with <code>npm test</code>" — clear success criterion.
+    </p>
+  </div>
+
+  <h2>Setup and Teardown</h2>
+  <p>
+    Setup actions run before the agent starts. Use them to create the starting state that the
+    scenario depends on: files to edit, databases to seed, servers to start.
+  </p>
+  <p>
+    Teardown actions run after scoring completes. Use them to clean up resources that should not
+    persist between runs.
+  </p>
+  <pre><code>{`"setup": [
+  { "action": "run_script", "command": "mkdir -p /tmp/workspace" },
+  { "action": "run_script", "command": "cp -r fixtures/project/* /tmp/workspace/" }
+],
+"teardown": [
+  { "action": "run_script", "command": "rm -rf /tmp/workspace" }
+]`}</code></pre>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">Lifecycle Details</div>
+    <p>
+      Each action runs sequentially with a 30-second timeout. Setup failures abort the job and
+      mark it as failed. Teardown failures are logged but do not block subsequent jobs or affect
+      scores.
+    </p>
+  </div>
+
+  <h3>Common patterns</h3>
+  <ul>
+    <li>
+      <strong>Create test fixtures:</strong> Use setup to write files that the agent will need to
+      read, edit, or debug.
+    </li>
+    <li>
+      <strong>Seed data:</strong> Populate a database or create configuration files the agent
+      should work with.
+    </li>
+    <li>
+      <strong>Initialize a project:</strong> Clone a repo, install dependencies, or set up a
+      specific project state.
+    </li>
+    <li>
+      <strong>Clean up:</strong> Remove temp directories, stop background processes, or reset
+      state in teardown.
+    </li>
+  </ul>
+
+  <h2>Scenario Organization</h2>
+  <p>
+    The filename (without <code>.json</code>) becomes the scenario key used in reports, CLI commands,
+    and baseline comparisons. Nested directories create namespaced keys.
+  </p>
+  <ul>
+    <li><code>scenarios/hello-world.json</code> &rarr; key <code>hello-world</code></li>
+    <li><code>scenarios/cms/create-post.json</code> &rarr; key <code>cms/create-post</code></li>
+    <li><code>scenarios/api/auth/login.json</code> &rarr; key <code>api/auth/login</code></li>
+  </ul>
+  <p>
+    Use directories to group related scenarios. Agents can be configured to run only specific
+    groups using glob patterns in the <a href="/configuration">agent configuration</a>:
+  </p>
+  <pre><code>{`{
+  "adapter": "claude-code",
+  "scenarios": ["cms/*", "api/*"]
+}`}</code></pre>
+
+  <h3>Agent-specific scenarios</h3>
+  <p>
+    Use the <code>agents</code> field in a scenario to restrict which agents run it. This is useful
+    when a scenario depends on capabilities specific to one agent, or when you want to test
+    different agents on different tasks.
+  </p>
+  <pre><code>{`{
+  "name": "Use Claude Code MCP integration",
+  "prompt": "Use the filesystem MCP server to list files in /tmp",
+  "rubric": "Agent successfully used the MCP filesystem tool",
+  "agents": ["claude-code"]
+}`}</code></pre>
+
+  <h2>Example Scenarios</h2>
+
+  <details class="example-collapse">
+    <summary>
+      <strong>File creation</strong>
+      <span>— Generate a README from scratch with no setup required.</span>
+    </summary>
+    <div class="example-body">
+      <pre><code>{`{
+  "name": "Create a README",
+  "prompt": "Create a README.md file for a Node.js project called 'my-api'. Include a title, description, install instructions, and usage example.",
+  "rubric": [
+    { "check": "README.md exists" },
+    { "check": "Contains a project title and description" },
+    { "check": "Contains npm install instructions" },
+    { "check": "Contains a usage or getting started example" }
+  ]
+}`}</code></pre>
+    </div>
+  </details>
+
+  <details class="example-collapse">
+    <summary>
+      <strong>Bug fix with verification</strong>
+      <span>— Find and fix a bug in a pre-seeded project, then confirm the test passes.</span>
+    </summary>
+    <div class="example-body">
+      <pre><code>{`{
+  "name": "Fix failing test",
+  "prompt": "The test in test/math.test.js is failing. Find the bug in src/math.js, fix it, and verify the test passes.",
+  "rubric": [
+    { "check": "Agent identified the root cause", "weight": 0.2 },
+    { "check": "Agent fixed src/math.js correctly", "weight": 0.4 },
+    { "check": "Agent ran the test and it passed", "weight": 0.4 }
+  ],
+  "setup": [
+    { "action": "run_script", "command": "mkdir -p src test" },
+    { "action": "run_script", "command": "echo 'exports.multiply = (a, b) => a + b;' > src/math.js" },
+    { "action": "run_script", "command": "echo 'const {multiply} = require(\\\"../src/math\\\"); console.assert(multiply(3,4) === 12, \\\"Expected 12\\\"); console.log(\\\"PASS\\\");' > test/math.test.js" }
+  ]
+}`}</code></pre>
+    </div>
+  </details>
+
+  <details class="example-collapse">
+    <summary>
+      <strong>Multi-step with setup and teardown</strong>
+      <span>— Add a new API endpoint to an existing Express app, write tests, and clean up.</span>
+    </summary>
+    <div class="example-body">
+      <pre><code>{`{
+  "name": "Add API endpoint with tests",
+  "prompt": "Add a GET /api/health endpoint to the Express app in src/app.js. It should return { status: 'ok', uptime: process.uptime() }. Add a test for it in test/health.test.js using the existing test setup.",
+  "rubric": [
+    { "check": "GET /api/health endpoint exists in src/app.js", "weight": 0.3 },
+    { "check": "Endpoint returns JSON with status and uptime fields", "weight": 0.3 },
+    { "check": "Test file exists and tests the endpoint", "weight": 0.2 },
+    { "check": "All tests pass", "weight": 0.2 }
+  ],
+  "setup": [
+    { "action": "run_script", "command": "npm init -y && npm install express" },
+    { "action": "run_script", "command": "mkdir -p src test" },
+    { "action": "run_script", "command": "echo 'const express = require(\\\"express\\\"); const app = express(); module.exports = app;' > src/app.js" }
+  ],
+  "teardown": [
+    { "action": "run_script", "command": "rm -rf node_modules package.json package-lock.json src test" }
+  ]
+}`}</code></pre>
+    </div>
+  </details>
+</DocsLayout>
