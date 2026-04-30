@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/netlify/axis/compare/v1.1.4...v1.1.5) (2026-04-30)
+
+
+### Bug Fixes
+
+* improved skip support ([f08e89c](https://github.com/netlify/axis/commit/f08e89c379015bccf870e4d06b0a30c7a48a4ec6))
+
 ## [1.1.4](https://github.com/netlify/axis/compare/v1.1.3...v1.1.4) (2026-04-30)
 
 
