@@ -49,11 +49,11 @@ export interface CalibrationParams {
   sigma: number;
 }
 
-/** Initial calibration — to be tuned from real-world data. */
+/** Default calibration. median = raw score that maps to 50/100. */
 export const DEFAULT_CALIBRATION: Record<InteractionCategory, CalibrationParams> = {
-  environment: { median: 0.75, sigma: 0.5 },
-  service: { median: 0.65, sigma: 0.5 },
-  agent: { median: 0.7, sigma: 0.5 },
+  environment: { median: 0.5, sigma: 0.4 },
+  service: { median: 0.5, sigma: 0.4 },
+  agent: { median: 0.5, sigma: 0.4 },
 };
 
 // --- Default scores for interactions the LLM missed ---

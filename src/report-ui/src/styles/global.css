@@ -607,57 +607,6 @@ h3 {
 
 /* --- Deductions Summary --- */
 
-.deductions-summary {
-  background: var(--warning-light);
-  border: 1px solid var(--warning);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 16px;
-}
-
-.deductions-header {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--warning);
-  margin-bottom: 10px;
-}
-
-.deduction-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(217, 119, 6, 0.15);
-}
-
-.deduction-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.deduction-criterion {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.deduction-lost {
-  font-size: 0.75rem;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  color: var(--warning);
-  white-space: nowrap;
-}
-
-.deduction-rationale {
-  grid-column: 1 / -1;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  font-style: italic;
-}
 
 /* --- Category Deductions --- */
 
@@ -1553,11 +1502,6 @@ h3 {
   }
 
   /* Deductions */
-  .deductions-summary {
-    padding: 10px 12px;
-  }
-
-  .deduction-item,
   .cat-deduction-item {
     flex-direction: column;
     gap: 4px;

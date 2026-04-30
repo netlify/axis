@@ -323,8 +323,6 @@ function categoryBarRow(label: string, score: number): string {
 // --- Goal Achievement ---
 
 function renderGoalAchievement(ga: GoalAchievementScore): string {
-  const imperfect = ga.criteria.filter((c) => c.score < 10);
-  const deductions = imperfect.length > 0 ? renderDeductionsSummary(imperfect) : "";
   const criteria = ga.criteria.map(renderCriterion).join("");
 
   return `
@@ -333,28 +331,7 @@ function renderGoalAchievement(ga: GoalAchievementScore): string {
         <h3>Goal Achievement</h3>
         <span class="section-score">${ga.score} / 100</span>
       </div>
-      ${deductions}
       <div class="criteria-list">${criteria}</div>
-    </div>`;
-}
-
-function renderDeductionsSummary(imperfect: CriterionGrade[]): string {
-  const items = imperfect
-    .map((c) => {
-      const lost = 10 - c.score;
-      return `
-      <div class="deduction-item">
-        <span class="deduction-criterion">${escapeHtml(c.check)}</span>
-        <span class="deduction-lost">-${lost} pts</span>
-        <span class="deduction-rationale">${escapeHtml(c.rationale)}</span>
-      </div>`;
-    })
-    .join("");
-
-  return `
-    <div class="deductions-summary">
-      <div class="deductions-header">Areas for improvement</div>
-      ${items}
     </div>`;
 }
 

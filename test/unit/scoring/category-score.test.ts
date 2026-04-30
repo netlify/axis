@@ -426,21 +426,21 @@ describe("computeCategoryScore", () => {
 
   it("produces score of 50 when rawScore matches median", () => {
     // To get rawScore == median, we need the weighted sum of dimensions to equal the median.
-    // For environment: median = 0.75
-    // Weights: success=0.35, speed=0.15, weight=0.15, relevance=0.15, necessity=0.2
-    // If all audit dimensions = 0.75 and necessity.score = 0.75, rawScore = 0.75
+    // For environment: median = 0.5
+    // Weights: success=0.7, speed=0.3, weight=0, relevance=0, necessity=0
+    // If success=0.5 and speed=0.5, rawScore = 0.5*0.7 + 0.5*0.3 = 0.5
     const audits: InteractionAudit[] = [
       makeAudit({
         id: 1,
         categories: ["environment"],
-        success: 0.75,
-        speed: 0.75,
-        weight: 0.75,
-        contextRelevance: 0.75,
+        success: 0.5,
+        speed: 0.5,
+        weight: 0.5,
+        contextRelevance: 0.5,
       }),
     ];
     const interactions: Interaction[] = [makeInteraction({ id: 1, categories: ["environment"] })];
-    const necessity = makeNecessity("environment", 0.75);
+    const necessity = makeNecessity("environment", 0.5);
 
     const result = computeCategoryScore("environment", audits, necessity, interactions);
     expect(result.score).toBe(50);

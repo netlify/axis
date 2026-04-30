@@ -125,7 +125,7 @@ COMPLETE SPARSE INDEX ({{totalInteractions}} total interactions, {{categoryInter
 RAW DATA FILES (for additional detail if needed):
 {{dataDir}}
 
-NOTE: Content shown above may be truncated for evaluation purposes. This does NOT mean the agent's actual tool results were truncated — evaluate based on the quality and structure of what is shown, not on apparent truncation boundaries.
+IMPORTANT: The sparse index and interaction details above are the COMPLETE authoritative record of this agent's execution. Base your scores strictly on the evidence presented. If an interaction succeeded and produced useful results, score it 1.0 — do not hedge or reduce scores based on speculation about unseen information.
 
 EVALUATION DIMENSIONS (score each 0.0 to 1.0):
 {{evaluationDimensions}}

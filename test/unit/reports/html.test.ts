@@ -127,10 +127,8 @@ describe("generateReportHtml", () => {
     expect(html).toContain("Content is visible");
   });
 
-  it("includes deductions rendering code in JS bundle", () => {
+  it("includes criterion rendering code in JS bundle", () => {
     const html = generateReportHtml(makeReport());
-    expect(html).toContain("Areas for improvement");
-    expect(html).toContain("deduction-item");
     expect(html).toContain("criterion-perfect");
     expect(html).toContain("criterion-imperfect");
   });
