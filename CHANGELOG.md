@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.4](https://github.com/netlify/axis/compare/v1.1.3...v1.1.4) (2026-04-30)
+
+
+### Bug Fixes
+
+* adjusting the calibration for category judging ([a6b5b04](https://github.com/netlify/axis/commit/a6b5b04fd9e3ccab824c887bb702d213dd126e36))
+* skip mode ([8909b41](https://github.com/netlify/axis/commit/8909b41c294794c0cdb2d095181d5b3865999e42))
+
 ## [1.1.3](https://github.com/netlify/axis/compare/v1.1.2...v1.1.3) (2026-04-29)
 
 
