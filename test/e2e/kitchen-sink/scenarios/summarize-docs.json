@@ -6,5 +6,6 @@
     { "check": "Agent wrote summary.md with substantive content", "weight": 0.25 },
     { "check": "Summary covers what async workloads are and their key features", "weight": 0.25 },
     { "check": "Summary includes setup steps", "weight": 0.25 }
-  ]
+  ],
+  "skip": true
 }

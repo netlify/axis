@@ -62,17 +62,18 @@ describe("kitchen-sink (all adapters)", () => {
     }
   });
 
-  it("runs both scenarios across both adapters", async () => {
+  it("runs active scenarios across both adapters (skipped excluded)", async () => {
     const output = await run({
       configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
       logger: silentLogger,
     });
 
-    // 2 scenarios × 2 agents = 4 results
-    expect(output.results).toHaveLength(4);
-    expect(output.summary.total).toBe(4);
-    expect(output.summary.completed).toBe(4);
+    // 1 active scenario (echo-test) × 2 agents = 2 results; summarize-docs is skip:true
+    expect(output.results).toHaveLength(2);
+    expect(output.summary.total).toBe(2);
+    expect(output.summary.completed).toBe(2);
     expect(output.summary.failed).toBe(0);
+    expect(output.summary.skipped).toBe(1);
   });
 
   it("produces results with correct agent names", async () => {
@@ -85,14 +86,14 @@ describe("kitchen-sink (all adapters)", () => {
     expect(agentNames).toEqual(["claude-code", "codex"]);
   });
 
-  it("includes both scenario keys", async () => {
+  it("includes only active scenario keys", async () => {
     const output = await run({
       configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
       logger: silentLogger,
     });
 
     const scenarioKeys = [...new Set(output.results.map((r) => r.scenarioKey))].sort();
-    expect(scenarioKeys).toEqual(["echo-test", "summarize-docs"]);
+    expect(scenarioKeys).toEqual(["echo-test"]);
   });
 
   it("echo-test scenario has correct prompt and rubric", async () => {
@@ -108,22 +109,6 @@ describe("kitchen-sink (all adapters)", () => {
       expect(result.prompt).toContain("largest word in the English language");
       expect(result.rubric).toBeInstanceOf(Array);
       expect(result.rubric).toHaveLength(2);
-    }
-  });
-
-  it("summarize-docs scenario has correct prompt and rubric", async () => {
-    const output = await run({
-      configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
-      logger: silentLogger,
-    });
-
-    const docResults = output.results.filter((r) => r.scenarioKey === "summarize-docs");
-    expect(docResults).toHaveLength(2);
-    for (const result of docResults) {
-      expect(result.scenarioName).toBe("Summarize async workloads docs");
-      expect(result.prompt).toContain("https://docs.netlify.com/build/async-workloads/overview/");
-      expect(result.rubric).toBeInstanceOf(Array);
-      expect(result.rubric).toHaveLength(4);
     }
   });
 
@@ -145,12 +130,12 @@ describe("kitchen-sink (all adapters)", () => {
       agentFilter: ["codex"],
     });
 
-    // 2 scenarios × 1 agent = 2 results
-    expect(output.results).toHaveLength(2);
+    // 1 active scenario × 1 agent = 1 result
+    expect(output.results).toHaveLength(1);
     expect(output.results.every((r) => r.agentName === "codex")).toBe(true);
   });
 
-  it("calls each adapter once per scenario", async () => {
+  it("calls each adapter once per active scenario", async () => {
     const adapters = setupAdapters();
 
     await run({
@@ -158,8 +143,8 @@ describe("kitchen-sink (all adapters)", () => {
       logger: silentLogger,
     });
 
-    // Each adapter runs 2 scenarios
-    expect(adapters["claude-code"].run).toHaveBeenCalledTimes(2);
-    expect(adapters["codex"].run).toHaveBeenCalledTimes(2);
+    // Each adapter runs 1 active scenario (echo-test)
+    expect(adapters["claude-code"].run).toHaveBeenCalledTimes(1);
+    expect(adapters["codex"].run).toHaveBeenCalledTimes(1);
   });
 });

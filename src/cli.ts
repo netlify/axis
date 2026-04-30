@@ -202,18 +202,20 @@ program
 
     // Interactive / non-JSON mode
     const isTTY = process.stderr.isTTY ?? false;
-    let onUpdate: ((jobs: JobState[]) => void) | undefined;
+    let onUpdate: ((jobs: JobState[], skipped: number) => void) | undefined;
     let unmountInk: (() => void) | undefined;
     let lastJobs: JobState[] = [];
+    let skippedCount = 0;
 
     const logger: Logger = {
       info: (msg) => process.stderr.write(`  ${msg}\n`),
       error: (msg) => process.stderr.write(`  ERROR: ${msg}\n`),
       verbose: opts.verbose || opts.debug ? (msg) => process.stderr.write(`  ${msg}\n`) : undefined,
       onJobUpdate: isTTY
-        ? (jobs) => {
+        ? (jobs, meta) => {
             lastJobs = jobs;
-            onUpdate?.([...jobs]);
+            if (meta?.skipped) skippedCount = meta.skipped;
+            onUpdate?.([...jobs], skippedCount);
           }
         : undefined,
     };
@@ -227,7 +229,7 @@ program
 
         const instance = render(
           React.createElement(App, {
-            subscribe: (cb: (jobs: JobState[]) => void) => {
+            subscribe: (cb: (jobs: JobState[], skipped: number) => void) => {
               onUpdate = cb;
             },
           }),
@@ -252,7 +254,7 @@ program
           const job = lastJobs.find((j) => j.scenarioKey === scenarioKey && j.agentName === agentName);
           if (job && job.status !== "failed") {
             job.status = "scoring";
-            onUpdate?.([...lastJobs]);
+            onUpdate?.([...lastJobs], skippedCount);
           }
         },
         // onScoringDone
@@ -263,7 +265,7 @@ program
               job.status = "done";
             }
             job.axisScore = scored.score.axisScore;
-            onUpdate?.([...lastJobs]);
+            onUpdate?.([...lastJobs], skippedCount);
           }
         },
       );

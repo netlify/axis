@@ -128,6 +128,7 @@ export function buildScoredOutput(runOutput: RunOutput, scoredResults: ScoredRun
       total: runOutput.summary.total,
       completed: runOutput.summary.completed,
       failed: runOutput.summary.failed,
+      ...(runOutput.summary.skipped ? { skipped: runOutput.summary.skipped } : {}),
       averageAxisScore: Math.round(averageAxisScore),
     },
   };

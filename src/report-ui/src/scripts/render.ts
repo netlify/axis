@@ -149,10 +149,22 @@ function renderHeader(report: ReportData): string {
             <div class="stat-value">${report.summary.completed}</div>
             <div class="stat-label">Passed</div>
           </div>
-          <div class="summary-stat${report.summary.failed > 0 ? " stat-failed" : ""}">
+          ${
+            report.summary.failed > 0
+              ? `<div class="summary-stat stat-failed">
             <div class="stat-value">${report.summary.failed}</div>
             <div class="stat-label">Failed</div>
-          </div>
+          </div>`
+              : ""
+          }
+          ${
+            report.summary.skipped
+              ? `<div class="summary-stat stat-skipped">
+            <div class="stat-value">${report.summary.skipped}</div>
+            <div class="stat-label">Skipped</div>
+          </div>`
+              : ""
+          }
           ${
             totalCost > 0
               ? `

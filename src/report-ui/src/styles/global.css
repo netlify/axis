@@ -239,6 +239,10 @@ h3 {
   color: var(--danger);
 }
 
+.summary-stat.stat-skipped .stat-value {
+  color: var(--text-muted);
+}
+
 /* --- Score Badge --- */
 
 .score-badge {

@@ -6,9 +6,10 @@ import { LiveDuration } from "./LiveDuration.js";
 
 interface LiveStatusProps {
   jobs: JobState[];
+  skippedCount?: number;
 }
 
-export function LiveStatus({ jobs }: LiveStatusProps) {
+export function LiveStatus({ jobs, skippedCount = 0 }: LiveStatusProps) {
   const done = jobs.filter((j) => j.status === "done").length;
   const failed = jobs.filter((j) => j.status === "failed").length;
   const scoring = jobs.filter((j) => j.status === "scoring").length;
@@ -46,6 +47,7 @@ export function LiveStatus({ jobs }: LiveStatusProps) {
           {done + failed}/{total} complete
         </Text>
       )}
+      {skippedCount > 0 ? <Text dimColor>{skippedCount} marked to be skipped</Text> : null}
       <Text> </Text>
     </Box>
   );

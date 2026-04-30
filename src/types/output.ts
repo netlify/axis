@@ -30,6 +30,7 @@ export interface RunSummary {
   total: number;
   completed: number;
   failed: number;
+  skipped?: number;
 }
 
 export type JobStatus = "pending" | "setup" | "running" | "teardown" | "done" | "failed" | "scoring";
@@ -68,7 +69,7 @@ export interface Logger {
   /** Detailed per-step logging. Only called when verbose mode is enabled. */
   verbose?(message: string): void;
   /** Called when a job's status changes. Used for live-updating displays. */
-  onJobUpdate?(jobs: JobState[]): void;
+  onJobUpdate?(jobs: JobState[], meta?: { skipped?: number }): void;
 }
 
 export const silentLogger: Logger = {

@@ -114,13 +114,11 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
     }
   }
 
-  if (skippedKeys.size > 0) {
-    logger.info(`Skipped ${skippedKeys.size} scenario${skippedKeys.size > 1 ? "s" : ""}: ${[...skippedKeys].join(", ")}`);
-  }
+  const skippedCount = skippedKeys.size;
 
   if (jobs.length === 0) {
     logger.info("No jobs discovered.");
-    return buildOutput(runStart, []);
+    return buildOutput(runStart, [], skippedCount);
   }
 
   // --- Initialize job state tracker ---
@@ -129,6 +127,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
     agentName: job.agentName,
     status: "pending" as JobStatus,
   }));
+  const jobMeta = skippedCount > 0 ? { skipped: skippedCount } : undefined;
 
   const updateStatus = (index: number, status: JobStatus, durationMs?: number) => {
     const patch: Partial<JobState> = { status, durationMs };
@@ -138,7 +137,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
       patch.runStartedAt = Date.now();
     }
     jobStates[index] = { ...jobStates[index], ...patch };
-    logger.onJobUpdate?.(jobStates);
+    logger.onJobUpdate?.(jobStates, jobMeta);
   };
 
   /**
@@ -156,7 +155,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
       liveTokens: grew ? tokens : prev,
       ...(newlyFinal ? { tokensFinal: true } : {}),
     };
-    logger.onJobUpdate?.(jobStates);
+    logger.onJobUpdate?.(jobStates, jobMeta);
   };
 
   // Build filtered environment once for all jobs
@@ -215,7 +214,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   }
 
   // Emit initial state after pre-flight so ink's first render is clean
-  logger.onJobUpdate?.(jobStates);
+  logger.onJobUpdate?.(jobStates, jobMeta);
 
   // --- Execute jobs with concurrency control ---
   const concurrency = options.concurrency ?? Infinity;
@@ -245,7 +244,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   });
   const results = await runWithConcurrency(tasks, concurrency);
 
-  return buildOutput(runStart, results);
+  return buildOutput(runStart, results, skippedCount);
 }
 
 interface JobOutput {
@@ -430,7 +429,7 @@ function normalizeAgents(agents: (string | AgentConfig)[]): Array<{ name: string
   return result;
 }
 
-function buildOutput(runStart: number, results: RunResult[]): RunOutput {
+function buildOutput(runStart: number, results: RunResult[], skippedCount = 0): RunOutput {
   const completed = results.filter((r) => r.output.metadata.exitCode === 0 && !r.output.metadata.error).length;
 
   return {
@@ -442,6 +441,7 @@ function buildOutput(runStart: number, results: RunResult[]): RunOutput {
       total: results.length,
       completed,
       failed: results.length - completed,
+      ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
     },
   };
 }

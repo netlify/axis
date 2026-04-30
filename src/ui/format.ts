@@ -1,4 +1,4 @@
-import type { RunOutput, RunResult } from "../types/output.js";
+import type { RunOutput, RunResult, RunSummary } from "../types/output.js";
 import { isScoredResult } from "../types/output.js";
 import type { CategoryScore, InteractionAudit, ScoreResult, ScoredOutput, ScoredRunResult } from "../types/scoring.js";
 import type { ReportManifest } from "../types/report.js";
@@ -45,6 +45,14 @@ export const STATUS_LABELS: Record<string, string> = {
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "—";
   return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
+}
+
+/** Build a conditional summary footer: "X completed, Y failed, Z skipped (N total)" */
+export function formatSummaryFooter(summary: RunSummary): string {
+  const parts = [`${summary.completed} completed`];
+  if (summary.failed > 0) parts.push(`${summary.failed} failed`);
+  if (summary.skipped) parts.push(`${summary.skipped} skipped`);
+  return `${parts.join(", ")} (${summary.total} total)`;
 }
 
 /** Common error patterns mapped to friendly one-line messages. */
@@ -189,9 +197,8 @@ export function renderSummaryTable(output: RunOutput): string {
 
   lines.push(`  ${sep}`);
   lines.push(
-    `  ${output.summary.completed} completed, ${output.summary.failed} failed (${output.summary.total} total)`.padEnd(
-      56,
-    ) + `${formatDuration(output.durationMs).padEnd(COL_DURATION)} ${totalCost > 0 ? "$" + totalCost.toFixed(4) : ""}`,
+    `  ${formatSummaryFooter(output.summary)}`.padEnd(56) +
+      `${formatDuration(output.durationMs).padEnd(COL_DURATION)} ${totalCost > 0 ? "$" + totalCost.toFixed(4) : ""}`,
   );
   lines.push("");
 
@@ -381,6 +388,9 @@ export function renderScoredSummaryTable(output: ScoredOutput): string {
       `${formatDuration(output.durationMs).padEnd(COL_DURATION)} ` +
       `${totalCost > 0 ? "$" + totalCost.toFixed(4) : ""}`,
   );
+  if (output.summary.skipped) {
+    lines.push(`  ${output.summary.skipped} marked to be skipped`);
+  }
   lines.push("");
 
   return lines.join("\n") + "\n";
@@ -434,9 +444,7 @@ export function renderReportDetail(report: ReportManifest): string {
   lines.push(`  ${sep}`);
   lines.push(`  Timestamp:  ${report.timestamp}`);
   lines.push(`  Duration:   ${formatDuration(report.durationMs)}`);
-  lines.push(
-    `  Scenarios:  ${report.summary.total} total, ${report.summary.completed} completed, ${report.summary.failed} failed`,
-  );
+  lines.push(`  Scenarios:  ${formatSummaryFooter(report.summary)}`);
 
   if ("averageAxisScore" in report.summary) {
     lines.push(`  AXIS Result: ${(report.summary as { averageAxisScore: number }).averageAxisScore} / 100 (average)`);
