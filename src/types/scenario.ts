@@ -2,6 +2,8 @@ export interface Scenario {
   /** Stable identifier derived from file path relative to scenarios root, sans .json */
   key: string;
   name: string;
+  /** When true, the scenario is excluded from runs. */
+  skip?: boolean;
   setup?: LifecycleAction[];
   prompt: string;
   rubric: string | RubricCriterion[];

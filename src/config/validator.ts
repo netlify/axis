@@ -89,6 +89,10 @@ export function validateScenario(data: unknown, filePath: string): asserts data 
     throw new Error(`Invalid scenario at ${filePath}: "rubric" must be a string or array`);
   }
 
+  if (obj.skip !== undefined && typeof obj.skip !== "boolean") {
+    throw new Error(`Invalid scenario at ${filePath}: "skip" must be a boolean`);
+  }
+
   if (obj.agents !== undefined) {
     if (!Array.isArray(obj.agents) || obj.agents.length === 0) {
       throw new Error(`Invalid scenario at ${filePath}: "agents" must be a non-empty array of strings`);

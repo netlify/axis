@@ -82,13 +82,24 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   // --- Discovery phase ---
   const jobs: Job[] = [];
   const agents = normalizeAgents(config.agents);
+  const skippedKeys = new Set<string>();
 
   for (const { name: agentName, config: agentConfig } of agents) {
     if (options.agentFilter?.length && !options.agentFilter.includes(agentName)) {
       continue;
     }
 
-    const scenarios = await discoverScenarios(configDir, config.scenarios, agentConfig.scenarios);
+    const allScenarios = await discoverScenarios(configDir, config.scenarios, agentConfig.scenarios);
+
+    // Partition into active and skipped
+    const scenarios: Scenario[] = [];
+    for (const s of allScenarios) {
+      if (s.skip) {
+        skippedKeys.add(s.key);
+      } else {
+        scenarios.push(s);
+      }
+    }
 
     const filteredScenarios = options.scenarioFilter?.length
       ? scenarios.filter((s) => options.scenarioFilter!.some((f) => f === s.key))
@@ -101,6 +112,10 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
       }
       jobs.push({ index: jobs.length, agentName, agentConfig, scenario, configDir, axisConfig: config });
     }
+  }
+
+  if (skippedKeys.size > 0) {
+    logger.info(`Skipped ${skippedKeys.size} scenario${skippedKeys.size > 1 ? "s" : ""}: ${[...skippedKeys].join(", ")}`);
   }
 
   if (jobs.length === 0) {
