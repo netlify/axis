@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.6](https://github.com/netlify/axis/compare/v1.1.5...v1.1.6) (2026-05-01)
+
+
+### Bug Fixes
+
+* adjust layout of reports ([531a260](https://github.com/netlify/axis/commit/531a2601beee7457cbb6c4452ca7df3f8696f7f5))
+* content tweak ([69b5076](https://github.com/netlify/axis/commit/69b5076a3fd46afee9548eb8a19eb89cab88d61b))
+* docs improvement ([aaf2c08](https://github.com/netlify/axis/commit/aaf2c0855d1999849b291e7a953321db092f365f))
+
 ## [1.1.5](https://github.com/netlify/axis/compare/v1.1.4...v1.1.5) (2026-04-30)
 
 
