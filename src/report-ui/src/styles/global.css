@@ -370,18 +370,93 @@ h3 {
   width: 16px;
   color: var(--text-muted);
   transition: transform var(--transition);
-  font-size: 0.75rem;
+  font-size: 0.625rem;
+  opacity: 0.5;
 }
 
 .result-row.expanded .expand-icon {
   transform: rotate(90deg);
 }
 
-.result-row .error-hint {
-  display: block;
-  font-size: 0.75rem;
+.error-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 6px;
+  border: 1px solid var(--light-gray);
+  border-radius: 50%;
+  background: var(--bg-card);
   color: var(--danger);
-  margin-top: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 1;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.error-btn:hover {
+  background: var(--danger-light);
+  border-color: var(--danger);
+}
+
+.modal-error-text {
+  border-color: var(--danger) !important;
+  background: var(--danger-light) !important;
+}
+
+/* --- Scenario Header Row --- */
+
+.scenario-header-row {
+  cursor: pointer;
+  background: #e8ebe5;
+  transition: background var(--transition);
+}
+
+.scenario-header-row:hover {
+  background: #e0e3dc;
+}
+
+.scenario-header-row td {
+  padding: 14px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.scenario-header-row td.col-scenario-header {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  padding-left: 0;
+}
+
+.scenario-header-row .expand-icon {
+  display: inline-block;
+  width: 16px;
+  color: var(--text-muted);
+  transition: transform var(--transition);
+  font-size: 0.75rem;
+}
+
+.scenario-header-row.expanded .expand-icon {
+  transform: rotate(90deg);
+}
+
+/* --- Agent Row (grouped) --- */
+
+.agent-row td.col-expand-indent {
+  text-align: center;
+}
+
+.agent-row.scenario-collapsed {
+  display: none;
+}
+
+.detail-row.scenario-collapsed {
+  display: none;
 }
 
 /* --- Detail Panel --- */
@@ -1472,6 +1547,19 @@ h3 {
     font-size: 0.6875rem;
   }
 
+  /* Scenario header - mobile */
+  .scenario-header-row td {
+    padding: 10px 6px;
+  }
+
+  .scenario-header-row td.col-scenario-header {
+    font-size: 0.8125rem;
+  }
+
+  .agent-row td.col-agent {
+    padding-left: 16px;
+  }
+
   /* Detail panel */
   .detail-panel {
     padding: 16px 12px;
@@ -1623,6 +1711,10 @@ h3 {
   .sparse-index-toggle,
   .info-btn {
     display: none !important;
+  }
+
+  .agent-row.scenario-collapsed {
+    display: table-row !important;
   }
 
   .modal-backdrop {

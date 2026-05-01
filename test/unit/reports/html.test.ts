@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generateReportHtml } from "../../../src/reports/html.js";
-import type { ReportManifest } from "../../../src/types/report.js";
+import type { ReportManifest, ReportResultEntry } from "../../../src/types/report.js";
 import type { CategoryScore } from "../../../src/types/scoring.js";
 
 function mockCategoryScore(score: number): CategoryScore {
@@ -21,6 +21,34 @@ function mockCategoryScore(score: number): CategoryScore {
       },
     ],
     necessity: { category: "environment", score: score / 100, unnecessaryIds: [], rationale: "test necessity" },
+  };
+}
+
+function makeResultEntry(overrides?: Partial<ReportResultEntry>): ReportResultEntry {
+  return {
+    scenarioKey: "hello-world",
+    scenarioName: "Hello World Scenario",
+    agentName: "claude-code",
+    durationMs: 2000,
+    exitCode: 0,
+    tokenUsage: { input: 500, output: 200 },
+    totalCostUsd: 0.005,
+    file: "scenarios/hello-world/claude-code.json",
+    score: {
+      axisScore: 85,
+      goalAchievement: {
+        score: 90,
+        criteria: [
+          { check: "Page loaded successfully", weight: 0.5, score: 9, rationale: "Page loaded fine" },
+          { check: "Content is visible", weight: 0.5, score: 8, rationale: "Content rendered correctly" },
+        ],
+      },
+      environment: mockCategoryScore(80),
+      service: mockCategoryScore(70),
+      agent: mockCategoryScore(90),
+      weights: { goal_achievement: 0.4, environment: 0.2, service: 0.2, agent: 0.2 },
+    },
+    ...overrides,
   };
 }
 
@@ -118,7 +146,10 @@ describe("generateReportHtml", () => {
     report.results[0].error = "API quota exceeded";
     report.results[0].exitCode = 1;
     const html = generateReportHtml(report);
+    // Error message embedded in JSON data
     expect(html).toContain("API quota exceeded");
+    // CSS and JS bundle contain error-btn styling and interaction code
+    expect(html).toContain(".error-btn");
   });
 
   it("includes goal achievement criteria data", () => {
@@ -288,15 +319,12 @@ describe("generateReportHtml", () => {
       { check: "Fetched the URL", weight: 0.5 },
       { check: "Wrote summary", weight: 0.5 },
     ];
-    report.results[0].agentConfig = { adapter: "claude-code", model: "sonnet" };
     const html = generateReportHtml(report);
     expect(html).toContain("modal-backdrop");
     expect(html).toContain("modal-prompt");
     expect(html).toContain("Fetch docs and write summary.md");
     expect(html).toContain("Fetched the URL");
     expect(html).toContain("50%");
-    expect(html).toContain("modal-config");
-    expect(html).toContain("adapter");
     expect(html).toContain("info-btn");
   });
 
@@ -322,5 +350,82 @@ describe("generateReportHtml", () => {
     report.results[0].score = undefined;
     const html = generateReportHtml(report);
     expect(html).toContain("<!DOCTYPE html>");
+  });
+
+  describe("scenario grouping", () => {
+    it("includes scenario grouping CSS and JS in the bundle", () => {
+      const html = generateReportHtml(makeReport());
+      // CSS class for scenario headers
+      expect(html).toContain(".scenario-header-row");
+      // CSS class for agent rows
+      expect(html).toContain(".agent-row");
+      // CSS class for collapse state
+      expect(html).toContain(".scenario-collapsed");
+      // JS grouping logic
+      expect(html).toContain("col-scenario-header");
+    });
+
+    it("embeds multi-agent scenario data correctly", () => {
+      const report = makeReport({
+        summary: { total: 2, completed: 2, failed: 0, averageAxisScore: 85 },
+        results: [
+          makeResultEntry({ scenarioKey: "s1", scenarioName: "Scenario One", agentName: "agent-a" }),
+          makeResultEntry({ scenarioKey: "s1", scenarioName: "Scenario One", agentName: "agent-b" }),
+        ],
+      });
+      const html = generateReportHtml(report);
+      expect(html).toContain("Scenario One");
+      expect(html).toContain("agent-a");
+      expect(html).toContain("agent-b");
+    });
+
+    it("embeds multi-scenario data correctly", () => {
+      const report = makeReport({
+        summary: { total: 4, completed: 4, failed: 0, averageAxisScore: 85 },
+        results: [
+          makeResultEntry({ scenarioKey: "s1", scenarioName: "Scenario A", agentName: "agent-1" }),
+          makeResultEntry({ scenarioKey: "s2", scenarioName: "Scenario B", agentName: "agent-1" }),
+          makeResultEntry({ scenarioKey: "s1", scenarioName: "Scenario A", agentName: "agent-2" }),
+          makeResultEntry({ scenarioKey: "s2", scenarioName: "Scenario B", agentName: "agent-2" }),
+        ],
+      });
+      const html = generateReportHtml(report);
+      expect(html).toContain("Scenario A");
+      expect(html).toContain("Scenario B");
+      expect(html).toContain("agent-1");
+      expect(html).toContain("agent-2");
+    });
+
+    it("handles unscored results with multiple agents", () => {
+      const report = makeReport({
+        summary: { total: 2, completed: 2, failed: 0 },
+        results: [
+          makeResultEntry({ scenarioKey: "s1", scenarioName: "S1", agentName: "a", score: undefined }),
+          makeResultEntry({ scenarioKey: "s1", scenarioName: "S1", agentName: "b", score: undefined }),
+        ],
+      });
+      const html = generateReportHtml(report);
+      expect(html).toContain("<!DOCTYPE html>");
+      expect(html).not.toContain("NaN");
+    });
+
+    it("embeds error data for failed agents in multi-agent scenarios", () => {
+      const report = makeReport({
+        summary: { total: 2, completed: 1, failed: 1, averageAxisScore: 85 },
+        results: [
+          makeResultEntry({ scenarioKey: "s1", scenarioName: "S1", agentName: "a" }),
+          makeResultEntry({ scenarioKey: "s1", scenarioName: "S1", agentName: "b", exitCode: 1, error: "Timeout" }),
+        ],
+      });
+      const html = generateReportHtml(report);
+      expect(html).toContain("Timeout");
+    });
+
+    it("includes scenario collapse interaction code in bundle", () => {
+      const html = generateReportHtml(makeReport());
+      // The JS bundle should contain the collapse/expand logic
+      expect(html).toContain("scenario-collapsed");
+      expect(html).toContain("col-scenario-header");
+    });
   });
 });

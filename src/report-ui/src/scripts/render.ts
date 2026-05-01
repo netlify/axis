@@ -73,6 +73,35 @@ function fillColorClass(score: number): string {
   return "fill-red";
 }
 
+// --- Scenario Grouping ---
+
+interface ScenarioGroup {
+  scenarioKey: string;
+  scenarioName: string;
+  entries: ResultEntry[];
+  prompt?: string;
+  rubric?: string | RubricCriterion[];
+}
+
+function groupByScenario(results: ResultEntry[]): ScenarioGroup[] {
+  const map = new Map<string, ScenarioGroup>();
+  for (const entry of results) {
+    let group = map.get(entry.scenarioKey);
+    if (!group) {
+      group = {
+        scenarioKey: entry.scenarioKey,
+        scenarioName: entry.scenarioName,
+        entries: [],
+        prompt: entry.prompt,
+        rubric: entry.rubric,
+      };
+      map.set(entry.scenarioKey, group);
+    }
+    group.entries.push(entry);
+  }
+  return Array.from(map.values());
+}
+
 // --- Components ---
 
 function scoreBadge(score: number | undefined, large = false): string {
@@ -187,9 +216,15 @@ function renderResultsSection(report: ReportData): string {
   }
 
   const hasScores = report.results.some((r) => r.score !== undefined);
+  const groups = groupByScenario(report.results);
 
-  const rows = report.results
-    .map((entry, i) => renderResultRow(entry, i, hasScores) + renderDetailRow(entry, i))
+  let globalIndex = 0;
+  const groupRows = groups
+    .map((group) => {
+      const startIndex = globalIndex;
+      globalIndex += group.entries.length;
+      return renderScenarioGroup(group, startIndex, hasScores);
+    })
     .join("");
 
   return `
@@ -198,8 +233,7 @@ function renderResultsSection(report: ReportData): string {
         <thead>
           <tr>
             <th></th>
-            <th>Scenario</th>
-            <th>Agent</th>
+            <th>Scenario / Agent</th>
             ${
               hasScores
                 ? `
@@ -216,27 +250,67 @@ function renderResultsSection(report: ReportData): string {
             <th class="col-right hide-mobile">Cost</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>${groupRows}</tbody>
       </table>
     </section>`;
 }
 
-function renderResultRow(entry: ResultEntry, index: number, hasScores: boolean): string {
-  const s = entry.score;
-  const isFailed = entry.exitCode !== 0 || !!entry.error;
+function renderScenarioGroup(group: ScenarioGroup, startIndex: number, hasScores: boolean): string {
+  const header = renderScenarioHeaderRow(group, startIndex, hasScores);
+  const agentRows = group.entries
+    .map((entry, i) => {
+      const globalIndex = startIndex + i;
+      return renderAgentRow(entry, globalIndex, hasScores, group.scenarioKey) +
+        renderDetailRow(entry, globalIndex, group.scenarioKey);
+    })
+    .join("");
+  return header + agentRows;
+}
 
-  const errorHint = entry.error ? `<span class="error-hint">${escapeHtml(friendlyError(entry.error))}</span>` : "";
-
-  const infoBtn = entry.prompt
-    ? `<button class="info-btn" data-modal-index="${index}" title="View scenario settings">\u2139</button>`
+function renderScenarioHeaderRow(group: ScenarioGroup, startIndex: number, hasScores: boolean): string {
+  const infoBtn = group.prompt
+    ? `<button class="info-btn" data-modal-index="${startIndex}" title="View scenario settings">\u2139</button>`
     : "";
 
   if (hasScores) {
     return `
-      <tr class="result-row" data-index="${index}">
+      <tr class="scenario-header-row expanded" data-scenario="${escapeHtml(group.scenarioKey)}">
         <td><span class="expand-icon">\u25B6</span></td>
-        <td class="col-scenario">${escapeHtml(entry.scenarioName)}${infoBtn}${errorHint}</td>
-        <td class="col-agent">${escapeHtml(entry.agentName)}</td>
+        <td class="col-scenario-header">${escapeHtml(group.scenarioName)}${infoBtn}</td>
+        <td class="col-score"></td>
+        <td class="col-score hide-mobile"></td>
+        <td class="col-score hide-mobile"></td>
+        <td class="col-score hide-mobile"></td>
+        <td class="col-score hide-mobile"></td>
+        <td class="col-right hide-mobile"></td>
+        <td class="col-right hide-mobile"></td>
+        <td class="col-right hide-mobile"></td>
+      </tr>`;
+  }
+
+  return `
+    <tr class="scenario-header-row expanded" data-scenario="${escapeHtml(group.scenarioKey)}">
+      <td><span class="expand-icon">\u25B6</span></td>
+      <td class="col-scenario-header">${escapeHtml(group.scenarioName)}${infoBtn}</td>
+      <td class="col-score"></td>
+      <td class="col-right hide-mobile"></td>
+      <td class="col-right hide-mobile"></td>
+      <td class="col-right hide-mobile"></td>
+    </tr>`;
+}
+
+function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, scenarioKey: string): string {
+  const s = entry.score;
+  const isFailed = entry.exitCode !== 0 || !!entry.error;
+  const errorBtn = entry.error
+    ? `<button class="error-btn" data-error-index="${index}" title="${escapeHtml(friendlyError(entry.error))}">!</button>`
+    : "";
+
+  if (hasScores) {
+    return `
+      <tr class="result-row agent-row" data-index="${index}" data-scenario="${escapeHtml(scenarioKey)}">
+        <td class="col-expand-indent"><span class="expand-icon">\u25B6</span></td>
+        <td class="col-agent">${escapeHtml(entry.agentName)}${errorBtn}</td>
         <td class="col-score">${scoreBadge(s?.axisScore)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.goalAchievement.score)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.environment.score)}</td>
@@ -253,10 +327,9 @@ function renderResultRow(entry: ResultEntry, index: number, hasScores: boolean):
     : `<span class="score-badge score-green">Pass</span>`;
 
   return `
-    <tr class="result-row" data-index="${index}">
-      <td><span class="expand-icon">\u25B6</span></td>
-      <td class="col-scenario">${escapeHtml(entry.scenarioName)}${infoBtn}${errorHint}</td>
-      <td class="col-agent">${escapeHtml(entry.agentName)}</td>
+    <tr class="result-row agent-row" data-index="${index}" data-scenario="${escapeHtml(scenarioKey)}">
+      <td class="col-expand-indent"><span class="expand-icon">\u25B6</span></td>
+      <td class="col-agent">${escapeHtml(entry.agentName)}${errorBtn}</td>
       <td class="col-score">${status}</td>
       <td class="col-right hide-mobile">${fmtTokens(entry.tokenUsage)}</td>
       <td class="col-right hide-mobile">${fmtDuration(entry.durationMs)}</td>
@@ -264,10 +337,11 @@ function renderResultRow(entry: ResultEntry, index: number, hasScores: boolean):
     </tr>`;
 }
 
-function renderDetailRow(entry: ResultEntry, index: number): string {
-  const colspan = entry.score ? 11 : 8;
+function renderDetailRow(entry: ResultEntry, index: number, scenarioKey?: string): string {
+  const colspan = entry.score ? 10 : 7;
+  const scenarioAttr = scenarioKey ? ` data-scenario="${escapeHtml(scenarioKey)}"` : "";
   return `
-    <tr class="detail-row" id="detail-${index}">
+    <tr class="detail-row" id="detail-${index}"${scenarioAttr}>
       <td colspan="${colspan}">
         <div class="detail-panel">
           ${entry.error ? `<div class="error-banner">${escapeHtml(entry.error)}</div>` : ""}
@@ -674,12 +748,21 @@ function renderSparseIndex(si: SparseIndex): string {
 // --- Modals ---
 
 function renderModals(results: ResultEntry[]): string {
-  return results
+  const promptModals = results
     .map((entry, i) => {
       if (!entry.prompt) return "";
       return renderModal(entry, i);
     })
     .join("");
+
+  const errorModals = results
+    .map((entry, i) => {
+      if (!entry.error) return "";
+      return renderErrorModal(entry, i);
+    })
+    .join("");
+
+  return promptModals + errorModals;
 }
 
 function renderModal(entry: ResultEntry, index: number): string {
@@ -689,14 +772,13 @@ function renderModal(entry: ResultEntry, index: number): string {
         <div class="modal-header">
           <div>
             <h3>${escapeHtml(entry.scenarioName)}</h3>
-            <span class="modal-subtitle">${escapeHtml(entry.scenarioKey)} &middot; ${escapeHtml(entry.agentName)}</span>
+            <span class="modal-subtitle">${escapeHtml(entry.scenarioKey)}</span>
           </div>
           <button class="modal-close">&times;</button>
         </div>
         <div class="modal-body">
           ${renderModalPrompt(entry.prompt)}
           ${entry.rubric ? renderModalRubric(entry.rubric) : ""}
-          ${entry.agentConfig ? renderModalConfig(entry.agentConfig) : ""}
         </div>
       </div>
     </div>`;
@@ -739,21 +821,24 @@ function renderModalRubric(rubric: string | RubricCriterion[]): string {
     </div>`;
 }
 
-function renderModalConfig(config: Record<string, unknown>): string {
-  const entries = Object.entries(config);
-  if (entries.length === 0) return "";
-
-  const items = entries
-    .map(([key, val]) => {
-      const display = typeof val === "string" ? val : JSON.stringify(val);
-      return `<div class="modal-config-item"><span class="modal-config-key">${escapeHtml(key)}</span><span class="modal-config-val">${escapeHtml(String(display))}</span></div>`;
-    })
-    .join("");
-
+function renderErrorModal(entry: ResultEntry, index: number): string {
   return `
-    <div class="modal-section">
-      <h4>Agent Configuration</h4>
-      <div class="modal-config">${items}</div>
+    <div class="modal-backdrop" data-error-index="${index}">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <h3>${escapeHtml(entry.agentName)}</h3>
+            <span class="modal-subtitle">${escapeHtml(entry.scenarioName)}</span>
+          </div>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-section">
+            <h4>Error</h4>
+            <pre class="modal-prompt modal-error-text">${escapeHtml(entry.error!)}</pre>
+          </div>
+        </div>
+      </div>
     </div>`;
 }
 

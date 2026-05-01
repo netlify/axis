@@ -1,8 +1,45 @@
 /** Attach expand/collapse event listeners to the rendered report. */
 export function initInteractions(): void {
+  // Scenario header collapse/expand
+  document.querySelectorAll<HTMLTableRowElement>(".scenario-header-row").forEach((header) => {
+    header.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest(".info-btn")) return;
+
+      const scenarioKey = header.dataset.scenario;
+      if (!scenarioKey) return;
+
+      const isExpanded = header.classList.contains("expanded");
+
+      const agentRows = document.querySelectorAll<HTMLTableRowElement>(
+        `.agent-row[data-scenario="${scenarioKey}"]`,
+      );
+      const detailRows = document.querySelectorAll<HTMLTableRowElement>(
+        `.detail-row[data-scenario="${scenarioKey}"]`,
+      );
+
+      if (isExpanded) {
+        header.classList.remove("expanded");
+        agentRows.forEach((r) => r.classList.add("scenario-collapsed"));
+        detailRows.forEach((r) => {
+          r.classList.remove("visible");
+          r.classList.add("scenario-collapsed");
+          const idx = r.id.replace("detail-", "");
+          const resultRow = document.querySelector<HTMLTableRowElement>(`.result-row[data-index="${idx}"]`);
+          resultRow?.classList.remove("expanded");
+        });
+      } else {
+        header.classList.add("expanded");
+        agentRows.forEach((r) => r.classList.remove("scenario-collapsed"));
+        detailRows.forEach((r) => r.classList.remove("scenario-collapsed"));
+      }
+    });
+  });
+
   // Result row expand/collapse (accordion)
   document.querySelectorAll<HTMLTableRowElement>(".result-row").forEach((row) => {
     row.addEventListener("click", () => {
+      if (row.classList.contains("scenario-collapsed")) return;
+
       const index = row.dataset.index;
       if (index === undefined) return;
 
@@ -66,6 +103,18 @@ export function initInteractions(): void {
       if (index === undefined) return;
 
       const backdrop = document.querySelector<HTMLElement>(`.modal-backdrop[data-modal-index="${index}"]`);
+      if (backdrop) backdrop.classList.add("visible");
+    });
+  });
+
+  // Modal open (error button)
+  document.querySelectorAll<HTMLButtonElement>(".error-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const index = btn.dataset.errorIndex;
+      if (index === undefined) return;
+
+      const backdrop = document.querySelector<HTMLElement>(`.modal-backdrop[data-error-index="${index}"]`);
       if (backdrop) backdrop.classList.add("visible");
     });
   });
