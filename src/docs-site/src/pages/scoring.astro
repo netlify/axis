@@ -93,15 +93,94 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     <em>how</em> it got there.
   </p>
 
-  <h2 id="interaction-dimensions">The Interaction Dimensions</h2>
+  <h2 id="environment">Environment</h2>
   <p>
-    Environment, Service, and Agent are scored by analyzing every tool interaction in the agent's
+    Environment measures how well local tools and the runtime performed during execution. It
+    answers the question: <em>did the tools the agent used work correctly and respond quickly?</em>
+  </p>
+  <p>
+    This dimension covers OS, filesystem, and dev tooling interactions:
+  </p>
+  <ul>
+    <li><strong>Shell:</strong> bash, shell, terminal, exec.</li>
+    <li><strong>File ops:</strong> read, write, edit, glob, grep, cat, head, tail, find, ls, mkdir, rm, cp, mv.</li>
+    <li><strong>Version control:</strong> git.</li>
+    <li><strong>Package managers:</strong> npm, yarn, pip, cargo, go, brew, apt.</li>
+    <li><strong>Build and test:</strong> make, tsc, docker, kubectl, node, python.</li>
+  </ul>
+  <p>
+    Environment is scored on <strong>Success</strong> (0.7) and <strong>Speed</strong> (0.3) only.
+    It does not evaluate whether the agent <em>should</em> have run a command &mdash; only whether
+    the command itself executed correctly and promptly. A low Environment score points to tool
+    failures or slow local operations, not poor agent decisions.
+  </p>
+
+  <h2 id="service">Service</h2>
+  <p>
+    Service measures how well external services and APIs performed. It answers the question:
+    <em>did the APIs and remote tools the agent called respond successfully and within reasonable
+    time?</em>
+  </p>
+  <p>
+    This dimension covers external APIs, MCP tools, network calls, and custom services. Any tool
+    interaction not matching the environment or agent patterns is classified as a service
+    interaction.
+  </p>
+  <p>
+    Like Environment, Service is scored on <strong>Success</strong> (0.7) and <strong>Speed</strong>
+    (0.3) only. It evaluates execution quality, not decision quality. A low Service score means
+    external services are failing or responding slowly &mdash; it does not reflect on the agent's
+    choice to call them.
+  </p>
+
+  <h2 id="agent">Agent</h2>
+  <p>
+    Agent measures the quality of the agent's decisions across the entire execution. It answers
+    the question: <em>did the agent make good choices about what to do and how to do it?</em>
+  </p>
+  <p>
+    This dimension directly covers self-organization and metacognition interactions:
+  </p>
+  <ul>
+    <li><strong>Tool discovery:</strong> toolsearch, listtoolsets, list_tools.</li>
+    <li><strong>Task management:</strong> taskcreate, taskupdate, tasklist, todo_read, todo_write.</li>
+    <li><strong>Planning:</strong> enterplanmode, exitplanmode.</li>
+    <li><strong>User interaction:</strong> askuserquestion, askfollowupquestion.</li>
+    <li><strong>Skill invocation:</strong> skill.</li>
+  </ul>
+  <p>
+    Unlike Environment and Service, Agent is scored on all five signals: <strong>Success</strong>
+    (0.1), <strong>Speed</strong> (0.1), <strong>Weight</strong> (0.2), <strong>Relevance</strong>
+    (0.2), and <strong>Necessity</strong> (0.4). Necessity carries the most weight because the
+    most fundamental question about decision quality is whether each interaction should have
+    happened at all. The agent dimension also evaluates <em>all</em> interactions across every
+    category &mdash; it judges the agent's choice to invoke environment and service tools, not
+    just agent-category tools.
+  </p>
+  <p>
+    A low Agent score means the agent is making poor decisions: unnecessary tool calls, bloated
+    requests, irrelevant file reads, or unfocused reasoning.
+  </p>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Multi-Category Interactions</div>
+    <p>
+      Some interactions span categories. For example, running <code>curl</code> via bash is both an
+      environment interaction (shell command) and a service interaction (network call). Environment
+      tools that target agent-internal paths (like <code>.claude/</code>) are reclassified as agent
+      interactions.
+    </p>
+  </div>
+
+  <h2 id="interaction-evaluation">How Interactions Are Evaluated</h2>
+  <p>
+    Environment, Service, and Agent are all scored by analyzing tool interactions in the agent's
     transcript. Each interaction is classified into a category, then evaluated on a set of signals.
   </p>
   <p>
-    A key design decision in AXIS is <strong>separating execution quality from decision quality</strong>.
-    When an agent runs <code>npm install</code> and it takes 10 seconds, there are two distinct
-    questions:
+    A key design decision in AXIS is <strong>separating execution quality from decision
+    quality</strong>. When an agent runs <code>npm install</code> and it takes 10 seconds, there
+    are two distinct questions:
   </p>
   <ol>
     <li>Was the <em>execution</em> good? Did npm succeed? Was it fast?</li>
@@ -109,15 +188,9 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   </ol>
   <p>
     Environment and Service answer the first question. Agent answers the second. This separation
-    matters because the two problems have different solutions. If your Service score is low, the
-    issue is with your APIs or external tools — they are failing or slow. If your Agent score is
-    low, the issue is with how the agent chose to use those tools — making unnecessary calls,
-    reading irrelevant files, or overscoping requests.
-  </p>
-  <p>
-    If both dimensions evaluated both qualities, a low Environment score would be ambiguous: is
-    the filesystem slow, or is the agent reading too many files? Keeping them separate gives you
-    actionable information.
+    ensures scores are actionable: a low Environment score means your tools are failing or slow,
+    while a low Agent score means the agent is making poor choices. Without this separation, a low
+    score would be ambiguous &mdash; is the filesystem slow, or is the agent reading too many files?
   </p>
 
   <h3 id="interaction-signals">Interaction Signals</h3>
@@ -279,6 +352,66 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     </tbody>
   </table>
 
+  <h3>How Speed Is Measured</h3>
+  <p>
+    Speed scores are computed deterministically from timestamps in the agent's output stream &mdash;
+    no LLM judgment is involved. Each agent CLI (Claude Code, Codex, Gemini) emits timestamped
+    transcript entries as it runs. AXIS uses these timestamps to measure how long each interaction
+    took.
+  </p>
+
+  <h4>Tool interactions</h4>
+  <p>
+    For tool calls, the duration is the time between the <code>tool_use</code> entry and its
+    paired <code>tool_result</code> entry:
+  </p>
+  <pre><code>durationMs = timestamp(tool_result) &minus; timestamp(tool_use)</code></pre>
+  <p>
+    Tool pairing is deterministic. AXIS first matches entries by tool ID (when the agent provides
+    one), then falls back to positional pairing &mdash; each unpaired <code>tool_use</code> is
+    matched with the next unpaired <code>tool_result</code> in sequence. This means the measured
+    duration includes everything that happens between the agent sending a tool request and
+    receiving the result: SDK roundtrips, sandbox setup, process spawning, and the actual
+    operation.
+  </p>
+
+  <h4>Agent thinking</h4>
+  <p>
+    Assistant (thinking/reasoning) entries do not have explicit start and end timestamps in the
+    same way tool calls do. Instead, AXIS infers the duration from the gap between the start of
+    the thinking block and the start of the next interaction:
+  </p>
+  <pre><code>durationMs = startMs(next interaction) &minus; startMs(current thinking block)</code></pre>
+  <p>
+    Consecutive assistant entries are merged into a single interaction before this calculation.
+    If a thinking block is the last interaction in the transcript, its duration remains unknown.
+  </p>
+
+  <h4>Missing or invalid timestamps</h4>
+  <p>
+    When timestamps are missing, empty, or invalid (not parseable as ISO 8601), the duration
+    is recorded as unknown. Interactions with unknown durations receive a <strong>perfect speed
+    score of 1.0</strong> &mdash; AXIS assumes the interaction was fast rather than penalizing
+    for missing data. This means speed scoring is conservative: it only lowers scores when it
+    has concrete evidence of slow performance.
+  </p>
+
+  <h4>What the duration includes</h4>
+  <p>
+    The measured duration reflects wall-clock time as reported by the agent CLI, which includes:
+  </p>
+  <ul>
+    <li>The actual operation (file read, API call, shell command, etc.)</li>
+    <li>Agent framework overhead (SDK serialization, sandbox setup)</li>
+    <li>Process spawning time for shell commands</li>
+    <li>Network latency for API calls</li>
+  </ul>
+  <p>
+    The speed thresholds above are intentionally generous to account for this overhead. A file
+    read scored as "Excellent" at &le;500ms leaves room for the agent framework to serialize
+    the request, execute the read, and return the result.
+  </p>
+
   <h2>Score Calibration</h2>
   <p>
     Raw signal scores are mapped to a 0 to 100 scale using a log-normal S-curve rather than
@@ -310,48 +443,6 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     Other signals (success, weight, relevance) are weighted by context size, so a failed API call
     that returns a large error response influences the score more than a trivial file read.
   </p>
-
-  <h2>Transcript Categorization</h2>
-  <p>
-    Every tool interaction in the transcript is classified into a category based on the tool name.
-    This classification determines which dimension the interaction contributes to.
-  </p>
-
-  <h3 id="environment">Environment</h3>
-  <p>OS, filesystem, and dev tooling interactions:</p>
-  <ul>
-    <li><strong>Shell:</strong> bash, shell, terminal, exec.</li>
-    <li><strong>File ops:</strong> read, write, edit, glob, grep, cat, head, tail, find, ls, mkdir, rm, cp, mv.</li>
-    <li><strong>Version control:</strong> git.</li>
-    <li><strong>Package managers:</strong> npm, yarn, pip, cargo, go, brew, apt.</li>
-    <li><strong>Build and test:</strong> make, tsc, docker, kubectl, node, python.</li>
-  </ul>
-
-  <h3 id="agent">Agent</h3>
-  <p>Self-organization and metacognition:</p>
-  <ul>
-    <li><strong>Tool discovery:</strong> toolsearch, listtoolsets, list_tools.</li>
-    <li><strong>Task management:</strong> taskcreate, taskupdate, tasklist, todo_read, todo_write.</li>
-    <li><strong>Planning:</strong> enterplanmode, exitplanmode.</li>
-    <li><strong>User interaction:</strong> askuserquestion, askfollowupquestion.</li>
-    <li><strong>Skill invocation:</strong> skill.</li>
-  </ul>
-
-  <h3 id="service">Service</h3>
-  <p>
-    Everything else: external APIs, MCP tools, network calls, and custom services. Any tool not
-    matching the environment or agent patterns is classified as a service interaction.
-  </p>
-
-  <div class="callout callout-info">
-    <div class="callout-title">Multi-Category Interactions</div>
-    <p>
-      Some interactions span categories. For example, running <code>curl</code> via bash is both an
-      environment interaction (shell command) and a service interaction (network call). Environment
-      tools that target agent-internal paths (like <code>.claude/</code>) are reclassified as agent
-      interactions.
-    </p>
-  </div>
 
   <h2>Interpreting Scores</h2>
   <table>
