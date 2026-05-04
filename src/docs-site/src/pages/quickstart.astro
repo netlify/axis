@@ -5,8 +5,8 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 <DocsLayout title="Quick Start" active="quickstart">
   <h1>Quick Start</h1>
   <p class="lead">
-    Get AXIS running in your project. This guide walks through creating a config,
-    writing your first scenario, running it, and understanding the results.
+    Get AXIS running in your project. Install the CLI, initialize a config, then iterate: run,
+    review, and baseline.
   </p>
 
   <h2>Prerequisites</h2>
@@ -15,52 +15,41 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     <li>An API key for at least one supported agent (for example, <code>ANTHROPIC_API_KEY</code> for Claude Code).</li>
   </ul>
 
-  <h2>1. Create a Config File</h2>
+  <h2>1. Install the CLI</h2>
   <p>
-    Add an <code>axis.config.json</code> to your project root. At minimum, specify where your
-    scenarios live and which agents to run.
+    Install AXIS globally so the <code>axis</code> binary is available on your <code>PATH</code>:
   </p>
-  <pre><code>{`{
-  "scenarios": "./scenarios",
-  "agents": ["claude-code"]
-}`}</code></pre>
+  <pre><code>npm install -g @netlify/axis</code></pre>
   <p>
-    See <a href="/configuration">Configuration Reference</a> for the full set of options, including
-    scoring weights, MCP servers, and custom agents.
+    Or, to skip the install and run directly with <code>npx</code>, prefix any command with
+    <code>npx @netlify/axis</code> (for example, <code>npx @netlify/axis init</code>).
   </p>
 
-  <h2>2. Write a Scenario</h2>
+  <h2>2. Initialize Your Project</h2>
   <p>
-    Create a <code>scenarios/</code> directory and add your first scenario as a JSON file. Each
-    scenario needs three things: a <strong>name</strong>, a <strong>prompt</strong> (the task for
-    the agent), and a <strong>rubric</strong> (how to judge whether it succeeded).
+    From your project root, run:
   </p>
-  <pre><code>{`{
-  "name": "Create a greeting file",
-  "prompt": "Create a file called hello.txt with the content 'Hello from AXIS'.",
-  "rubric": [
-    { "check": "File hello.txt exists in the workspace", "weight": 0.5 },
-    { "check": "File contains exactly 'Hello from AXIS'", "weight": 0.5 }
-  ]
-}`}</code></pre>
+  <pre><code>axis init</code></pre>
   <p>
-    Save this as <code>scenarios/hello-world.json</code>. The filename (without <code>.json</code>)
-    becomes the scenario key used in reports and CLI commands.
-  </p>
-  <p>
-    A few things that make scenarios work well:
+    In an interactive terminal, this prompts you for the scenarios directory and which agents to
+    include (comma-separated, e.g. <code>claude-code,codex,gemini</code>). It then creates two files:
   </p>
   <ul>
-    <li><strong>Specific prompts</strong> -tell the agent exactly what to do. Vague prompts lead to inconsistent results.</li>
-    <li><strong>Observable rubric checks</strong> -each check should describe something a judge can verify from the transcript and workspace state.</li>
-    <li><strong>Weighted checks</strong> -distribute weight based on importance. If the file existing matters more than its content, weight it higher.</li>
+    <li><code>axis.config.json</code> -minimal config with your chosen scenarios path and agents.</li>
+    <li><code>scenarios/hello-world.json</code> -a sample scenario that asks the agent to create a file with specific content.</li>
   </ul>
   <p>
-    See <a href="/scenarios">Writing Scenarios</a> for a deeper guide on prompts, rubrics, setup/teardown, and examples.
+    To skip the prompts, pass flags directly:
+  </p>
+  <pre><code>axis init --agent claude-code,codex --scenarios ./scenarios</code></pre>
+  <p>
+    See the <a href="/configuration">Configuration Reference</a> for additional options like scoring
+    weights, MCP servers, and custom agents, and <a href="/scenarios">Writing Scenarios</a> for guidance
+    on writing effective prompts and rubrics.
   </p>
 
   <h2>3. Run It</h2>
-  <pre><code>npx @netlify/axis run</code></pre>
+  <pre><code>axis run</code></pre>
   <p>
     AXIS spawns the agent in an isolated workspace, captures the full interaction transcript, scores
     the result against your rubric, and displays a summary in your terminal.
@@ -86,13 +75,13 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     Every run saves a report to <code>.axis/reports/</code>. You can revisit it at any time.
   </p>
   <pre><code>{`# View the latest report summary
-npx @netlify/axis reports latest
+axis reports latest
 
 # Open the HTML report in your browser
-npx @netlify/axis reports latest --html
+axis reports latest --html
 
 # Get JSON output for scripting
-npx @netlify/axis reports latest --json`}</code></pre>
+axis reports latest --json`}</code></pre>
   <p>
     The HTML report includes the full scoring breakdown, interaction transcript, and judge
     evaluations. See <a href="/reports">Reports & Baselines</a> for details on report contents
@@ -142,10 +131,10 @@ npx @netlify/axis reports latest --json`}</code></pre>
     it to detect regressions.
   </p>
   <pre><code>{`# Save the latest report as a baseline
-npx @netlify/axis baseline set
+axis baseline set
 
 # Compare future runs automatically
-npx @netlify/axis run --compare-baseline`}</code></pre>
+axis run --compare-baseline`}</code></pre>
   <p>
     The comparison exits with code 1 if any regressions are detected, making it suitable for CI
     gating. See <a href="/reports">Reports & Baselines</a> for baseline workflows.

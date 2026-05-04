@@ -2,6 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { run } from "./runner/runner.js";
@@ -11,6 +12,7 @@ import { initReport, finalizeReport } from "./reports/writer.js";
 import { listReports, readReport, readScenarioResults } from "./reports/reader.js";
 import { setBaseline, readBaseline, listBaselines, deleteBaseline, DEFAULT_BASELINE_NAME } from "./baselines/store.js";
 import { compareBaseline } from "./baselines/compare.js";
+import { getBuiltinAdapterNames } from "./adapters/registry.js";
 import {
   renderReportList,
   renderReportDetail,
@@ -51,6 +53,105 @@ function handleSignal(signal: NodeJS.Signals): void {
 
 process.on("SIGINT", () => handleSignal("SIGINT"));
 process.on("SIGTERM", () => handleSignal("SIGTERM"));
+
+// --- axis init command ---
+
+const BUILT_IN_AGENTS = ["claude-code", "codex", "gemini"];
+
+function prompt(rl: readline.Interface, question: string, defaultValue: string): Promise<string> {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer.trim() || defaultValue);
+    });
+  });
+}
+
+program
+  .command("init")
+  .description("Initialize a new AXIS configuration and sample scenario")
+  .option("-s, --scenarios <path>", "path to scenarios directory", "./scenarios")
+  .option("-a, --agent <names>", "agent(s) to include (comma-separated, e.g. claude-code,codex)")
+  .option("-f, --force", "overwrite existing files")
+  .action(async (opts) => {
+    let scenariosPath: string = opts.scenarios;
+    let agents: string[] = opts.agent
+      ? opts.agent
+          .split(/[\s,]+/)
+          .filter(Boolean)
+          .map((a: string) => a.toLowerCase())
+      : [];
+
+    const hasExplicitFlags = opts.agent || opts.scenarios !== "./scenarios";
+    const interactive = process.stdin.isTTY && !hasExplicitFlags;
+
+    if (interactive) {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+      scenariosPath = await prompt(rl, `  Scenarios directory (${scenariosPath}): `, scenariosPath);
+      const agentAnswer = await prompt(
+        rl,
+        `  Agents [${BUILT_IN_AGENTS.join(", ")}] (claude-code): `,
+        "claude-code",
+      );
+      agents = agentAnswer
+        .split(/[\s,]+/)
+        .filter(Boolean)
+        .map((a) => a.toLowerCase());
+      rl.close();
+    }
+
+    // Filter out unknown agents (warn the user about which were ignored)
+    const knownAgents = new Set(getBuiltinAdapterNames());
+    const ignored = agents.filter((a) => !knownAgents.has(a));
+    agents = agents.filter((a) => knownAgents.has(a));
+
+    if (ignored.length > 0) {
+      process.stderr.write(
+        `\n  Warning: ignoring unknown agent${ignored.length > 1 ? "s" : ""}: ${ignored.join(", ")}\n` +
+          `  Built-in agents: ${getBuiltinAdapterNames().join(", ")}\n`,
+      );
+    }
+
+    if (agents.length === 0) agents = ["claude-code"];
+
+    const configPath = path.resolve("axis.config.json");
+    const scenariosDir = path.resolve(scenariosPath);
+    const scenarioFile = path.join(scenariosDir, "hello-world.json");
+
+    // Check for existing files
+    if (!opts.force) {
+      if (fs.existsSync(configPath)) {
+        process.stderr.write("\n  axis.config.json already exists. Use --force to overwrite.\n\n");
+        process.exit(1);
+      }
+      if (fs.existsSync(scenarioFile)) {
+        process.stderr.write(`\n  ${path.relative(".", scenarioFile)} already exists. Use --force to overwrite.\n\n`);
+        process.exit(1);
+      }
+    }
+
+    const config = {
+      scenarios: scenariosPath,
+      agents,
+    };
+
+    const scenario = {
+      name: "Hello World",
+      prompt: "Create a file called hello.txt with the content 'Hello, World!'",
+      rubric: [
+        { check: "A file named hello.txt was created" },
+        { check: "The file contains the text 'Hello, World!'" },
+      ],
+    };
+
+    fs.mkdirSync(scenariosDir, { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+    fs.writeFileSync(scenarioFile, JSON.stringify(scenario, null, 2) + "\n");
+
+    process.stdout.write(`\n  Created axis.config.json\n`);
+    process.stdout.write(`  Created ${path.relative(".", scenarioFile)}\n\n`);
+    process.stdout.write(`  Run \`axis run\` to execute your first scenario.\n\n`);
+  });
 
 // --- Shared run pipeline ---
 
@@ -166,7 +267,7 @@ program
     const pipelineOpts: RunPipelineOptions = {
       configPath: opts.config,
       scenario: opts.scenario,
-      agent: opts.agent,
+      agent: opts.agent ? opts.agent.toLowerCase() : undefined,
       concurrency: opts.concurrency,
       score: opts.score,
       verbose: opts.verbose,
@@ -331,7 +432,7 @@ program
 
       // View a specific scenario result
       if (scenarioKey) {
-        const agentFilter: string[] | undefined = opts.agent;
+        const agentFilter: string[] | undefined = opts.agent?.map((a: string) => a.toLowerCase());
 
         // Read all agents, then filter if --agent was specified
         let results = readScenarioResults(configDir, reportId, scenarioKey);

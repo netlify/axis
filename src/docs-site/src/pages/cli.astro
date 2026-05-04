@@ -9,6 +9,32 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     directly or via <code>npx @netlify/axis</code>.
   </p>
 
+  <h2><code>axis init</code></h2>
+  <div class="cli-block">
+    <div class="cli-command">axis init [options]</div>
+    <div class="cli-desc">
+      Scaffold a new <code>axis.config.json</code> and a sample scenario in <code>./scenarios</code>. When run in
+      a TTY without flags, prompts interactively for the scenarios directory and agents.
+    </div>
+    <div class="cli-flags">
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-s, --scenarios &lt;path&gt;</code></span>
+        <span class="cli-flag-desc">Path to scenarios directory (default: <code>./scenarios</code>).</span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-a, --agent &lt;names&gt;</code></span>
+        <span class="cli-flag-desc">
+          Agent(s) to include — comma-separated (e.g. <code>claude-code,codex,gemini</code>). Default:
+          <code>claude-code</code>.
+        </span>
+      </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>-f, --force</code></span>
+        <span class="cli-flag-desc">Overwrite existing files.</span>
+      </div>
+    </div>
+  </div>
+
   <h2><code>axis run</code></h2>
   <div class="cli-block">
     <div class="cli-command">axis run [options]</div>

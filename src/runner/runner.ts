@@ -203,7 +203,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
     const missing = required.filter((key) => !jobEnv[key]);
     if (missing.length > 0) {
       throw new Error(
-        `The "${job.agentConfig.adapter}" adapter requires environment variable${missing.length > 1 ? "s" : ""} ${missing.join(", ")} ` +
+        `The "${job.agentConfig.adapter}" agent requires environment variable${missing.length > 1 ? "s" : ""} ${missing.join(", ")} ` +
           `but ${missing.length > 1 ? "they are" : "it is"} not set. ` +
           `Add ${missing.length > 1 ? "them" : "it"} to your shell environment or to the "env" array in axis.config.json.`,
       );

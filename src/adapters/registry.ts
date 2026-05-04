@@ -24,14 +24,19 @@ export function getAdapter(adapterName: string): AgentAdapter {
   const factory = BUILTIN_FACTORIES[adapterName];
   if (!factory) {
     throw new Error(
-      `Unknown adapter: "${adapterName}". Built-in: claude-sdk, claude-code, codex, gemini, gemini-acp, goose. ` +
-        `Register custom adapters via the "adapters" config field or registerAdapter().`,
+      `Unknown agent: "${adapterName}". Built-in: ${getBuiltinAdapterNames().join(", ")}. ` +
+        `Register custom agents via the "adapters" config field or registerAdapter().`,
     );
   }
 
   const instance = factory();
   instanceCache.set(adapterName, instance);
   return instance;
+}
+
+/** Names of all built-in agent adapters. */
+export function getBuiltinAdapterNames(): string[] {
+  return Object.keys(BUILTIN_FACTORIES);
 }
 
 /** Register a custom adapter by name. */

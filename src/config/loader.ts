@@ -23,11 +23,24 @@ export async function loadConfig(configPath?: string): Promise<{ config: AxisCon
   }
 
   validateConfig(parsed, resolvedPath);
+  normalizeConfigAgents(parsed);
 
   return {
     config: parsed,
     configDir: path.dirname(resolvedPath),
   };
+}
+
+/** Lowercase all agent names in a validated config (mutates in place). */
+function normalizeConfigAgents(config: AxisConfig): void {
+  for (let i = 0; i < config.agents.length; i++) {
+    const entry = config.agents[i];
+    if (typeof entry === "string") {
+      config.agents[i] = entry.toLowerCase();
+    } else {
+      entry.adapter = entry.adapter.toLowerCase();
+    }
+  }
 }
 
 export async function discoverScenarios(
@@ -97,6 +110,7 @@ async function loadScenarioFile(filePath: string, rootDir: string): Promise<Scen
   }
 
   validateScenario(parsed, filePath);
+  normalizeScenarioAgents(parsed);
 
   // Derive key from relative path: scenarios/cms/create-post.json → "cms/create-post"
   const relativePath = path.relative(rootDir, filePath);
@@ -114,6 +128,18 @@ async function loadScenarioFile(filePath: string, rootDir: string): Promise<Scen
 
   // Expand variants: each becomes a standalone Scenario, base does not run
   return scenario.variants.map((variant) => expandVariant(scenario, variant, baseKey));
+}
+
+/** Lowercase agent-name entries in a scenario and any variants (mutates in place). */
+function normalizeScenarioAgents(scenario: Scenario & { variants?: ScenarioVariant[] }): void {
+  if (scenario.agents) {
+    scenario.agents = scenario.agents.map((a) => a.toLowerCase());
+  }
+  if (scenario.variants) {
+    for (const v of scenario.variants) {
+      if (v.agents) v.agents = v.agents.map((a) => a.toLowerCase());
+    }
+  }
 }
 
 function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: string): Scenario {
