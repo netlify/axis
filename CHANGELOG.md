@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0](https://github.com/netlify/axis/compare/v1.1.7...v1.2.0) (2026-05-04)
+
+
+### Features
+
+* init support ([912fe42](https://github.com/netlify/axis/commit/912fe42b25da19e890bdf7af7c29b6eefc775951))
+* support time limits and token limits ([ac782da](https://github.com/netlify/axis/commit/ac782da2078830bc3f04227c08d4dc62e39c0f31))
+
+
+### Bug Fixes
+
+* axis for axis ([a3eab12](https://github.com/netlify/axis/commit/a3eab12e2c5bf9d2be8046155cb05ff06c102929))
+* improve table layouts on report ([141e2f8](https://github.com/netlify/axis/commit/141e2f804b82caaad3d8880cc6bc6fa5cb61e780))
+* improve variant rendering on cli ([76ab416](https://github.com/netlify/axis/commit/76ab4164a94dda12dd38adecf5039ab6ae31773c))
+* render the variants properly ([37cd2a2](https://github.com/netlify/axis/commit/37cd2a20fa29d34a9f521994d919567f6634057c))
+
 ## [1.1.7](https://github.com/netlify/axis/compare/v1.1.6...v1.1.7) (2026-05-04)
 
 
