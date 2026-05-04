@@ -131,6 +131,7 @@ function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: stri
       variant.mcp_servers !== undefined
         ? { ...parent.mcp_servers, ...variant.mcp_servers }
         : parent.mcp_servers,
+    limits: variant.limits ?? parent.limits,
   };
 
   // Strip undefined optional fields to keep objects clean
@@ -140,6 +141,7 @@ function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: stri
   if (expanded.agents === undefined) delete expanded.agents;
   if (expanded.skills === undefined) delete expanded.skills;
   if (expanded.mcp_servers === undefined) delete expanded.mcp_servers;
+  if (expanded.limits === undefined) delete expanded.limits;
 
   return expanded;
 }

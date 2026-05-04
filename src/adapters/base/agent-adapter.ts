@@ -252,15 +252,41 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       });
 
       // 9. Timeout → SIGTERM → SIGKILL, with proper timer cleanup
+      const effectiveTimeout = input.timeoutMs ?? timeoutMs;
       let timedOut = false;
       let killTimer: NodeJS.Timeout | undefined;
       const outerTimer = setTimeout(() => {
         timedOut = true;
         child.kill("SIGTERM");
         killTimer = setTimeout(() => child.kill("SIGKILL"), SIGTERM_TO_SIGKILL_MS);
-      }, timeoutMs);
+      }, effectiveTimeout);
+
+      // 9b. External abort signal (from runner limits)
+      let abortedBySignal = false;
+      let abortReason = "";
+      let signalKillTimer: NodeJS.Timeout | undefined;
+
+      if (input.signal) {
+        const onAbort = () => {
+          if (abortedBySignal) return;
+          abortedBySignal = true;
+          abortReason = String(input.signal!.reason || "Job aborted");
+          child.kill("SIGTERM");
+          signalKillTimer = setTimeout(() => child.kill("SIGKILL"), SIGTERM_TO_SIGKILL_MS);
+        };
+        if (input.signal.aborted) {
+          onAbort();
+        } else {
+          input.signal.addEventListener("abort", onAbort, { once: true });
+          child.on("close", () => {
+            input.signal!.removeEventListener("abort", onAbort);
+          });
+        }
+      }
+
       child.on("close", () => {
         if (killTimer) clearTimeout(killTimer);
+        if (signalKillTimer) clearTimeout(signalKillTimer);
       });
 
       // 10. Stream stdout — capture spec locally so TS narrowing survives closures
@@ -325,7 +351,23 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
             endTime: endTime.toISOString(),
             durationMs: endTime.getTime() - startTime.getTime(),
             exitCode,
-            error: `Agent timed out after ${timeoutMs / 1000}s`,
+            error: `Agent timed out after ${effectiveTimeout / 1000}s`,
+          },
+        };
+      }
+
+      // 12b. Abort path (external signal from runner limits)
+      if (abortedBySignal) {
+        return {
+          transcript,
+          result: null,
+          rawOutput,
+          metadata: {
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            durationMs: endTime.getTime() - startTime.getTime(),
+            exitCode,
+            error: abortReason,
           },
         };
       }

@@ -1,4 +1,4 @@
-import type { McpServerConfig } from "./config.js";
+import type { McpServerConfig, ScenarioLimitsConfig } from "./config.js";
 
 export interface Scenario {
   /** Stable identifier derived from file path relative to scenarios root, sans .json */
@@ -16,6 +16,8 @@ export interface Scenario {
   skills?: string[];
   /** MCP servers specific to this scenario, merged with top-level servers. */
   mcp_servers?: Record<string, McpServerConfig>;
+  /** Per-scenario time/token limits. Overrides settings.limits.scenario defaults. */
+  limits?: ScenarioLimitsConfig;
   /**
    * When defined, the scenario becomes a template. Only variants run;
    * the base scenario does not execute on its own. Each variant inherits
@@ -35,6 +37,8 @@ export interface ScenarioVariant {
   agents?: string[];
   skills?: string[];
   mcp_servers?: Record<string, McpServerConfig>;
+  /** Per-variant time/token limits. Overrides parent scenario and default limits. */
+  limits?: ScenarioLimitsConfig;
 }
 
 export interface LifecycleAction {

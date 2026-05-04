@@ -1,0 +1,10 @@
+{
+  "scenarios": "./scenarios",
+  "agents": ["mock-agent"],
+  "settings": {
+    "limits": {
+      "run": { "time_minutes": 30, "tokens": 1000000 },
+      "scenario": { "time_minutes": 5, "tokens": 100000 }
+    }
+  }
+}

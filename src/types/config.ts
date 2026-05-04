@@ -37,6 +37,24 @@ export interface SettingsConfig {
   scoring_weights?: ScoringWeights;
   /** Maximum number of parallel jobs. Defaults to unlimited (all jobs run simultaneously). */
   concurrency?: number;
+  /** Time and token spend limits for the run and individual scenarios. */
+  limits?: LimitsConfig;
+}
+
+/** Overall run limits and default per-scenario limits. */
+export interface LimitsConfig {
+  /** When hit, ALL remaining and in-progress jobs are aborted. */
+  run?: ScenarioLimitsConfig;
+  /** Default limits applied to each individual job. Per-scenario limits override these. */
+  scenario?: ScenarioLimitsConfig;
+}
+
+/** Limits for an individual scenario/job. Reused across settings and scenario configs. */
+export interface ScenarioLimitsConfig {
+  /** Maximum execution time in minutes. Accepts fractional values. */
+  time_minutes?: number;
+  /** Maximum total tokens (input + output + cache). Must be a positive integer. */
+  tokens?: number;
 }
 
 export interface ScoringWeights {

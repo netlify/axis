@@ -48,6 +48,10 @@ export interface AgentInput {
    * below the true count so the UI never has to reverse.
    */
   onTokenProgress?: (estimatedTokens: number) => void;
+  /** Override the adapter's default timeout (in ms). Set by the runner from resolved scenario limits. */
+  timeoutMs?: number;
+  /** Abort signal. When fired, the adapter kills the child process with SIGTERM → SIGKILL. */
+  signal?: AbortSignal;
 }
 
 export interface AgentOutput {

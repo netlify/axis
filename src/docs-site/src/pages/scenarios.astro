@@ -90,6 +90,12 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <td>Scenario-specific MCP servers, merged with top-level <a href="/configuration#mcp-servers">MCP servers</a> (scenario wins on name conflict).</td>
       </tr>
       <tr>
+        <td><code>limits</code></td>
+        <td><code>object</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Time and token limits for this scenario. Overrides <a href="/configuration#limits">default scenario limits</a>. Fields: <code>time_minutes</code>, <code>tokens</code>.</td>
+      </tr>
+      <tr>
         <td><code>variants</code></td>
         <td><code>object[]</code></td>
         <td><span class="req-no">No</span></td>
@@ -377,6 +383,11 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <td><code>setup</code> / <code>teardown</code></td>
         <td><code>object[]</code></td>
         <td>Replaces the parent lifecycle actions.</td>
+      </tr>
+      <tr>
+        <td><code>limits</code></td>
+        <td><code>object</code></td>
+        <td>Replaces the parent's limits. Fields: <code>time_minutes</code>, <code>tokens</code>.</td>
       </tr>
       <tr>
         <td><code>skip</code></td>

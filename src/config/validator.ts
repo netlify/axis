@@ -49,6 +49,19 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
     }
   }
 
+  if (settings?.limits !== undefined) {
+    const limits = settings.limits as Record<string, unknown>;
+    if (typeof limits !== "object" || limits === null || Array.isArray(limits)) {
+      throw new Error(`Invalid config at ${filePath}: "settings.limits" must be an object`);
+    }
+    if (limits.run !== undefined) {
+      validateLimits(limits.run, filePath, "settings.limits.run");
+    }
+    if (limits.scenario !== undefined) {
+      validateLimits(limits.scenario, filePath, "settings.limits.scenario");
+    }
+  }
+
   if (obj.mcp_servers !== undefined) {
     validateMcpServers(obj.mcp_servers, filePath);
   }
@@ -110,6 +123,10 @@ export function validateScenario(data: unknown, filePath: string): asserts data 
 
   if (obj.mcp_servers !== undefined) {
     validateMcpServers(obj.mcp_servers, filePath);
+  }
+
+  if (obj.limits !== undefined) {
+    validateLimits(obj.limits, filePath, "limits");
   }
 
   if (obj.setup !== undefined) {
@@ -207,6 +224,10 @@ function validateVariants(data: unknown, filePath: string): void {
     if (variant.teardown !== undefined) {
       validateLifecycleActions(variant.teardown, filePath, `variants[${i}].teardown`);
     }
+
+    if (variant.limits !== undefined) {
+      validateLimits(variant.limits, filePath, `variants[${i}].limits`);
+    }
   }
 }
 
@@ -289,6 +310,24 @@ export function resolveRubricWeights(rubric: RubricCriterion[]): RubricCriterion
   const share = unspecified.length > 0 ? remaining / unspecified.length : 0;
 
   return rubric.map((r) => (r.weight !== undefined ? r : { ...r, weight: share }));
+}
+
+function validateLimits(data: unknown, filePath: string, field: string): void {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new Error(`Invalid config at ${filePath}: "${field}" must be an object`);
+  }
+  const obj = data as Record<string, unknown>;
+
+  if (obj.time_minutes !== undefined) {
+    if (typeof obj.time_minutes !== "number" || obj.time_minutes <= 0) {
+      throw new Error(`Invalid config at ${filePath}: "${field}.time_minutes" must be a positive number`);
+    }
+  }
+  if (obj.tokens !== undefined) {
+    if (typeof obj.tokens !== "number" || !Number.isInteger(obj.tokens) || obj.tokens <= 0) {
+      throw new Error(`Invalid config at ${filePath}: "${field}.tokens" must be a positive integer`);
+    }
+  }
 }
 
 function validateLifecycleActions(data: unknown, filePath: string, field: string): void {

@@ -212,6 +212,119 @@ describe("validateConfig", () => {
     expect(() => validateConfig(config, "test.json")).toThrow("headers.Auth must be a string");
   });
 
+  it("accepts valid settings.limits", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: {
+        limits: {
+          run: { time_minutes: 30, tokens: 1000000 },
+          scenario: { time_minutes: 5, tokens: 100000 },
+        },
+      },
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("accepts partial settings.limits (only run)", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { run: { time_minutes: 10 } } },
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("accepts partial settings.limits (only scenario)", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { scenario: { tokens: 50000 } } },
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("accepts empty settings.limits object", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: {} },
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("accepts fractional time_minutes", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { scenario: { time_minutes: 0.5 } } },
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("rejects non-object settings.limits", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: "bad" },
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow('"settings.limits" must be an object');
+  });
+
+  it("rejects zero time_minutes in run limits", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { run: { time_minutes: 0 } } },
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow("time_minutes\" must be a positive number");
+  });
+
+  it("rejects negative time_minutes", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { run: { time_minutes: -5 } } },
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow("time_minutes\" must be a positive number");
+  });
+
+  it("rejects non-number time_minutes", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { run: { time_minutes: "10" } } },
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow("time_minutes\" must be a positive number");
+  });
+
+  it("rejects zero tokens in scenario limits", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { scenario: { tokens: 0 } } },
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow("tokens\" must be a positive integer");
+  });
+
+  it("rejects float tokens", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { scenario: { tokens: 1.5 } } },
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow("tokens\" must be a positive integer");
+  });
+
+  it("rejects negative tokens", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      settings: { limits: { scenario: { tokens: -100 } } },
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow("tokens\" must be a positive integer");
+  });
+
   it("accepts valid top-level skills", () => {
     const config = {
       scenarios: "./s",
@@ -367,6 +480,26 @@ describe("validateScenario", () => {
     expect(() => validateScenario(scenario, "test.json")).toThrow('"skills" must be an array of strings');
   });
 
+  it("accepts a scenario with limits", () => {
+    const scenario = { ...validScenario, limits: { time_minutes: 10, tokens: 50000 } };
+    expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("accepts a scenario with partial limits", () => {
+    const scenario = { ...validScenario, limits: { tokens: 50000 } };
+    expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("rejects scenario with invalid limits", () => {
+    const scenario = { ...validScenario, limits: { time_minutes: -1 } };
+    expect(() => validateScenario(scenario, "test.json")).toThrow("time_minutes\" must be a positive number");
+  });
+
+  it("rejects scenario with non-integer tokens limit", () => {
+    const scenario = { ...validScenario, limits: { tokens: 1.5 } };
+    expect(() => validateScenario(scenario, "test.json")).toThrow("tokens\" must be a positive integer");
+  });
+
   it("accepts a scenario with mcp_servers", () => {
     const scenario = {
       ...validScenario,
@@ -513,6 +646,22 @@ describe("validateScenario", () => {
         variants: [{ name: "v", teardown: "bad" }],
       };
       expect(() => validateScenario(scenario, "test.json")).toThrow("must be an array");
+    });
+
+    it("accepts variant with limits", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [{ name: "v", limits: { time_minutes: 2, tokens: 10000 } }],
+      };
+      expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+    });
+
+    it("rejects variant with invalid limits", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [{ name: "v", limits: { tokens: -1 } }],
+      };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("tokens\" must be a positive integer");
     });
 
     it("rejects non-object variant entries", () => {

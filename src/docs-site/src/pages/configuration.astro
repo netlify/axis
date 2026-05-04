@@ -47,6 +47,10 @@ const mcpExample = `{
       "environment": 0.2,
       "service": 0.2,
       "agent": 0.2
+    },
+    "limits": {
+      "run": { "time_minutes": 60, "tokens": 2000000 },
+      "scenario": { "time_minutes": 10, "tokens": 200000 }
     }
   },
   "env": ["ANTHROPIC_API_KEY", "GEMINI_API_KEY"],
@@ -90,7 +94,7 @@ const mcpExample = `{
         <td><code>settings</code></td>
         <td><code>object</code></td>
         <td><span class="req-no">No</span></td>
-        <td>Concurrency and scoring weight overrides.</td>
+        <td>Concurrency, scoring weight, and limit overrides.</td>
       </tr>
       <tr>
         <td><code>env</code></td>
@@ -224,6 +228,93 @@ const mcpExample = `{
     }
   }
 }`}</code></pre>
+
+  <h2 id="limits">Limits</h2>
+  <p>
+    Limits control how much time and tokens a run or individual scenario can consume. This prevents
+    runaway agents from consuming unbounded resources. Limits can be configured at three levels:
+  </p>
+  <ul>
+    <li><strong>Overall run limits</strong> (<code>settings.limits.run</code>) &mdash; when hit, all remaining and in-progress jobs are aborted.</li>
+    <li><strong>Default scenario limits</strong> (<code>settings.limits.scenario</code>) &mdash; default budget for each individual job. Only that job fails when exceeded.</li>
+    <li><strong>Per-scenario limits</strong> (<code>limits</code> in the scenario JSON) &mdash; override the defaults for a specific scenario. Only that job fails when exceeded.</li>
+  </ul>
+
+  <h3>Default behavior</h3>
+  <p>
+    Even without any limits configured, each scenario has a default time limit of <strong>15 minutes</strong>.
+    You can override this by setting <code>settings.limits.scenario.time_minutes</code> or by adding
+    <code>limits.time_minutes</code> to individual scenarios.
+  </p>
+
+  <h3>Limit fields</h3>
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>time_minutes</code></td>
+        <td><code>number</code></td>
+        <td>Maximum wall-clock time in minutes. Accepts fractional values (e.g. <code>0.5</code> for 30 seconds). Default: <code>15</code> per scenario.</td>
+      </tr>
+      <tr>
+        <td><code>tokens</code></td>
+        <td><code>number</code></td>
+        <td>Maximum total tokens (input + output + cache). Must be a positive integer. No default.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Overall run limits</h3>
+  <p>
+    Set <code>settings.limits.run</code> to cap the total time or tokens across the entire run.
+    When an overall limit is reached, all remaining and currently running jobs are immediately
+    terminated and marked as failed.
+  </p>
+  <pre><code>{`{
+  "settings": {
+    "limits": {
+      "run": { "time_minutes": 60, "tokens": 2000000 }
+    }
+  }
+}`}</code></pre>
+
+  <h3>Per-scenario limits</h3>
+  <p>
+    Set <code>settings.limits.scenario</code> to define default per-job budgets. These can be
+    overridden by adding a <code>limits</code> field directly in a scenario file.
+  </p>
+  <pre><code>{`// axis.config.json — default for all scenarios
+{
+  "settings": {
+    "limits": {
+      "scenario": { "time_minutes": 10, "tokens": 200000 }
+    }
+  }
+}
+
+// scenarios/expensive-task.json — override for one scenario
+{
+  "name": "Expensive task",
+  "prompt": "...",
+  "rubric": "...",
+  "limits": { "time_minutes": 30, "tokens": 500000 }
+}`}</code></pre>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">Token limit accuracy</div>
+    <p>
+      Token limits are enforced using a conservative estimate during execution (based on streamed
+      assistant text). The actual token count may slightly exceed the limit before the job is
+      terminated. The authoritative token count from the agent's API is used for overall run
+      limit tracking.
+    </p>
+  </div>
 
   <h2 id="mcp-servers">MCP Servers</h2>
   <p>

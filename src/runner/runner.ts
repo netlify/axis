@@ -7,8 +7,34 @@ import { executeLifecycleActions } from "./lifecycle.js";
 import type { RunOutput, RunResult, Logger, JobState, JobStatus } from "../types/output.js";
 import { silentLogger as defaultLogger, formatError } from "../types/output.js";
 import type { Scenario } from "../types/scenario.js";
-import type { AgentConfig, AxisConfig, ResolvedSkill } from "../types/config.js";
+import type { AgentConfig, AxisConfig, ResolvedSkill, ScenarioLimitsConfig } from "../types/config.js";
 import { resolveSkills } from "../skills/resolver.js";
+
+// ---------------------------------------------------------------------------
+// Limit resolution
+// ---------------------------------------------------------------------------
+
+/** Default per-scenario time limit when none is configured (15 minutes). */
+const DEFAULT_SCENARIO_TIME_MINUTES = 15;
+
+interface ResolvedJobLimits {
+  timeoutMs?: number;
+  tokenLimit?: number;
+}
+
+function resolveJobLimits(scenario: Scenario, defaultLimits?: ScenarioLimitsConfig): ResolvedJobLimits {
+  const effective = scenario.limits ?? defaultLimits;
+  const timeMinutes = effective?.time_minutes ?? DEFAULT_SCENARIO_TIME_MINUTES;
+  return {
+    timeoutMs: timeMinutes * 60 * 1000,
+    tokenLimit: effective?.tokens,
+  };
+}
+
+function formatLimitMinutes(ms: number): string {
+  const minutes = ms / 60_000;
+  return Number.isInteger(minutes) ? `${minutes}m` : `${minutes.toFixed(1)}m`;
+}
 
 export type { RunOutput, RunResult };
 
@@ -218,33 +244,86 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   // Emit initial state after pre-flight so ink's first render is clean
   logger.onJobUpdate?.(jobStates, jobMeta);
 
+  // --- Resolve overall limits ---
+  const runLimits = config.settings?.limits?.run;
+  const defaultScenarioLimits = config.settings?.limits?.scenario;
+
+  const runAbortController = new AbortController();
+  let runTimeLimitTimer: NodeJS.Timeout | undefined;
+
+  // Start overall time limit timer
+  if (runLimits?.time_minutes) {
+    const runTimeMs = runLimits.time_minutes * 60 * 1000;
+    runTimeLimitTimer = setTimeout(() => {
+      if (!runAbortController.signal.aborted) {
+        runAbortController.abort(`Overall time limit reached (${formatLimitMinutes(runTimeMs)})`);
+      }
+    }, runTimeMs);
+  }
+
+  // Overall token limit: check cumulative tokens on every update
+  const runTokenLimit = runLimits?.tokens;
+  const checkOverallTokenLimit = () => {
+    if (!runTokenLimit || runAbortController.signal.aborted) return;
+    const cumulative = jobStates.reduce((sum, s) => sum + (s.liveTokens ?? 0), 0);
+    if (cumulative >= runTokenLimit) {
+      runAbortController.abort(`Overall token limit reached (${runTokenLimit} tokens)`);
+    }
+  };
+
   // --- Execute jobs with concurrency control ---
   const concurrency = options.concurrency ?? Infinity;
   const tasks = jobs.map((job) => async () => {
-    const { result, cleanup } = await executeJob(
-      job,
-      jobEnv,
-      logger,
-      updateStatus,
-      updateTokens,
-      resolvedSkillMap,
-      options.registerCleanup,
-      options.debug,
-    );
+    // If overall abort already fired, fail immediately
+    if (runAbortController.signal.aborted) {
+      const reason = String(runAbortController.signal.reason);
+      updateStatus(job.index, "failed", 0);
+      return buildFailedResult(job, reason);
+    }
+
+    // Per-job abort controller, linked to overall
+    const jobAbortController = new AbortController();
+    const onRunAbort = () => {
+      jobAbortController.abort(runAbortController.signal.reason);
+    };
+    runAbortController.signal.addEventListener("abort", onRunAbort, { once: true });
+
+    const jobLimits = resolveJobLimits(job.scenario, defaultScenarioLimits);
 
     try {
-      // Allow external processing (e.g. scoring/verification) before teardown.
-      // If onResult returns a Promise, we await it so the judge can verify
-      // results before teardown scripts destroy resources.
-      if (options.onResult) {
-        await options.onResult(result);
+      const { result, cleanup } = await executeJob(
+        job,
+        jobEnv,
+        logger,
+        updateStatus,
+        updateTokens,
+        resolvedSkillMap,
+        options.registerCleanup,
+        options.debug,
+        jobAbortController,
+        jobLimits,
+        checkOverallTokenLimit,
+      );
+
+      try {
+        // Allow external processing (e.g. scoring/verification) before teardown.
+        // If onResult returns a Promise, we await it so the judge can verify
+        // results before teardown scripts destroy resources.
+        if (options.onResult) {
+          await options.onResult(result);
+        }
+      } finally {
+        await cleanup();
       }
+      return result;
     } finally {
-      await cleanup();
+      runAbortController.signal.removeEventListener("abort", onRunAbort);
     }
-    return result;
   });
   const results = await runWithConcurrency(tasks, concurrency);
+
+  // Clean up overall time limit timer
+  if (runTimeLimitTimer) clearTimeout(runTimeLimitTimer);
 
   return buildOutput(runStart, results, skippedCount);
 }
@@ -264,6 +343,9 @@ async function executeJob(
   resolvedSkillMap: Map<string, ResolvedSkill>,
   registerCleanup?: (fn: () => void) => void,
   _debug?: boolean,
+  jobAbortController?: AbortController,
+  jobLimits?: ResolvedJobLimits,
+  checkOverallTokenLimit?: () => void,
 ): Promise<JobOutput> {
   const { index, agentName, agentConfig, scenario, axisConfig } = job;
   const label = `${scenario.key} (${agentName})`;
@@ -335,8 +417,34 @@ async function executeJob(
         ? { ...axisConfig.mcp_servers, ...scenario.mcp_servers }
         : axisConfig.mcp_servers,
       resolvedSkills: agentSkills.length > 0 ? agentSkills : undefined,
-      onTokenProgress: (tokens) => updateTokens(index, tokens),
+      onTokenProgress: (tokens) => {
+        updateTokens(index, tokens);
+        // Per-scenario token limit
+        if (jobLimits?.tokenLimit && tokens >= jobLimits.tokenLimit) {
+          jobAbortController?.abort(`Scenario token limit reached (${jobLimits.tokenLimit} tokens)`);
+        }
+        // Overall token limit (checks cumulative across all jobs)
+        checkOverallTokenLimit?.();
+      },
+      ...(jobLimits?.timeoutMs ? { timeoutMs: jobLimits.timeoutMs } : {}),
+      ...(jobAbortController ? { signal: jobAbortController.signal } : {}),
     });
+
+    // Rewrite adapter timeout error to scenario-specific message when a
+    // per-scenario time limit was the cause.
+    if (output.metadata.error?.startsWith("Agent timed out") && jobLimits?.timeoutMs) {
+      output.metadata.error = `Scenario time limit reached (${formatLimitMinutes(jobLimits.timeoutMs)})`;
+    }
+
+    // If the abort signal fired during execution but the adapter didn't
+    // handle it (e.g. mock adapters, custom adapters without signal support),
+    // apply the abort reason as the error on the runner side.
+    if (jobAbortController?.signal.aborted && !output.metadata.error) {
+      output.metadata.error = String(jobAbortController.signal.reason);
+      if (output.metadata.exitCode === 0) {
+        output.metadata.exitCode = 1;
+      }
+    }
 
     // Snap the live counter up to the real total (input + output + cache).
     // The UI animates up to this value — it won't exceed it because
@@ -347,6 +455,8 @@ async function executeJob(
     if (usage) {
       const realTotal = (usage.input ?? 0) + (usage.output ?? 0) + (usage.cacheReadInput ?? 0);
       updateTokens(index, realTotal, true);
+      // Re-check overall token limit with the authoritative total
+      checkOverallTokenLimit?.();
     }
 
     const durationMs = output.metadata.durationMs || Date.now() - jobStart;
@@ -431,6 +541,29 @@ function normalizeAgents(agents: (string | AgentConfig)[]): Array<{ name: string
   }
 
   return result;
+}
+
+function buildFailedResult(job: Job, error: string): RunResult {
+  const now = new Date().toISOString();
+  return {
+    scenarioKey: job.scenario.key,
+    scenarioName: job.scenario.name,
+    agentName: job.agentName,
+    prompt: job.scenario.prompt,
+    rubric: job.scenario.rubric,
+    agentConfig: job.agentConfig,
+    output: {
+      transcript: [],
+      result: null,
+      metadata: {
+        startTime: now,
+        endTime: now,
+        durationMs: 0,
+        exitCode: 1,
+        error,
+      },
+    },
+  };
 }
 
 function buildOutput(runStart: number, results: RunResult[], skippedCount = 0): RunOutput {
