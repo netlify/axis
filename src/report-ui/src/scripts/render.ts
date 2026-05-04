@@ -73,6 +73,27 @@ function fillColorClass(score: number): string {
   return "fill-red";
 }
 
+// --- Variant helpers ---
+
+function getBaseKey(scenarioKey: string): string {
+  const idx = scenarioKey.indexOf("@");
+  return idx === -1 ? scenarioKey : scenarioKey.slice(0, idx);
+}
+
+function getVariantName(scenarioKey: string): string | null {
+  const idx = scenarioKey.indexOf("@");
+  return idx === -1 ? null : scenarioKey.slice(idx + 1);
+}
+
+function getBaseScenarioName(scenarioName: string): string {
+  return scenarioName.replace(/ \[[^\]]+\]$/, "");
+}
+
+function displayAgentName(entry: ResultEntry): string {
+  const variant = getVariantName(entry.scenarioKey);
+  return variant ? `${entry.agentName} @${variant}` : entry.agentName;
+}
+
 // --- Scenario Grouping ---
 
 interface ScenarioGroup {
@@ -86,16 +107,17 @@ interface ScenarioGroup {
 function groupByScenario(results: ResultEntry[]): ScenarioGroup[] {
   const map = new Map<string, ScenarioGroup>();
   for (const entry of results) {
-    let group = map.get(entry.scenarioKey);
+    const baseKey = getBaseKey(entry.scenarioKey);
+    let group = map.get(baseKey);
     if (!group) {
       group = {
-        scenarioKey: entry.scenarioKey,
-        scenarioName: entry.scenarioName,
+        scenarioKey: baseKey,
+        scenarioName: getBaseScenarioName(entry.scenarioName),
         entries: [],
         prompt: entry.prompt,
         rubric: entry.rubric,
       };
-      map.set(entry.scenarioKey, group);
+      map.set(baseKey, group);
     }
     group.entries.push(entry);
   }
@@ -310,7 +332,7 @@ function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, s
     return `
       <tr class="result-row agent-row" data-index="${index}" data-scenario="${escapeHtml(scenarioKey)}">
         <td class="col-expand-indent"><span class="expand-icon">\u25B6</span></td>
-        <td class="col-agent">${escapeHtml(entry.agentName)}${errorBtn}</td>
+        <td class="col-agent">${escapeHtml(displayAgentName(entry))}${errorBtn}</td>
         <td class="col-score">${scoreBadge(s?.axisScore)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.goalAchievement.score)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.environment.score)}</td>
@@ -827,7 +849,7 @@ function renderErrorModal(entry: ResultEntry, index: number): string {
       <div class="modal">
         <div class="modal-header">
           <div>
-            <h3>${escapeHtml(entry.agentName)}</h3>
+            <h3>${escapeHtml(displayAgentName(entry))}</h3>
             <span class="modal-subtitle">${escapeHtml(entry.scenarioName)}</span>
           </div>
           <button class="modal-close">&times;</button>
