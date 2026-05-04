@@ -360,7 +360,7 @@ function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, s
 }
 
 function renderDetailRow(entry: ResultEntry, index: number, scenarioKey?: string): string {
-  const colspan = entry.score ? 10 : 7;
+  const colspan = entry.score ? 10 : 6;
   const scenarioAttr = scenarioKey ? ` data-scenario="${escapeHtml(scenarioKey)}"` : "";
   return `
     <tr class="detail-row" id="detail-${index}"${scenarioAttr}>

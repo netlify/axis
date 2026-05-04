@@ -1,5 +1,21 @@
+/** Set every detail-row's colspan to the number of currently-visible header cells. */
+function syncDetailColspans(): void {
+  const headerRow = document.querySelector<HTMLTableRowElement>(".results-table thead tr");
+  if (!headerRow) return;
+  const visible = Array.from(headerRow.cells).filter(
+    (c) => c.offsetParent !== null || c.getClientRects().length > 0,
+  ).length;
+  if (visible === 0) return;
+  document.querySelectorAll<HTMLTableCellElement>(".detail-row > td[colspan]").forEach((td) => {
+    td.colSpan = visible;
+  });
+}
+
 /** Attach expand/collapse event listeners to the rendered report. */
 export function initInteractions(): void {
+  syncDetailColspans();
+  window.addEventListener("resize", syncDetailColspans);
+
   // Scenario header collapse/expand
   document.querySelectorAll<HTMLTableRowElement>(".scenario-header-row").forEach((header) => {
     header.addEventListener("click", (e) => {
