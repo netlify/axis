@@ -1,0 +1,14 @@
+{
+  "name": "Variant echo test",
+  "prompt": "Hello from variant",
+  "rubric": "The agent should echo back the prompt text.",
+  "variants": [
+    {
+      "name": "baseline"
+    },
+    {
+      "name": "alt-prompt",
+      "prompt": "Hello from alt variant"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { Box, Text } from "ink";
 import type { JobState } from "../types/output.js";
-import { STATUS_ICONS, STATUS_LABELS } from "./format.js";
+import { getBaseKey, getVariantName, STATUS_ICONS, STATUS_LABELS } from "./format.js";
 import { AnimatedTokens } from "./AnimatedTokens.js";
 import { LiveDuration } from "./LiveDuration.js";
 
@@ -58,15 +58,18 @@ function ScenarioGroup({ scenarioKey, agents }: { scenarioKey: string; agents: J
     <Box flexDirection="column">
       <Text bold>{scenarioKey}</Text>
       {agents.map((job) => (
-        <AgentRow key={job.agentName} job={job} />
+        <AgentRow key={`${job.scenarioKey}:${job.agentName}`} job={job} />
       ))}
       <Text> </Text>
     </Box>
   );
 }
 
+const COL_AGENT_LIVE = 25;
+
 function AgentRow({ job }: { job: JobState }) {
   const icon = STATUS_ICONS[job.status] ?? "?";
+  const variant = getVariantName(job.scenarioKey);
 
   const label =
     (job.status === "done" || job.status === "failed") && job.axisScore !== undefined
@@ -90,11 +93,14 @@ function AgentRow({ job }: { job: JobState }) {
   const hasTime = job.runStartedAt !== undefined || job.durationMs !== undefined;
   const hasTokens = (job.liveTokens ?? 0) > 0;
 
+  // Build the agent display name with optional variant suffix
+  const agentDisplay = variant ? `${job.agentName} @${variant}` : job.agentName;
+
   return (
     <Box>
       <Text color={color}>
         {"  "}
-        {icon} {job.agentName.padEnd(20)} {label.padEnd(15)}
+        {icon} {agentDisplay.padEnd(COL_AGENT_LIVE)} {label.padEnd(15)}
       </Text>
       {hasTime ? (
         <Box marginRight={1}>
@@ -109,9 +115,10 @@ function AgentRow({ job }: { job: JobState }) {
 function groupByScenario(jobs: JobState[]): Array<{ scenarioKey: string; agents: JobState[] }> {
   const map = new Map<string, JobState[]>();
   for (const job of jobs) {
-    const list = map.get(job.scenarioKey) ?? [];
+    const baseKey = getBaseKey(job.scenarioKey);
+    const list = map.get(baseKey) ?? [];
     list.push(job);
-    map.set(job.scenarioKey, list);
+    map.set(baseKey, list);
   }
   return Array.from(map, ([scenarioKey, agents]) => ({ scenarioKey, agents }));
 }

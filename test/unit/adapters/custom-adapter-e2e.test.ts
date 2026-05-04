@@ -20,6 +20,7 @@ describe("Custom adapter e2e", () => {
     const output = await run({
       configPath: path.join(E2E_DIR, "axis.config.json"),
       logger: silentLogger,
+      scenarioFilter: ["echo-test"],
     });
 
     expect(output.results).toHaveLength(1);
@@ -41,6 +42,7 @@ describe("Custom adapter e2e", () => {
     const output = await run({
       configPath: path.join(E2E_DIR, "axis.config.json"),
       logger: silentLogger,
+      scenarioFilter: ["echo-test"],
     });
 
     expect(output.summary.completed).toBe(1);
@@ -51,6 +53,7 @@ describe("Custom adapter e2e", () => {
     const output = await run({
       configPath: path.join(E2E_DIR, "axis.config.json"),
       logger: silentLogger,
+      scenarioFilter: ["echo-test"],
     });
 
     expect(output.version).toBe("0.1.0");

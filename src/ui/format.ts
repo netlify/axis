@@ -5,18 +5,38 @@ import type { ReportManifest } from "../types/report.js";
 import type { Baseline, BaselineComparison } from "../types/baseline.js";
 
 // --- Layout constants ---
-const COL_SCENARIO = 30;
+const COL_SCENARIO = 22;
 const COL_SCENARIO_SCORED = 22;
-const COL_AGENT = 15;
+const COL_AGENT = 25;
 const COL_STATUS = 10;
 const COL_DURATION = 10;
 const COL_SCORE = 7;
-const SEP_SUMMARY = 70;
-const SEP_SCORED = 95;
-const SEP_REPORT = 90;
+const SEP_SUMMARY = 72;
+const SEP_SCORED = 102;
+const SEP_REPORT = 100;
 const SEP_DETAIL = 50;
 const RESULT_TRUNCATE_SHORT = 200;
 const RESULT_TRUNCATE_LONG = 500;
+
+// --- Variant display helpers ---
+
+/** Strip @variant suffix to get the base scenario key. */
+export function getBaseKey(scenarioKey: string): string {
+  const idx = scenarioKey.indexOf("@");
+  return idx === -1 ? scenarioKey : scenarioKey.slice(0, idx);
+}
+
+/** Extract variant name from a scenarioKey, or null if none. */
+export function getVariantName(scenarioKey: string): string | null {
+  const idx = scenarioKey.indexOf("@");
+  return idx === -1 ? null : scenarioKey.slice(idx + 1);
+}
+
+/** Build display agent name: "claude-code @variant" or plain "claude-code". */
+function displayAgent(scenarioKey: string, agentName: string): string {
+  const variant = getVariantName(scenarioKey);
+  return variant ? `${agentName} @${variant}` : agentName;
+}
 
 /** Threshold for high/medium criterion scores (out of 10). */
 const CRITERION_HIGH = 8;
@@ -153,10 +173,10 @@ export function renderFinalOutput(output: RunOutput, verbose: boolean, agentCoun
   }
 
   const agents = agentCount ?? new Set(output.results.map((r) => r.agentName)).size;
-  const total = output.summary.total;
+  const scenarios = new Set(output.results.map((r) => getBaseKey(r.scenarioKey))).size;
 
   let out = "\n";
-  out += `  AXIS — ${total} scenario${total !== 1 ? "s" : ""} for ${agents} agent${agents !== 1 ? "s" : ""}\n`;
+  out += `  AXIS — ${scenarios} scenario${scenarios !== 1 ? "s" : ""} for ${agents} agent${agents !== 1 ? "s" : ""}\n`;
 
   if (verbose) {
     for (const result of output.results) {
@@ -187,7 +207,7 @@ export function renderSummaryTable(output: RunOutput): string {
     totalCost += cost;
 
     lines.push(
-      `  ${result.scenarioKey.padEnd(COL_SCENARIO)} ${result.agentName.padEnd(COL_AGENT)} ${status.padEnd(COL_STATUS)} ${formatDuration(meta.durationMs).padEnd(COL_DURATION)} ${cost > 0 ? "$" + cost.toFixed(4) : "—"}`,
+      `  ${getBaseKey(result.scenarioKey).padEnd(COL_SCENARIO)} ${displayAgent(result.scenarioKey, result.agentName).padEnd(COL_AGENT)} ${status.padEnd(COL_STATUS)} ${formatDuration(meta.durationMs).padEnd(COL_DURATION)} ${cost > 0 ? "$" + cost.toFixed(4) : "—"}`,
     );
 
     if (meta.error) {
@@ -250,10 +270,10 @@ export function renderScoredOutput(output: ScoredOutput, verbose: boolean, agent
   }
 
   const agents = agentCount ?? new Set(output.results.map((r) => r.agentName)).size;
-  const total = output.summary.total;
+  const scenarios = new Set(output.results.map((r) => getBaseKey(r.scenarioKey))).size;
 
   let out = "\n";
-  out += `  AXIS — ${total} scenario${total !== 1 ? "s" : ""} for ${agents} agent${agents !== 1 ? "s" : ""}\n`;
+  out += `  AXIS — ${scenarios} scenario${scenarios !== 1 ? "s" : ""} for ${agents} agent${agents !== 1 ? "s" : ""}\n`;
 
   for (const result of output.results) {
     out += renderScoredResult(result, verbose);
@@ -362,7 +382,7 @@ export function renderScoredSummaryTable(output: ScoredOutput): string {
     totalCost += cost;
 
     lines.push(
-      `  ${result.scenarioKey.padEnd(COL_SCENARIO_SCORED)} ${result.agentName.padEnd(COL_AGENT)} ` +
+      `  ${getBaseKey(result.scenarioKey).padEnd(COL_SCENARIO_SCORED)} ${displayAgent(result.scenarioKey, result.agentName).padEnd(COL_AGENT)} ` +
         `${String(result.score.axisScore).padEnd(COL_SCORE)} ` +
         `${String(result.score.goalAchievement.score).padEnd(COL_SCORE)} ` +
         `${String(result.score.environment.score).padEnd(COL_SCORE)} ` +
@@ -384,7 +404,7 @@ export function renderScoredSummaryTable(output: ScoredOutput): string {
 
   lines.push(`  ${sep}`);
   lines.push(
-    `  Average AXIS Result: ${output.summary.averageAxisScore} / 100`.padEnd(72) +
+    `  Average AXIS Result: ${output.summary.averageAxisScore} / 100`.padEnd(82) +
       `${formatDuration(output.durationMs).padEnd(COL_DURATION)} ` +
       `${totalCost > 0 ? "$" + totalCost.toFixed(4) : ""}`,
   );
@@ -464,7 +484,7 @@ export function renderReportDetail(report: ReportManifest): string {
       const s = r.score;
       const cost = r.totalCostUsd ?? 0;
       lines.push(
-        `  ${r.scenarioKey.padEnd(COL_SCENARIO_SCORED)} ${r.agentName.padEnd(COL_AGENT)} ` +
+        `  ${getBaseKey(r.scenarioKey).padEnd(COL_SCENARIO_SCORED)} ${displayAgent(r.scenarioKey, r.agentName).padEnd(COL_AGENT)} ` +
           `${s ? String(s.axisScore).padEnd(COL_SCORE) : "\u2014".padEnd(COL_SCORE)} ` +
           `${s ? String(s.goalAchievement.score).padEnd(COL_SCORE) : "\u2014".padEnd(COL_SCORE)} ` +
           `${s ? String(s.environment.score).padEnd(COL_SCORE) : "\u2014".padEnd(COL_SCORE)} ` +
@@ -492,7 +512,7 @@ export function renderReportDetail(report: ReportManifest): string {
       const status = r.exitCode !== 0 || r.error ? "\u2717 fail" : "\u2713 pass";
       const cost = r.totalCostUsd ?? 0;
       lines.push(
-        `  ${r.scenarioKey.padEnd(COL_SCENARIO)} ${r.agentName.padEnd(COL_AGENT)} ` +
+        `  ${getBaseKey(r.scenarioKey).padEnd(COL_SCENARIO)} ${displayAgent(r.scenarioKey, r.agentName).padEnd(COL_AGENT)} ` +
           `${status.padEnd(COL_STATUS)} ${formatDuration(r.durationMs).padEnd(COL_DURATION)} ` +
           `${cost > 0 ? "$" + cost.toFixed(4) : "\u2014"}`,
       );
@@ -553,9 +573,9 @@ export function renderScenarioDetail(result: RunResult | ScoredRunResult): strin
 
 // --- Baseline rendering ---
 
-const SEP_BASELINE = 90;
+const SEP_BASELINE = 100;
 const COL_BASELINE_SCENARIO = 22;
-const COL_BASELINE_AGENT = 15;
+const COL_BASELINE_AGENT = 25;
 const COL_BASELINE_SCORE = 10;
 
 export function renderBaselineList(baselines: Baseline[]): string {
@@ -608,7 +628,7 @@ export function renderBaselineShow(baseline: Baseline): string {
   for (const [scenarioKey, agents] of Object.entries(baseline.results)) {
     for (const [agentName, entry] of Object.entries(agents)) {
       lines.push(
-        `  ${scenarioKey.padEnd(COL_BASELINE_SCENARIO)} ${agentName.padEnd(COL_BASELINE_AGENT)} ` +
+        `  ${getBaseKey(scenarioKey).padEnd(COL_BASELINE_SCENARIO)} ${displayAgent(scenarioKey, agentName).padEnd(COL_BASELINE_AGENT)} ` +
           `${String(entry.axisScore).padEnd(COL_SCORE)} ` +
           `${String(entry.goalAchievement).padEnd(COL_SCORE)} ` +
           `${String(entry.environment).padEnd(COL_SCORE)} ` +
@@ -648,7 +668,7 @@ export function renderBaselineComparison(diff: BaselineComparison): string {
 
   for (const entry of diff.entries) {
     lines.push(
-      `  ${entry.scenarioKey.padEnd(COL_BASELINE_SCENARIO)} ${entry.agentName.padEnd(COL_BASELINE_AGENT)} ` +
+      `  ${getBaseKey(entry.scenarioKey).padEnd(COL_BASELINE_SCENARIO)} ${displayAgent(entry.scenarioKey, entry.agentName).padEnd(COL_BASELINE_AGENT)} ` +
         `${String(entry.baseline).padEnd(COL_BASELINE_SCORE)} ` +
         `${String(entry.current).padEnd(COL_BASELINE_SCORE)} ` +
         deltaIndicator(entry.delta),
