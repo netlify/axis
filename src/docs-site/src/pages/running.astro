@@ -18,12 +18,12 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     Each job follows the same lifecycle:
   </p>
   <ol>
-    <li><strong>Setup</strong> — Run setup actions defined in the scenario (if any).</li>
-    <li><strong>Spawn</strong> — Start the agent process in an isolated workspace.</li>
-    <li><strong>Capture</strong> — Stream and record the full interaction transcript.</li>
-    <li><strong>Score</strong> — Evaluate the transcript against the rubric and interaction signals (unless <code>--no-score</code> is set).</li>
-    <li><strong>Teardown</strong> — Run teardown actions (if any).</li>
-    <li><strong>Save</strong> — Write the result to the report.</li>
+    <li><strong>Setup</strong> -Run setup actions defined in the scenario (if any).</li>
+    <li><strong>Spawn</strong> -Start the agent process in an isolated workspace.</li>
+    <li><strong>Capture</strong> -Stream and record the full interaction transcript.</li>
+    <li><strong>Score</strong> -Evaluate the transcript against the rubric and interaction signals (unless <code>--no-score</code> is set).</li>
+    <li><strong>Teardown</strong> -Run teardown actions (if any).</li>
+    <li><strong>Save</strong> -Write the result to the report.</li>
   </ol>
   <p>
     The agent has a 10-minute timeout by default. If the agent does not finish within the timeout,
@@ -129,12 +129,12 @@ export default createAgentAdapter<{ stdout: string }>({
   </p>
   <ul>
     <li>
-      <strong>Lines mode</strong> — For agents that emit NDJSON (one JSON object per line). AXIS
+      <strong>Lines mode</strong> -For agents that emit NDJSON (one JSON object per line). AXIS
       parses each line and passes the parsed object to your <code>onLine</code> handler. The
       built-in Claude Code, Codex, and Gemini agents all use this mode.
     </li>
     <li>
-      <strong>Aggregate mode</strong> — For agents that emit plain text or non-JSON output. Raw
+      <strong>Aggregate mode</strong> -For agents that emit plain text or non-JSON output. Raw
       chunks are passed to <code>onChunk</code> and accumulated in state. Use this for agents with
       custom output formats or simple stdout capture.
     </li>
@@ -158,5 +158,22 @@ export default createAgentAdapter<{ stdout: string }>({
     MCP server configuration files are written into each workspace before the agent spawns, in the
     format native to each agent CLI. See <a href="/configuration#mcp-servers">MCP Servers</a> in
     the configuration reference.
+  </p>
+
+  <h2>Multi-variant Scenarios</h2>
+  <p>
+    A single scenario file can produce multiple jobs by defining <a href="/scenarios#variants">variants</a>.
+    Each variant runs as an independent job with its own key, inheriting the base scenario's fields
+    and applying any overrides. This is useful for testing the same task under different tool
+    configurations, prompts, or agent restrictions without duplicating scenario files.
+  </p>
+  <p>
+    For example, a scenario with two variants and two agents produces four jobs (2 variants &times; 2
+    agents). Each variant appears as a separate row in the CLI output and a separate entry in
+    reports, identified by its <code>@</code>-suffixed key (e.g., <code>create-post@with-mcp</code>).
+  </p>
+  <p>
+    See <a href="/scenarios#variants">Writing Scenarios &rarr; Variants</a> for the full field
+    reference and examples.
   </p>
 </DocsLayout>

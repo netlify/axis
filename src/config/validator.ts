@@ -108,15 +108,109 @@ export function validateScenario(data: unknown, filePath: string): asserts data 
     validateSkillsSources(obj.skills, filePath, "skills");
   }
 
+  if (obj.mcp_servers !== undefined) {
+    validateMcpServers(obj.mcp_servers, filePath);
+  }
+
   if (obj.setup !== undefined) {
     validateLifecycleActions(obj.setup, filePath, "setup");
   }
   if (obj.teardown !== undefined) {
     validateLifecycleActions(obj.teardown, filePath, "teardown");
   }
+
+  if (obj.variants !== undefined) {
+    validateVariants(obj.variants, filePath);
+  }
 }
 
-function validateMcpServers(data: unknown, filePath: string): void {
+const VARIANT_NAME_RE = /^[a-zA-Z0-9_-]+$/;
+
+function validateVariants(data: unknown, filePath: string): void {
+  if (!Array.isArray(data)) {
+    throw new Error(`Invalid scenario at ${filePath}: "variants" must be an array`);
+  }
+
+  const names = new Set<string>();
+
+  for (let i = 0; i < data.length; i++) {
+    const variant = data[i] as Record<string, unknown>;
+
+    if (typeof variant !== "object" || variant === null) {
+      throw new Error(`Invalid scenario at ${filePath}: variants[${i}] must be an object`);
+    }
+
+    if (typeof variant.name !== "string" || !VARIANT_NAME_RE.test(variant.name)) {
+      throw new Error(
+        `Invalid scenario at ${filePath}: variants[${i}].name must be a string matching /^[a-zA-Z0-9_-]+$/`,
+      );
+    }
+
+    if (names.has(variant.name)) {
+      throw new Error(`Invalid scenario at ${filePath}: duplicate variant name "${variant.name}"`);
+    }
+    names.add(variant.name);
+
+    if (variant.prompt !== undefined && typeof variant.prompt !== "string") {
+      throw new Error(`Invalid scenario at ${filePath}: variants[${i}].prompt must be a string`);
+    }
+
+    if (variant.rubric !== undefined) {
+      if (typeof variant.rubric === "string") {
+        // String rubric — freeform evaluation description
+      } else if (Array.isArray(variant.rubric)) {
+        for (let j = 0; j < variant.rubric.length; j++) {
+          const entry = variant.rubric[j] as Record<string, unknown>;
+          if (typeof entry.check !== "string") {
+            throw new Error(`Invalid scenario at ${filePath}: variants[${i}].rubric[${j}] missing "check" string`);
+          }
+          if (entry.weight !== undefined && typeof entry.weight !== "number") {
+            throw new Error(
+              `Invalid scenario at ${filePath}: variants[${i}].rubric[${j}].weight must be a number`,
+            );
+          }
+        }
+        variant.rubric = resolveRubricWeights(variant.rubric as RubricCriterion[]);
+      } else {
+        throw new Error(`Invalid scenario at ${filePath}: variants[${i}].rubric must be a string or array`);
+      }
+    }
+
+    if (variant.skip !== undefined && typeof variant.skip !== "boolean") {
+      throw new Error(`Invalid scenario at ${filePath}: variants[${i}].skip must be a boolean`);
+    }
+
+    if (variant.agents !== undefined) {
+      if (!Array.isArray(variant.agents) || variant.agents.length === 0) {
+        throw new Error(
+          `Invalid scenario at ${filePath}: variants[${i}].agents must be a non-empty array of strings`,
+        );
+      }
+      for (let j = 0; j < variant.agents.length; j++) {
+        if (typeof variant.agents[j] !== "string") {
+          throw new Error(`Invalid scenario at ${filePath}: variants[${i}].agents[${j}] must be a string`);
+        }
+      }
+    }
+
+    if (variant.skills !== undefined) {
+      validateSkillsSources(variant.skills, filePath, `variants[${i}].skills`);
+    }
+
+    if (variant.mcp_servers !== undefined) {
+      validateMcpServers(variant.mcp_servers, filePath);
+    }
+
+    if (variant.setup !== undefined) {
+      validateLifecycleActions(variant.setup, filePath, `variants[${i}].setup`);
+    }
+    if (variant.teardown !== undefined) {
+      validateLifecycleActions(variant.teardown, filePath, `variants[${i}].teardown`);
+    }
+  }
+}
+
+export function validateMcpServers(data: unknown, filePath: string): void {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     throw new Error(`Invalid config at ${filePath}: "mcp_servers" must be an object`);
   }

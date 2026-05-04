@@ -1,4 +1,4 @@
-/* AXIS Docs — Design system
+/* AXIS Docs -Design system
  *
  * Light theme with bold personality. Deep teal (#016867) accent,
  * dark sidebar + code blocks, gradient headings, glow effects.
@@ -10,7 +10,7 @@
   --bg: #fafbf9;
   --bg-card: #ffffff;
 
-  /* Text — all pass 4.5:1 on --bg */
+  /* Text -all pass 4.5:1 on --bg */
   --text: #1a1a2e;             /* ~16:1 on bg   */
   --text-secondary: #374151;   /* ~10:1 on bg   */
   --text-muted: #637083;       /* ~4.8:1 on bg  */
@@ -20,10 +20,10 @@
   --border-bright: #d1d5db;
   --light-gray: #f3f4f6;
 
-  /* Accent — teal */
+  /* Accent -teal */
   --accent: #016867;           /* ~6.3:1 on bg  */
   --accent-hover: #015554;     /* ~8.2:1 on bg  */
-  --accent-bright: #2dd4bf;    /* decorative only — not for text on light */
+  --accent-bright: #2dd4bf;    /* decorative only -not for text on light */
   --accent-light: rgba(1, 104, 103, 0.07);
 
   /* Category card borders */
@@ -85,7 +85,7 @@ body {
   min-height: 100vh;
 }
 
-/* --- Focus — visible outline for keyboard navigation --- */
+/* --- Focus -visible outline for keyboard navigation --- */
 
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -319,7 +319,7 @@ p {
   margin-bottom: 32px;
 }
 
-/* Links — underlined by default for A11Y (color alone is insufficient) */
+/* Links -underlined by default for A11Y (color alone is insufficient) */
 a {
   color: var(--accent);
   text-decoration: underline;
@@ -838,7 +838,7 @@ details.example-collapse .example-body pre {
   line-height: 1.4;
 }
 
-/* Label positions — match pie quadrants */
+/* Label positions -match pie quadrants */
 .dimension-label-goal { grid-column: 3; grid-row: 1; justify-self: start; }
 .dimension-label-env { grid-column: 3; grid-row: 2; justify-self: start; }
 .dimension-label-svc { grid-column: 1; grid-row: 2; justify-self: end; text-align: right; }

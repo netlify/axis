@@ -102,7 +102,9 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
     }
 
     const filteredScenarios = options.scenarioFilter?.length
-      ? scenarios.filter((s) => options.scenarioFilter!.some((f) => f === s.key))
+      ? scenarios.filter((s) =>
+          options.scenarioFilter!.some((f) => f === s.key || (s.key.includes("@") && f === s.key.split("@")[0])),
+        )
       : scenarios;
 
     for (const scenario of filteredScenarios) {
@@ -329,7 +331,9 @@ async function executeJob(
       env: jobEnv,
       registerCleanup,
       captureRawOutput: true,
-      mcpServers: axisConfig.mcp_servers,
+      mcpServers: scenario.mcp_servers
+        ? { ...axisConfig.mcp_servers, ...scenario.mcp_servers }
+        : axisConfig.mcp_servers,
       resolvedSkills: agentSkills.length > 0 ? agentSkills : undefined,
       onTokenProgress: (tokens) => updateTokens(index, tokens),
     });

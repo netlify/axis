@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { AxisConfig } from "../types/config.js";
-import type { Scenario } from "../types/scenario.js";
+import type { Scenario, ScenarioVariant } from "../types/scenario.js";
 import { validateConfig, validateScenario } from "./validator.js";
 import { formatError } from "../types/output.js";
 
@@ -51,6 +51,15 @@ export async function discoverScenarios(
   const scenarios: Scenario[] = [];
   await walkDir(rootDir, rootDir, scenarios);
 
+  // Check for duplicate keys (can happen when variant keys collide with other scenario keys)
+  const seen = new Set<string>();
+  for (const s of scenarios) {
+    if (seen.has(s.key)) {
+      throw new Error(`Duplicate scenario key "${s.key}". Ensure variant names do not collide with other scenarios.`);
+    }
+    seen.add(s.key);
+  }
+
   // Sort by key for deterministic ordering
   scenarios.sort((a, b) => a.key.localeCompare(b.key));
 
@@ -71,13 +80,13 @@ async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Pro
     if (entry.isDirectory()) {
       await walkDir(fullPath, rootDir, scenarios);
     } else if (entry.isFile() && entry.name.endsWith(".json")) {
-      const scenario = await loadScenarioFile(fullPath, rootDir);
-      scenarios.push(scenario);
+      const loaded = await loadScenarioFile(fullPath, rootDir);
+      scenarios.push(...loaded);
     }
   }
 }
 
-async function loadScenarioFile(filePath: string, rootDir: string): Promise<Scenario> {
+async function loadScenarioFile(filePath: string, rootDir: string): Promise<Scenario[]> {
   const raw = await fs.readFile(filePath, "utf-8");
 
   let parsed: unknown;
@@ -91,31 +100,70 @@ async function loadScenarioFile(filePath: string, rootDir: string): Promise<Scen
 
   // Derive key from relative path: scenarios/cms/create-post.json → "cms/create-post"
   const relativePath = path.relative(rootDir, filePath);
-  const key = relativePath
+  const baseKey = relativePath
     .replace(/\.json$/, "")
     .split(path.sep)
     .join("/");
 
-  parsed.key = key;
+  const scenario = parsed as Scenario & { variants?: ScenarioVariant[] };
 
-  return parsed;
+  if (!scenario.variants || scenario.variants.length === 0) {
+    scenario.key = baseKey;
+    return [scenario];
+  }
+
+  // Expand variants: each becomes a standalone Scenario, base does not run
+  return scenario.variants.map((variant) => expandVariant(scenario, variant, baseKey));
+}
+
+function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: string): Scenario {
+  const expanded: Scenario = {
+    key: `${baseKey}@${variant.name}`,
+    name: `${parent.name} [${variant.name}]`,
+    prompt: variant.prompt ?? parent.prompt,
+    rubric: variant.rubric ?? parent.rubric,
+    skip: variant.skip ?? parent.skip,
+    setup: variant.setup ?? parent.setup,
+    teardown: variant.teardown ?? parent.teardown,
+    agents: variant.agents ?? parent.agents,
+    skills: variant.skills !== undefined ? variant.skills : parent.skills,
+    mcp_servers:
+      variant.mcp_servers !== undefined
+        ? { ...parent.mcp_servers, ...variant.mcp_servers }
+        : parent.mcp_servers,
+  };
+
+  // Strip undefined optional fields to keep objects clean
+  if (expanded.skip === undefined) delete expanded.skip;
+  if (expanded.setup === undefined) delete expanded.setup;
+  if (expanded.teardown === undefined) delete expanded.teardown;
+  if (expanded.agents === undefined) delete expanded.agents;
+  if (expanded.skills === undefined) delete expanded.skills;
+  if (expanded.mcp_servers === undefined) delete expanded.mcp_servers;
+
+  return expanded;
 }
 
 function matchesFilter(key: string, filter: string[]): boolean {
+  const baseKey = key.includes("@") ? key.split("@")[0] : key;
+
   return filter.some((pattern) => {
-    // Exact match
+    // Exact match (full key including variant)
     if (pattern === key) return true;
 
-    // Simple glob: "cms/*" matches "cms/create-post" and "cms/delete-post"
+    // Base key match: "cms/create-post" matches all its variants
+    if (pattern === baseKey && pattern !== key) return true;
+
+    // Simple glob: "cms/*" matches "cms/create-post" and "cms/create-post@variant"
     if (pattern.endsWith("/*")) {
       const prefix = pattern.slice(0, -2);
-      return key.startsWith(prefix + "/");
+      return baseKey.startsWith(prefix + "/");
     }
 
     // Prefix glob: "cms/**" matches any depth under cms/
     if (pattern.endsWith("/**")) {
       const prefix = pattern.slice(0, -3);
-      return key.startsWith(prefix + "/");
+      return baseKey.startsWith(prefix + "/");
     }
 
     return false;

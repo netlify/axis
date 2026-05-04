@@ -83,6 +83,18 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <td><span class="req-no">No</span></td>
         <td>Scenario-specific skills, merged with top-level and agent-level skills.</td>
       </tr>
+      <tr>
+        <td><code>mcp_servers</code></td>
+        <td><code>object</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Scenario-specific MCP servers, merged with top-level <a href="/configuration#mcp-servers">MCP servers</a> (scenario wins on name conflict).</td>
+      </tr>
+      <tr>
+        <td><code>variants</code></td>
+        <td><code>object[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Run multiple configurations of the same scenario. See <a href="#variants">Variants</a>.</td>
+      </tr>
     </tbody>
   </table>
 
@@ -163,7 +175,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 ]`}</code></pre>
   <p>
     In this example, the server starting is weighted highest because it is the core outcome. You can
-    also mix weighted and unweighted checks — AXIS distributes the remaining weight equally across
+    also mix weighted and unweighted checks -AXIS distributes the remaining weight equally across
     any checks without an explicit <code>weight</code>.
   </p>
 
@@ -189,10 +201,10 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <div class="callout callout-info">
     <div class="callout-title">Strong vs Weak Checks</div>
     <p>
-      <strong>Weak:</strong> "Agent did a good job" — subjective, hard for the judge to score consistently.<br />
-      <strong>Weak:</strong> "Agent used git" — checks behavior, not outcome. What if git was unnecessary?<br />
-      <strong>Strong:</strong> "File <code>output.csv</code> contains at least 10 rows of valid CSV data" — concrete, verifiable.<br />
-      <strong>Strong:</strong> "The test suite passes with <code>npm test</code>" — clear success criterion.
+      <strong>Weak:</strong> "Agent did a good job" -subjective, hard for the judge to score consistently.<br />
+      <strong>Weak:</strong> "Agent used git" -checks behavior, not outcome. What if git was unnecessary?<br />
+      <strong>Strong:</strong> "File <code>output.csv</code> contains at least 10 rows of valid CSV data" -concrete, verifiable.<br />
+      <strong>Strong:</strong> "The test suite passes with <code>npm test</code>" -clear success criterion.
     </p>
   </div>
 
@@ -274,12 +286,122 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   "agents": ["claude-code"]
 }`}</code></pre>
 
+  <h2 id="variants">Variants</h2>
+  <p>
+    Variants let you run the same scenario under different configurations -different skills,
+    MCP servers, prompts, or agent restrictions -without duplicating the entire scenario file.
+    When <code>variants</code> is defined, the base scenario becomes a template: only the
+    variants execute, each inheriting all fields from the parent. To also run the
+    unmodified scenario as a control, add a variant with no overrides (the
+    <strong>baseline pattern</strong>).
+  </p>
+
+  <pre><code>{`{
+  "name": "Create a blog post",
+  "prompt": "Create a new blog post titled 'Hello World' on the CMS.",
+  "rubric": [
+    { "check": "Blog post was created successfully", "weight": 0.5 },
+    { "check": "Title matches 'Hello World'", "weight": 0.5 }
+  ],
+  "variants": [
+    {
+      "name": "with-netlify-mcp",
+      "mcp_servers": {
+        "netlify": { "type": "http", "url": "https://mcp.netlify.com" }
+      }
+    },
+    {
+      "name": "with-custom-skill",
+      "skills": ["./skills/blog-helper"]
+    },
+    {
+      "name": "alt-prompt",
+      "prompt": "Create a draft blog post titled 'Hello World' without publishing."
+    }
+  ]
+}`}</code></pre>
+
+  <p>
+    This produces three scenario keys: <code>create-post@with-netlify-mcp</code>,
+    <code>create-post@with-custom-skill</code>, and <code>create-post@alt-prompt</code>. Each
+    variant inherits the parent's <code>rubric</code>, <code>setup</code>, and other fields, then
+    applies its own overrides. The variant name is appended to the scenario key with an
+    <code>@</code> separator.
+  </p>
+
+  <h3>Variant fields</h3>
+  <p>
+    Only <code>name</code> is required on a variant. All other fields are optional and inherit
+    from the parent when omitted.
+  </p>
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Behavior</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>name</code></td>
+        <td><code>string</code></td>
+        <td>Required. Must match <code>/^[a-zA-Z0-9_-]+$/</code>. Used in the scenario key.</td>
+      </tr>
+      <tr>
+        <td><code>prompt</code></td>
+        <td><code>string</code></td>
+        <td>Replaces the parent prompt.</td>
+      </tr>
+      <tr>
+        <td><code>rubric</code></td>
+        <td><code>string | object[]</code></td>
+        <td>Replaces the parent rubric.</td>
+      </tr>
+      <tr>
+        <td><code>skills</code></td>
+        <td><code>string[]</code></td>
+        <td>Replaces the parent's scenario-level skills (top-level and agent-level skills still merge in).</td>
+      </tr>
+      <tr>
+        <td><code>mcp_servers</code></td>
+        <td><code>object</code></td>
+        <td>Merged with parent's scenario-level MCP servers (variant wins on name conflict).</td>
+      </tr>
+      <tr>
+        <td><code>agents</code></td>
+        <td><code>string[]</code></td>
+        <td>Replaces the parent agent restriction.</td>
+      </tr>
+      <tr>
+        <td><code>setup</code> / <code>teardown</code></td>
+        <td><code>object[]</code></td>
+        <td>Replaces the parent lifecycle actions.</td>
+      </tr>
+      <tr>
+        <td><code>skip</code></td>
+        <td><code>boolean</code></td>
+        <td>Overrides the parent skip flag.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Filtering Variants</div>
+    <p>
+      CLI filters and agent-level <code>scenarios</code> globs work with variant keys. Filtering
+      by the base key matches all its variants: <code>--scenario create-post</code> runs all three
+      variants above. Use the full key to target a specific variant:
+      <code>--scenario create-post@with-netlify-mcp</code>.
+    </p>
+  </div>
+
   <h2>Example Scenarios</h2>
 
   <details class="example-collapse">
     <summary>
       <strong>File creation</strong>
-      <span>— Generate a README from scratch with no setup required.</span>
+      <span>Generate a README from scratch with no setup required.</span>
     </summary>
     <div class="example-body">
       <pre><code>{`{
@@ -298,7 +420,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <details class="example-collapse">
     <summary>
       <strong>Bug fix with verification</strong>
-      <span>— Find and fix a bug in a pre-seeded project, then confirm the test passes.</span>
+      <span>Find and fix a bug in a pre-seeded project, then confirm the test passes.</span>
     </summary>
     <div class="example-body">
       <pre><code>{`{
@@ -321,27 +443,69 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <details class="example-collapse">
     <summary>
       <strong>Multi-step with setup and teardown</strong>
-      <span>— Add a new API endpoint to an existing Express app, write tests, and clean up.</span>
+      <span>Add a new API endpoint, write tests, and clean up.</span>
     </summary>
     <div class="example-body">
       <pre><code>{`{
   "name": "Add API endpoint with tests",
-  "prompt": "Add a GET /api/health endpoint to the Express app in src/app.js. It should return { status: 'ok', uptime: process.uptime() }. Add a test for it in test/health.test.js using the existing test setup.",
+  "prompt": "Add a GET /api/health endpoint to the Express app in src/app.js. It should return { status: 'ok', uptime: process.uptime() }. Write a test in test/health.test.js.",
   "rubric": [
-    { "check": "GET /api/health endpoint exists in src/app.js", "weight": 0.3 },
-    { "check": "Endpoint returns JSON with status and uptime fields", "weight": 0.3 },
-    { "check": "Test file exists and tests the endpoint", "weight": 0.2 },
+    { "check": "GET /api/health endpoint exists", "weight": 0.3 },
+    { "check": "Returns JSON with status and uptime", "weight": 0.3 },
+    { "check": "Test file exists and covers the endpoint", "weight": 0.2 },
     { "check": "All tests pass", "weight": 0.2 }
   ],
   "setup": [
     { "action": "run_script", "command": "npm init -y && npm install express" },
-    { "action": "run_script", "command": "mkdir -p src test" },
-    { "action": "run_script", "command": "echo 'const express = require(\\\"express\\\"); const app = express(); module.exports = app;' > src/app.js" }
+    { "action": "run_script", "command": "mkdir -p src test" }
   ],
   "teardown": [
-    { "action": "run_script", "command": "rm -rf node_modules package.json package-lock.json src test" }
+    { "action": "run_script", "command": "rm -rf node_modules package.json src test" }
   ]
 }`}</code></pre>
+    </div>
+  </details>
+
+  <details class="example-collapse">
+    <summary>
+      <strong>Multi-variant scenario</strong>
+      <span>Test the same task with different tool configurations.</span>
+    </summary>
+    <div class="example-body">
+      <pre><code>{`{
+  "name": "Deploy a site",
+  "prompt": "Deploy the project in the current directory to production.",
+  "rubric": [
+    { "check": "Site was deployed successfully", "weight": 0.5 },
+    { "check": "Agent confirmed the deploy URL", "weight": 0.3 },
+    { "check": "No errors in the deployment log", "weight": 0.2 }
+  ],
+  "setup": [
+    { "action": "run_script", "command": "npm init -y && echo '<h1>Hello</h1>' > index.html" }
+  ],
+  "variants": [
+    {
+      "name": "baseline"
+    },
+    {
+      "name": "with-mcp",
+      "mcp_servers": {
+        "netlify": { "type": "http", "url": "https://mcp.netlify.com" }
+      }
+    },
+    {
+      "name": "with-deploy-skill",
+      "skills": ["./skills/deploy"]
+    }
+  ]
+}`}</code></pre>
+      <p>
+        The first variant, <code>baseline</code>, has no overrides -it runs the scenario exactly
+        as defined, giving you a control run to compare against. The other variants layer on
+        different tool configurations. This produces three keys:
+        <code>deploy@baseline</code>, <code>deploy@with-mcp</code>, and
+        <code>deploy@with-deploy-skill</code>.
+      </p>
     </div>
   </details>
 </DocsLayout>

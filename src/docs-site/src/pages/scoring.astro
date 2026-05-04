@@ -26,30 +26,30 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     </a>
 
     <svg class="dimension-chart" viewBox="0 0 200 200" role="img" aria-label="Scoring dimensions: Goal Achievement 40%, Environment 20%, Service 20%, Agent 20%">
-      <!-- Goal Achievement — 40%, starts at 12 o'clock -->
+      <!-- Goal Achievement -40%, starts at 12 o'clock -->
       <circle cx="100" cy="100" r="70" fill="none"
         stroke="var(--accent)" stroke-width="28"
         stroke-dasharray="173.7 266.1" stroke-dashoffset="111.1"
         data-segment="goal"/>
-      <!-- Environment — 20% -->
+      <!-- Environment -20% -->
       <circle cx="100" cy="100" r="70" fill="none"
         stroke="var(--color-env)" stroke-width="28"
         stroke-dasharray="85.8 354.0" stroke-dashoffset="375.0"
         data-segment="env"/>
-      <!-- Service — 20% -->
+      <!-- Service -20% -->
       <circle cx="100" cy="100" r="70" fill="none"
         stroke="var(--color-svc)" stroke-width="28"
         stroke-dasharray="85.8 354.0" stroke-dashoffset="287.0"
         data-segment="svc"/>
-      <!-- Agent — 20% -->
+      <!-- Agent -20% -->
       <circle cx="100" cy="100" r="70" fill="none"
         stroke="var(--color-agent)" stroke-width="28"
         stroke-dasharray="85.8 354.0" stroke-dashoffset="199.0"
         data-segment="agent"/>
-      <!-- Center label — default -->
+      <!-- Center label -default -->
       <text class="center-default" x="100" y="95" text-anchor="middle" fill="var(--text-muted)" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="12" font-weight="700" letter-spacing="0.5">AXIS</text>
       <text class="center-default" x="100" y="112" text-anchor="middle" fill="var(--text-muted)" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="11">Result</text>
-      <!-- Center label — hover (hidden by default) -->
+      <!-- Center label -hover (hidden by default) -->
       <text class="center-pct" x="100" y="98" text-anchor="middle" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="28" font-weight="800" opacity="0">40%</text>
       <text class="center-name" x="100" y="116" text-anchor="middle" fill="var(--text-muted)" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="10" font-weight="500" letter-spacing="0.3" opacity="0">Goal Achievement</text>
     </svg>
@@ -110,7 +110,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   </ul>
   <p>
     Environment is scored on <strong>Success</strong> (0.7) and <strong>Speed</strong> (0.3) only.
-    It does not evaluate whether the agent <em>should</em> have run a command &mdash; only whether
+    It does not evaluate whether the agent <em>should</em> have run a command -only whether
     the command itself executed correctly and promptly. A low Environment score points to tool
     failures or slow local operations, not poor agent decisions.
   </p>
@@ -129,7 +129,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <p>
     Like Environment, Service is scored on <strong>Success</strong> (0.7) and <strong>Speed</strong>
     (0.3) only. It evaluates execution quality, not decision quality. A low Service score means
-    external services are failing or responding slowly &mdash; it does not reflect on the agent's
+    external services are failing or responding slowly -it does not reflect on the agent's
     choice to call them.
   </p>
 
@@ -154,7 +154,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     (0.2), and <strong>Necessity</strong> (0.4). Necessity carries the most weight because the
     most fundamental question about decision quality is whether each interaction should have
     happened at all. The agent dimension also evaluates <em>all</em> interactions across every
-    category &mdash; it judges the agent's choice to invoke environment and service tools, not
+    category -it judges the agent's choice to invoke environment and service tools, not
     just agent-category tools.
   </p>
   <p>
@@ -190,7 +190,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     Environment and Service answer the first question. Agent answers the second. This separation
     ensures scores are actionable: a low Environment score means your tools are failing or slow,
     while a low Agent score means the agent is making poor choices. Without this separation, a low
-    score would be ambiguous &mdash; is the filesystem slow, or is the agent reading too many files?
+    score would be ambiguous -is the filesystem slow, or is the agent reading too many files?
   </p>
 
   <h3 id="interaction-signals">Interaction Signals</h3>
@@ -270,20 +270,20 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       </tr>
       <tr>
         <td>Weight</td>
-        <td>&mdash;</td>
-        <td>&mdash;</td>
+        <td>-</td>
+        <td>-</td>
         <td>0.2</td>
       </tr>
       <tr>
         <td>Relevance</td>
-        <td>&mdash;</td>
-        <td>&mdash;</td>
+        <td>-</td>
+        <td>-</td>
         <td>0.2</td>
       </tr>
       <tr>
         <td>Necessity</td>
-        <td>&mdash;</td>
-        <td>&mdash;</td>
+        <td>-</td>
+        <td>-</td>
         <td>0.4</td>
       </tr>
     </tbody>
@@ -302,7 +302,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     Necessity answers the most fundamental question about decision quality: should this interaction
     have happened at all? An agent that makes fewer, more targeted interactions is fundamentally
     better than one that shotguns commands hoping something works. Weight (0.2) and Relevance (0.2)
-    refine the picture — were the calls right-sized, and was the output actually useful? Success and
+    refine the picture -were the calls right-sized, and was the output actually useful? Success and
     Speed are low (0.1 each) for the Agent dimension because execution outcomes are already captured
     by Environment and Service.
   </p>
@@ -354,7 +354,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 
   <h3>How Speed Is Measured</h3>
   <p>
-    Speed scores are computed deterministically from timestamps in the agent's output stream &mdash;
+    Speed scores are computed deterministically from timestamps in the agent's output stream -
     no LLM judgment is involved. Each agent CLI (Claude Code, Codex, Gemini) emits timestamped
     transcript entries as it runs. AXIS uses these timestamps to measure how long each interaction
     took.
@@ -368,7 +368,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <pre><code>durationMs = timestamp(tool_result) &minus; timestamp(tool_use)</code></pre>
   <p>
     Tool pairing is deterministic. AXIS first matches entries by tool ID (when the agent provides
-    one), then falls back to positional pairing &mdash; each unpaired <code>tool_use</code> is
+    one), then falls back to positional pairing -each unpaired <code>tool_use</code> is
     matched with the next unpaired <code>tool_result</code> in sequence. This means the measured
     duration includes everything that happens between the agent sending a tool request and
     receiving the result: SDK roundtrips, sandbox setup, process spawning, and the actual
@@ -391,7 +391,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <p>
     When timestamps are missing, empty, or invalid (not parseable as ISO 8601), the duration
     is recorded as unknown. Interactions with unknown durations receive a <strong>perfect speed
-    score of 1.0</strong> &mdash; AXIS assumes the interaction was fast rather than penalizing
+    score of 1.0</strong> -AXIS assumes the interaction was fast rather than penalizing
     for missing data. This means speed scoring is conservative: it only lowers scores when it
     has concrete evidence of slow performance.
   </p>
@@ -420,8 +420,8 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <h4>Why an S-curve?</h4>
   <p>
     Linear scaling would mean going from 80 to 90 is exactly as hard as going from 20 to 30.
-    That does not match reality. Fixing obvious problems — broken commands, missing files, erroring
-    APIs — is straightforward. But squeezing out the last few points of efficiency, eliminating
+    That does not match reality. Fixing obvious problems -broken commands, missing files, erroring
+    APIs -is straightforward. But squeezing out the last few points of efficiency, eliminating
     every unnecessary interaction and optimizing every call, requires real sophistication. The
     S-curve reflects this: easy gains at the bottom, diminishing returns at the top.
   </p>

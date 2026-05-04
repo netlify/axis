@@ -78,7 +78,7 @@ npx @netlify/axis reports latest --agent claude-code`}</code></pre>
   <h2>Baselines</h2>
   <p>
     Baselines snapshot your scores at a point in time. You compare future runs against a baseline
-    to detect regressions — scores that dropped by more than the noise tolerance (1 point).
+    to detect regressions -scores that dropped by more than the noise tolerance (1 point).
   </p>
 
   <h3>Setting a baseline</h3>
@@ -139,19 +139,19 @@ npx @netlify/axis baseline delete v1.0`}</code></pre>
   </p>
   <ul>
     <li>
-      <strong><code>--json</code></strong> — Machine-readable output to stdout. No live terminal
+      <strong><code>--json</code></strong> -Machine-readable output to stdout. No live terminal
       display, no color codes. Suitable for piping to other tools or saving as artifacts.
     </li>
     <li>
-      <strong><code>--compare-baseline</code></strong> — Exits with code 1 if regressions are
+      <strong><code>--compare-baseline</code></strong> -Exits with code 1 if regressions are
       detected. Use this as a CI gate: the build fails if agent experience degrades.
     </li>
     <li>
-      <strong><code>--concurrency</code></strong> — Control resource usage in constrained CI
+      <strong><code>--concurrency</code></strong> -Control resource usage in constrained CI
       environments.
     </li>
     <li>
-      <strong>API keys via environment</strong> — Pass <code>ANTHROPIC_API_KEY</code>,
+      <strong>API keys via environment</strong> -Pass <code>ANTHROPIC_API_KEY</code>,
       <code>CODEX_API_KEY</code>, or <code>GEMINI_API_KEY</code> as CI secrets.
     </li>
   </ul>

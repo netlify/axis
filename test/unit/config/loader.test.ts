@@ -79,6 +79,311 @@ describe("discoverScenarios", () => {
     );
   });
 
+  describe("variants", () => {
+    let tmpDir: string;
+
+    async function writeScenarioJson(relativePath: string, data: Record<string, unknown>) {
+      const fullPath = path.join(tmpDir, relativePath);
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await fs.writeFile(fullPath, JSON.stringify(data));
+    }
+
+    it("returns single scenario when no variants defined", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/simple.json", {
+        name: "Simple",
+        prompt: "test",
+        rubric: "test rubric",
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].key).toBe("simple");
+      expect(scenarios[0].name).toBe("Simple");
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("returns single scenario when variants is empty array", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/simple.json", {
+        name: "Simple",
+        prompt: "test",
+        rubric: "test rubric",
+        variants: [],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].key).toBe("simple");
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("expands variants into separate scenarios with @ keys", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Test",
+        prompt: "base prompt",
+        rubric: "base rubric",
+        variants: [
+          { name: "variant-a" },
+          { name: "variant-b" },
+        ],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios).toHaveLength(2);
+
+      const keys = scenarios.map((s) => s.key);
+      expect(keys).toContain("test@variant-a");
+      expect(keys).toContain("test@variant-b");
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("inherits parent fields when variant does not override", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Parent",
+        prompt: "parent prompt",
+        rubric: "parent rubric",
+        skills: ["./base-skill"],
+        variants: [{ name: "v1" }],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].prompt).toBe("parent prompt");
+      expect(scenarios[0].rubric).toBe("parent rubric");
+      expect(scenarios[0].skills).toEqual(["./base-skill"]);
+      expect(scenarios[0].name).toBe("Parent [v1]");
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("uses variant overrides when provided", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Parent",
+        prompt: "parent prompt",
+        rubric: "parent rubric",
+        variants: [
+          { name: "v1", prompt: "override prompt", rubric: "override rubric" },
+        ],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].prompt).toBe("override prompt");
+      expect(scenarios[0].rubric).toBe("override rubric");
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("variant skills replace parent skills (not merge)", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Parent",
+        prompt: "test",
+        rubric: "test",
+        skills: ["./parent-skill"],
+        variants: [
+          { name: "v1", skills: ["./variant-skill"] },
+        ],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios[0].skills).toEqual(["./variant-skill"]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("variant mcp_servers merge with parent (variant wins on conflict)", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Parent",
+        prompt: "test",
+        rubric: "test",
+        mcp_servers: {
+          shared: { type: "stdio", command: "parent-cmd" },
+          parent_only: { type: "http", url: "https://parent.com" },
+        },
+        variants: [
+          {
+            name: "v1",
+            mcp_servers: {
+              shared: { type: "stdio", command: "variant-cmd" },
+              variant_only: { type: "http", url: "https://variant.com" },
+            },
+          },
+        ],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios[0].mcp_servers).toEqual({
+        shared: { type: "stdio", command: "variant-cmd" },
+        parent_only: { type: "http", url: "https://parent.com" },
+        variant_only: { type: "http", url: "https://variant.com" },
+      });
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("variant skip overrides parent skip", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Parent",
+        prompt: "test",
+        rubric: "test",
+        skip: true,
+        variants: [
+          { name: "active", skip: false },
+          { name: "skipped" },
+        ],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      const active = scenarios.find((s) => s.key === "test@active")!;
+      const skipped = scenarios.find((s) => s.key === "test@skipped")!;
+
+      expect(active.skip).toBe(false);
+      expect(skipped.skip).toBe(true);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("variant setup/teardown replace parent (not merge)", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Parent",
+        prompt: "test",
+        rubric: "test",
+        setup: [{ action: "run_script", command: "parent-setup" }],
+        variants: [
+          { name: "v1", setup: [{ action: "run_script", command: "variant-setup" }] },
+        ],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios[0].setup).toEqual([{ action: "run_script", command: "variant-setup" }]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("detects duplicate keys across variant and non-variant scenarios", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+
+      // Create a scenario file whose variant key collides with another file
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Parent",
+        prompt: "test",
+        rubric: "test",
+        variants: [{ name: "other" }],
+      });
+      // This file has key "test@other" which collides with the variant above
+      await writeScenarioJson("scenarios/test@other.json", {
+        name: "Collider",
+        prompt: "test",
+        rubric: "test",
+      });
+
+      await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow("Duplicate scenario key");
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("filters by base key to match all variants", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Test",
+        prompt: "test",
+        rubric: "test",
+        variants: [
+          { name: "v1" },
+          { name: "v2" },
+        ],
+      });
+      await writeScenarioJson("scenarios/other.json", {
+        name: "Other",
+        prompt: "test",
+        rubric: "test",
+      });
+
+      const filtered = await discoverScenarios(tmpDir, "./scenarios", ["test"]);
+      expect(filtered).toHaveLength(2);
+      expect(filtered.every((s) => s.key.startsWith("test@"))).toBe(true);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("filters by exact variant key", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Test",
+        prompt: "test",
+        rubric: "test",
+        variants: [
+          { name: "v1" },
+          { name: "v2" },
+        ],
+      });
+
+      const filtered = await discoverScenarios(tmpDir, "./scenarios", ["test@v1"]);
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].key).toBe("test@v1");
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("glob filter matches variants by base key", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/cms/post.json", {
+        name: "Post",
+        prompt: "test",
+        rubric: "test",
+        variants: [
+          { name: "v1" },
+          { name: "v2" },
+        ],
+      });
+      await writeScenarioJson("scenarios/other.json", {
+        name: "Other",
+        prompt: "test",
+        rubric: "test",
+      });
+
+      const filtered = await discoverScenarios(tmpDir, "./scenarios", ["cms/*"]);
+      expect(filtered).toHaveLength(2);
+      expect(filtered.every((s) => s.key.startsWith("cms/post@"))).toBe(true);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("variant agents override parent agents", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Test",
+        prompt: "test",
+        rubric: "test",
+        agents: ["claude-code"],
+        variants: [
+          { name: "gemini-only", agents: ["gemini"] },
+          { name: "inherits" },
+        ],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      const gemini = scenarios.find((s) => s.key === "test@gemini-only")!;
+      const inherits = scenarios.find((s) => s.key === "test@inherits")!;
+
+      expect(gemini.agents).toEqual(["gemini"]);
+      expect(inherits.agents).toEqual(["claude-code"]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+  });
+
   describe("nested directories", () => {
     let tmpDir: string;
 

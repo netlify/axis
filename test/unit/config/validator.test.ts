@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { validateConfig, validateScenario, resolveRubricWeights } from "../../../src/config/validator.js";
+import {
+  validateConfig,
+  validateScenario,
+  validateMcpServers,
+  resolveRubricWeights,
+} from "../../../src/config/validator.js";
 
 describe("validateConfig", () => {
   it("accepts a valid config with string agents", () => {
@@ -360,6 +365,160 @@ describe("validateScenario", () => {
   it("rejects scenario skills with non-string elements", () => {
     const scenario = { ...validScenario, skills: ["valid", 42] };
     expect(() => validateScenario(scenario, "test.json")).toThrow('"skills" must be an array of strings');
+  });
+
+  it("accepts a scenario with mcp_servers", () => {
+    const scenario = {
+      ...validScenario,
+      mcp_servers: { fs: { type: "stdio", command: "node", args: ["server.js"] } },
+    };
+    expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("rejects invalid mcp_servers on scenario", () => {
+    const scenario = { ...validScenario, mcp_servers: "bad" };
+    expect(() => validateScenario(scenario, "test.json")).toThrow("must be an object");
+  });
+
+  describe("variants", () => {
+    it("accepts valid variants", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [
+          { name: "variant-a" },
+          { name: "variant_b", prompt: "Override prompt" },
+        ],
+      };
+      expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+    });
+
+    it("accepts variant with all overridable fields", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [
+          {
+            name: "full-override",
+            prompt: "Custom prompt",
+            rubric: [{ check: "Custom check", weight: 1.0 }],
+            skip: true,
+            agents: ["gemini"],
+            skills: ["./custom-skill"],
+            mcp_servers: { test: { type: "stdio", command: "echo" } },
+            setup: [{ action: "run_script", command: "echo setup" }],
+            teardown: [{ action: "run_script", command: "echo teardown" }],
+          },
+        ],
+      };
+      expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+    });
+
+    it("rejects non-array variants", () => {
+      const scenario = { ...validScenario, variants: "bad" };
+      expect(() => validateScenario(scenario, "test.json")).toThrow('"variants" must be an array');
+    });
+
+    it("rejects variant without name", () => {
+      const scenario = { ...validScenario, variants: [{ prompt: "x" }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].name must be a string");
+    });
+
+    it("rejects variant with invalid name characters", () => {
+      const scenario = { ...validScenario, variants: [{ name: "has spaces" }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].name must be a string matching");
+    });
+
+    it("rejects variant name with @ character", () => {
+      const scenario = { ...validScenario, variants: [{ name: "has@at" }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].name must be a string matching");
+    });
+
+    it("rejects variant name with slash", () => {
+      const scenario = { ...validScenario, variants: [{ name: "has/slash" }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].name must be a string matching");
+    });
+
+    it("rejects duplicate variant names", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [{ name: "dupe" }, { name: "dupe" }],
+      };
+      expect(() => validateScenario(scenario, "test.json")).toThrow('duplicate variant name "dupe"');
+    });
+
+    it("rejects variant with non-string prompt", () => {
+      const scenario = { ...validScenario, variants: [{ name: "v", prompt: 42 }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].prompt must be a string");
+    });
+
+    it("rejects variant with invalid rubric", () => {
+      const scenario = { ...validScenario, variants: [{ name: "v", rubric: 42 }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].rubric must be a string or array");
+    });
+
+    it("rejects variant with rubric entry missing check", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [{ name: "v", rubric: [{ weight: 1.0 }] }],
+      };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].rubric[0] missing");
+    });
+
+    it("resolves rubric weights on variant rubrics", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [{ name: "v", rubric: [{ check: "a" }, { check: "b" }] }],
+      };
+      validateScenario(scenario, "test.json");
+      const rubric = scenario.variants[0].rubric as Array<{ check: string; weight: number }>;
+      expect(rubric[0].weight).toBeCloseTo(0.5, 10);
+      expect(rubric[1].weight).toBeCloseTo(0.5, 10);
+    });
+
+    it("rejects variant with non-boolean skip", () => {
+      const scenario = { ...validScenario, variants: [{ name: "v", skip: "yes" }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].skip must be a boolean");
+    });
+
+    it("rejects variant with empty agents array", () => {
+      const scenario = { ...validScenario, variants: [{ name: "v", agents: [] }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].agents must be a non-empty array");
+    });
+
+    it("rejects variant with non-string agent entries", () => {
+      const scenario = { ...validScenario, variants: [{ name: "v", agents: [42] }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].agents[0] must be a string");
+    });
+
+    it("rejects variant with invalid skills", () => {
+      const scenario = { ...validScenario, variants: [{ name: "v", skills: "bad" }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow('"variants[0].skills" must be an array');
+    });
+
+    it("rejects variant with invalid mcp_servers", () => {
+      const scenario = { ...validScenario, variants: [{ name: "v", mcp_servers: "bad" }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("must be an object");
+    });
+
+    it("rejects variant with invalid setup", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [{ name: "v", setup: [{ action: "bad" }] }],
+      };
+      expect(() => validateScenario(scenario, "test.json")).toThrow('must be "run_script"');
+    });
+
+    it("rejects variant with invalid teardown", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [{ name: "v", teardown: "bad" }],
+      };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("must be an array");
+    });
+
+    it("rejects non-object variant entries", () => {
+      const scenario = { ...validScenario, variants: ["bad"] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0] must be an object");
+    });
   });
 });
 

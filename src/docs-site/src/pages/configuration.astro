@@ -382,8 +382,13 @@ const mcpExample = `{
   <h2>Scenarios</h2>
   <p>
     Scenarios are JSON files in the configured scenarios directory. The filename (without <code>.json</code>)
-    becomes the scenario key. Nested directories create namespaced keys — for example,
+    becomes the scenario key. Nested directories create namespaced keys -for example,
     <code>scenarios/cms/create-post.json</code> maps to key <code>cms/create-post</code>.
+  </p>
+  <p>
+    Scenarios can define <a href="/scenarios#variants">variants</a> to run the same task under
+    different configurations (skills, MCP servers, prompts, etc.) without duplicating files. Each
+    variant produces a separate job with a key like <code>create-post@variant-name</code>.
   </p>
   <p>
     See <a href="/scenarios">Writing Scenarios</a> for the complete scenario schema, rubric design
