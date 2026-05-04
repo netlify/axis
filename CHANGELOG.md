@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.7](https://github.com/netlify/axis/compare/v1.1.6...v1.1.7) (2026-05-04)
+
+
+### Bug Fixes
+
+* dims ([fe815cc](https://github.com/netlify/axis/commit/fe815cc58c08ba1158e13c3bdb7a5b18c1021fda))
+* fix urls ([77e97ec](https://github.com/netlify/axis/commit/77e97ec0c0a6423435aa829d8edc40048d681370))
+
 ## [1.1.6](https://github.com/netlify/axis/compare/v1.1.5...v1.1.6) (2026-05-01)
 
 
