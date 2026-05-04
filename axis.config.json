@@ -1,0 +1,6 @@
+{
+  "scenarios": "./scenarios",
+  "agents": [
+    "codex"
+  ]
+}

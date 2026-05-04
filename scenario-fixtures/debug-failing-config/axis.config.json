@@ -1,0 +1,7 @@
+{
+  "scenarios": "./scenarios",
+  "agents": ["claude-code", "echo"],
+  "adapters": {
+    "echo": "./adapters/echo-adapter.ts"
+  }
+}

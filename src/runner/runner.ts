@@ -347,7 +347,7 @@ async function executeJob(
   jobLimits?: ResolvedJobLimits,
   checkOverallTokenLimit?: () => void,
 ): Promise<JobOutput> {
-  const { index, agentName, agentConfig, scenario, axisConfig } = job;
+  const { index, agentName, agentConfig, scenario, axisConfig, configDir } = job;
   const label = `${scenario.key} (${agentName})`;
   const jobStart = Date.now();
 
@@ -356,7 +356,7 @@ async function executeJob(
   const workspace = createWorkspace();
   const adapter = getAdapter(agentConfig.adapter);
   const adapterIsolation = adapter.isolationEnv?.(workspace) ?? {};
-  const jobEnv = { ...adapterIsolation, ...env, HOME: workspace };
+  const jobEnv = { ...adapterIsolation, ...env, HOME: workspace, AXIS_CONFIG_DIR: configDir };
   logger.verbose?.(`[${label}] Workspace: ${workspace}`);
 
   // Register workspace for cleanup on process signal (Ctrl-C)

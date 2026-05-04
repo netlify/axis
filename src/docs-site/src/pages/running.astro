@@ -153,6 +153,7 @@ export default createAgentAdapter<{ stdout: string }>({
     <li><strong>HOME directory:</strong> Set to the workspace to prevent global config leakage.</li>
     <li><strong>Agent-specific dirs:</strong> <code>CLAUDE_CONFIG_DIR</code>, <code>CODEX_HOME</code>, <code>GEMINI_CLI_HOME</code> are all set to isolated paths.</li>
     <li><strong>Environment variables:</strong> Only explicitly listed vars and system essentials (<code>PATH</code>, <code>USER</code>, <code>SHELL</code>, <code>LANG</code>, <code>TERM</code>, <code>TMPDIR</code>) are passed through.</li>
+    <li><strong><code>AXIS_CONFIG_DIR</code>:</strong> Set to the absolute path of the directory containing <code>axis.config.json</code>. Lifecycle scripts and the agent process can use it to reference versioned fixtures or helper scripts. See <a href="/scenarios#lifecycle-environment-variables">Lifecycle environment variables</a>.</li>
   </ul>
   <p>
     MCP server configuration files are written into each workspace before the agent spawns, in the

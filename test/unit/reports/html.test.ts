@@ -127,6 +127,23 @@ describe("generateReportHtml", () => {
     expect(html).toContain("\\u003cscript\\u003e");
   });
 
+  it("preserves $-prefixed sequences from JSON content (e.g. shell quoting)", () => {
+    // String.prototype.replace treats $&, $', $`, $$, $1-$9 as special replacement
+    // patterns. If a tool output or scenario name contains these literally, naive
+    // replacement chops them out and corrupts the embedded JSON.
+    const report = makeReport();
+    report.results[0].prompt = `rg --files | rg "$'foo'" && echo $& done $\` $$ $1 $9`;
+    const html = generateReportHtml(report);
+
+    const m = html.match(/<script[^>]*id=["']axis-data["'][^>]*>/);
+    expect(m).not.toBeNull();
+    const dataStart = m!.index! + m![0].length;
+    const dataEnd = html.indexOf("</script>", dataStart);
+    const embedded = html.slice(dataStart, dataEnd);
+    const parsed = JSON.parse(embedded);
+    expect(parsed.results[0].prompt).toBe(report.results[0].prompt);
+  });
+
   it("handles unscored results", () => {
     const report = makeReport();
     report.results[0].score = undefined;

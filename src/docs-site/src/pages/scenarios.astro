@@ -224,11 +224,10 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     persist between runs.
   </p>
   <pre><code>{`"setup": [
-  { "action": "run_script", "command": "mkdir -p /tmp/workspace" },
-  { "action": "run_script", "command": "cp -r fixtures/project/* /tmp/workspace/" }
+  { "action": "run_script", "command": "cp -R \\"$AXIS_CONFIG_DIR/scenario-fixtures/my-project/.\\" ." }
 ],
 "teardown": [
-  { "action": "run_script", "command": "rm -rf /tmp/workspace" }
+  { "action": "run_script", "command": "rm -rf /tmp/my-project-artifacts" }
 ]`}</code></pre>
 
   <div class="callout callout-warn">
@@ -239,6 +238,56 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       scores.
     </p>
   </div>
+
+  <h3 id="lifecycle-environment-variables">Lifecycle environment variables</h3>
+  <p>
+    Setup and teardown scripts run with the workspace as their working directory. The following
+    environment variables are available inside <code>run_script</code> commands:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Variable</th>
+        <th>Value</th>
+        <th>Use it for</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>AXIS_CONFIG_DIR</code></td>
+        <td>Absolute path to the directory containing <code>axis.config.json</code>.</td>
+        <td>Referencing fixtures, helper scripts, or other files versioned alongside your project.</td>
+      </tr>
+      <tr>
+        <td><code>HOME</code></td>
+        <td>Set to the workspace temp directory (same as <code>pwd</code>).</td>
+        <td>Workspace isolation &mdash; tools that read <code>$HOME</code> stay scoped to the run.</td>
+      </tr>
+      <tr>
+        <td><code>PWD</code></td>
+        <td>The fresh per-job workspace temp directory.</td>
+        <td>Writing files the agent will see &mdash; relative paths land here.</td>
+      </tr>
+      <tr>
+        <td>System passthroughs</td>
+        <td><code>PATH</code>, <code>USER</code>, <code>SHELL</code>, <code>LANG</code>, <code>TERM</code>, <code>TMPDIR</code>.</td>
+        <td>Standard shell tooling. Other host vars are <em>not</em> passed unless listed in <code>env</code> in the config.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The <code>AXIS_CONFIG_DIR</code> variable enables the recommended pattern of keeping fixture
+    data in a versioned <code>scenario-fixtures/</code> directory next to
+    <code>axis.config.json</code>, then copying just the bits a scenario needs into its workspace:
+  </p>
+  <pre><code>{`scenario-fixtures/
+  my-project/
+    package.json
+    src/index.js
+    .axis/baselines/main.json   # hidden files copied via the trailing /. on cp -R
+
+scenarios/
+  my-scenario.json              # setup: cp -R "$AXIS_CONFIG_DIR/scenario-fixtures/my-project/." .`}</code></pre>
 
   <h3>Common patterns</h3>
   <ul>

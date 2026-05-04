@@ -24,5 +24,6 @@ export function generateReportHtml(report: ReportManifest): string {
   const template = fs.readFileSync(findTemplate(), "utf-8");
   // Escape < and > in JSON to prevent </script> from closing the tag prematurely
   const safeJson = JSON.stringify(report).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
-  return template.replace(DATA_PLACEHOLDER, safeJson);
+  // Use a replacer function so `$` sequences in the JSON (e.g. `$'`) aren't interpreted as special patterns
+  return template.replace(DATA_PLACEHOLDER, () => safeJson);
 }

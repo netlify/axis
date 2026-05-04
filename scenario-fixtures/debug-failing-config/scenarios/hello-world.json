@@ -1,0 +1,11 @@
+{
+  "name": "Hello World",
+  "setup": [
+    { "action": "run_command", "command": "mkdir -p /tmp/axis-debug" }
+  ],
+  "prompt": "Create /tmp/axis-debug/hello.txt with the text 'hi'.",
+  "criteria": [
+    { "check": "File was created", "weight": 0.5 },
+    { "check": "File contains 'hi'", "weight": 0.5 }
+  ]
+}
