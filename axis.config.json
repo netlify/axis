@@ -2,5 +2,13 @@
   "scenarios": "./scenarios",
   "agents": [
     "codex"
-  ]
+  ],
+  "settings": {
+    "limits": {
+      "scenario": {
+        "time_minutes": 3,
+        "tokens": 3000000
+      }
+    }
+  }
 }

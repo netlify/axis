@@ -836,6 +836,15 @@ h3 {
   margin-bottom: 12px;
 }
 
+.category-empty-state {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 12px 14px;
+  background: var(--bg-alt);
+  border-radius: 6px;
+}
+
 /* --- Audits --- */
 
 .audits-section {

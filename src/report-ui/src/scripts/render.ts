@@ -121,7 +121,20 @@ function groupByScenario(results: ResultEntry[]): ScenarioGroup[] {
     }
     group.entries.push(entry);
   }
-  return Array.from(map.values());
+  // Stable ordering for predictable diffs across reports:
+  // scenarios alphabetical by base key; entries by agent name then variant name.
+  const groups = Array.from(map.values());
+  for (const group of groups) {
+    group.entries.sort((a, b) => {
+      const agentCmp = a.agentName.localeCompare(b.agentName);
+      if (agentCmp !== 0) return agentCmp;
+      const va = getVariantName(a.scenarioKey) ?? "";
+      const vb = getVariantName(b.scenarioKey) ?? "";
+      return va.localeCompare(vb);
+    });
+  }
+  groups.sort((a, b) => a.scenarioKey.localeCompare(b.scenarioKey));
+  return groups;
 }
 
 // --- Components ---
@@ -468,16 +481,31 @@ function renderCriterion(c: CriterionGrade): string {
 // --- Category Card ---
 
 function renderCategoryCard(label: string, cat: CategoryScore): string {
+  // Zero-state: no interactions of this category occurred in the run
+  if (cat.interactionCount === 0) {
+    return `
+      <div class="detail-section">
+        <div class="section-header">
+          <h3>${escapeHtml(label)}</h3>
+          <span class="section-score">${cat.score} / 100</span>
+        </div>
+        <div class="category-empty-state">${escapeHtml(emptyCategoryMessage(label))}</div>
+      </div>`;
+  }
+
   const d = cat.dimensions;
   const nonDefaultAudits = cat.audits.filter((a) => a.rationale !== "default");
   const hasRealAudits = nonDefaultAudits.length > 0;
 
-  // Identify dimensions below 100
+  // Dimensions that actually contribute to this category's score.
+  // Env/Service score = success + speed only; Agent uses all dims.
+  const includeNecessity = label === "Agent";
+  const includeRelevance = label === "Agent";
   const dimEntries: Array<{ label: string; value: number }> = [
     { label: "Success", value: d.success },
     { label: "Speed", value: d.speed },
-    { label: "Relevance", value: d.relevance },
-    { label: "Necessity", value: d.necessity },
+    ...(includeRelevance ? [{ label: "Relevance", value: d.relevance }] : []),
+    ...(includeNecessity ? [{ label: "Necessity", value: d.necessity }] : []),
   ];
   const imperfectDims = dimEntries.filter((e) => e.value < 100);
 
@@ -503,8 +531,21 @@ function renderCategoryCard(label: string, cat: CategoryScore): string {
       ${dimensionsBlock}
       ${deductionsBlock}
       ${hasRealAudits ? renderAudits(nonDefaultAudits) : ""}
-      ${renderNecessity(cat.necessity)}
+      ${includeNecessity ? renderNecessity(cat.necessity) : ""}
     </div>`;
+}
+
+function emptyCategoryMessage(label: string): string {
+  switch (label) {
+    case "Environment":
+      return "No environment interactions (filesystem, shell, processes) in this run.";
+    case "Service":
+      return "No service interactions (HTTP requests, MCP tools, external APIs) in this run.";
+    case "Agent":
+      return "No agent decision points captured in this run.";
+    default:
+      return `No ${label.toLowerCase()} interactions in this run.`;
+  }
 }
 
 function renderCategoryDeductions(
