@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/netlify/axis/compare/v1.2.0...v1.2.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* report adjustments ([3108a5a](https://github.com/netlify/axis/commit/3108a5af374854810fc87ce7ac740810c7892f5b))
+
 ## [1.2.0](https://github.com/netlify/axis/compare/v1.1.7...v1.2.0) (2026-05-04)
 
 
