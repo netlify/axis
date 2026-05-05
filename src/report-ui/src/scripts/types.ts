@@ -36,7 +36,25 @@ export interface ResultEntry {
   prompt?: string;
   rubric?: string | RubricCriterion[];
   agentConfig?: Record<string, unknown>;
+  resolvedConfig?: ResolvedRunConfig;
 }
+
+export interface ResolvedRunConfig {
+  limits?: { time_minutes?: number; tokens?: number };
+  skills?: string[];
+  setup?: LifecycleAction[];
+  teardown?: LifecycleAction[];
+  mcpServers?: Record<string, McpServerConfig>;
+}
+
+export interface LifecycleAction {
+  action: string;
+  command: string;
+}
+
+export type McpServerConfig =
+  | { type?: "stdio"; command: string; args?: string[]; env?: Record<string, string> }
+  | { type: "http"; url: string; headers?: Record<string, string> };
 
 export interface RubricCriterion {
   check: string;

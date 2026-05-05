@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { loadConfig, discoverScenarios } from "../config/loader.js";
 import { getAdapter, registerAdapter } from "../adapters/registry.js";
 import { executeLifecycleActions } from "./lifecycle.js";
-import type { RunOutput, RunResult, Logger, JobState, JobStatus } from "../types/output.js";
+import type { ResolvedRunConfig, RunOutput, RunResult, Logger, JobState, JobStatus } from "../types/output.js";
 import { silentLogger as defaultLogger, formatError } from "../types/output.js";
 import type { Scenario } from "../types/scenario.js";
 import type { AgentConfig, AxisConfig, ResolvedSkill, ScenarioLimitsConfig } from "../types/config.js";
@@ -34,6 +34,41 @@ function resolveJobLimits(scenario: Scenario, defaultLimits?: ScenarioLimitsConf
 function formatLimitMinutes(ms: number): string {
   const minutes = ms / 60_000;
   return Number.isInteger(minutes) ? `${minutes}m` : `${minutes.toFixed(1)}m`;
+}
+
+/** Build the materialized configuration that was actually applied to a run, with defaults filled in. */
+function buildResolvedRunConfig(
+  scenario: Scenario,
+  axisConfig: AxisConfig,
+  agentConfig: AgentConfig,
+): ResolvedRunConfig {
+  // Limits: scenario-level overrides default; default time_minutes always applied.
+  const limitsBase = scenario.limits ?? axisConfig.settings?.limits?.scenario;
+  const limits: ScenarioLimitsConfig = {
+    time_minutes: limitsBase?.time_minutes ?? DEFAULT_SCENARIO_TIME_MINUTES,
+    ...(limitsBase?.tokens !== undefined ? { tokens: limitsBase.tokens } : {}),
+  };
+
+  // Skills merge axis → agent → scenario, dedup preserving order.
+  const seen = new Set<string>();
+  const skills: string[] = [];
+  for (const s of [...(axisConfig.skills ?? []), ...(agentConfig.skills ?? []), ...(scenario.skills ?? [])]) {
+    if (!seen.has(s)) {
+      seen.add(s);
+      skills.push(s);
+    }
+  }
+
+  // MCP: merge top-level + scenario; scenario keys override.
+  const mcpServers = { ...(axisConfig.mcp_servers ?? {}), ...(scenario.mcp_servers ?? {}) };
+
+  return {
+    limits,
+    skills: skills.length > 0 ? skills : undefined,
+    setup: scenario.setup && scenario.setup.length > 0 ? scenario.setup : undefined,
+    teardown: scenario.teardown && scenario.teardown.length > 0 ? scenario.teardown : undefined,
+    mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+  };
 }
 
 export type { RunOutput, RunResult };
@@ -473,6 +508,7 @@ async function executeJob(
         agentConfig,
         output,
         workingDirectory: workspace,
+        resolvedConfig: buildResolvedRunConfig(scenario, axisConfig, agentConfig),
       },
       cleanup,
     };
@@ -552,6 +588,7 @@ function buildFailedResult(job: Job, error: string): RunResult {
     prompt: job.scenario.prompt,
     rubric: job.scenario.rubric,
     agentConfig: job.agentConfig,
+    resolvedConfig: buildResolvedRunConfig(job.scenario, job.axisConfig, job.agentConfig),
     output: {
       transcript: [],
       result: null,

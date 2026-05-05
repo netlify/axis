@@ -1,11 +1,14 @@
 import type {
   ReportData,
   ResultEntry,
+  ResolvedRunConfig,
   ScoreResult,
   CategoryScore,
   GoalAchievementScore,
   CriterionGrade,
   InteractionAudit,
+  LifecycleAction,
+  McpServerConfig,
   SparseIndex,
   Interaction,
   RubricCriterion,
@@ -165,12 +168,15 @@ function dimensionItem(label: string, value: number): string {
 // --- Main Render ---
 
 export function renderReport(report: ReportData): string {
+  // Pre-sort entries into display order so row indices and modal indices align.
+  const orderedResults = groupByScenario(report.results).flatMap((g) => g.entries);
+  const orderedReport = { ...report, results: orderedResults };
   return `
     <div class="container">
-      ${renderHeader(report)}
-      ${renderResultsSection(report)}
+      ${renderHeader(orderedReport)}
+      ${renderResultsSection(orderedReport)}
     </div>
-    ${renderModals(report.results)}`;
+    ${renderModals(orderedResults)}`;
 }
 
 // --- Header ---
@@ -302,16 +308,12 @@ function renderScenarioGroup(group: ScenarioGroup, startIndex: number, hasScores
   return header + agentRows;
 }
 
-function renderScenarioHeaderRow(group: ScenarioGroup, startIndex: number, hasScores: boolean): string {
-  const infoBtn = group.prompt
-    ? `<button class="info-btn" data-modal-index="${startIndex}" title="View scenario settings">\u2139</button>`
-    : "";
-
+function renderScenarioHeaderRow(group: ScenarioGroup, _startIndex: number, hasScores: boolean): string {
   if (hasScores) {
     return `
       <tr class="scenario-header-row expanded" data-scenario="${escapeHtml(group.scenarioKey)}">
         <td><span class="expand-icon">\u25B6</span></td>
-        <td class="col-scenario-header">${escapeHtml(group.scenarioName)}${infoBtn}</td>
+        <td class="col-scenario-header">${escapeHtml(group.scenarioName)}</td>
         <td class="col-score"></td>
         <td class="col-score hide-mobile"></td>
         <td class="col-score hide-mobile"></td>
@@ -326,7 +328,7 @@ function renderScenarioHeaderRow(group: ScenarioGroup, startIndex: number, hasSc
   return `
     <tr class="scenario-header-row expanded" data-scenario="${escapeHtml(group.scenarioKey)}">
       <td><span class="expand-icon">\u25B6</span></td>
-      <td class="col-scenario-header">${escapeHtml(group.scenarioName)}${infoBtn}</td>
+      <td class="col-scenario-header">${escapeHtml(group.scenarioName)}</td>
       <td class="col-score"></td>
       <td class="col-right hide-mobile"></td>
       <td class="col-right hide-mobile"></td>
@@ -340,12 +342,15 @@ function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, s
   const errorBtn = entry.error
     ? `<button class="error-btn" data-error-index="${index}" title="${escapeHtml(friendlyError(entry.error))}">!</button>`
     : "";
+  const infoBtn = entry.prompt || entry.agentConfig
+    ? `<button class="info-btn" data-modal-index="${index}" title="View resolved configuration" type="button">\u2139</button>`
+    : "";
 
   if (hasScores) {
     return `
       <tr class="result-row agent-row" data-index="${index}" data-scenario="${escapeHtml(scenarioKey)}">
         <td class="col-expand-indent"><span class="expand-icon">\u25B6</span></td>
-        <td class="col-agent">${escapeHtml(displayAgentName(entry))}${errorBtn}</td>
+        <td class="col-agent">${escapeHtml(displayAgentName(entry))}${infoBtn}${errorBtn}</td>
         <td class="col-score">${scoreBadge(s?.axisScore)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.goalAchievement.score)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.environment.score)}</td>
@@ -364,7 +369,7 @@ function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, s
   return `
     <tr class="result-row agent-row" data-index="${index}" data-scenario="${escapeHtml(scenarioKey)}">
       <td class="col-expand-indent"><span class="expand-icon">\u25B6</span></td>
-      <td class="col-agent">${escapeHtml(entry.agentName)}${errorBtn}</td>
+      <td class="col-agent">${escapeHtml(displayAgentName(entry))}${infoBtn}${errorBtn}</td>
       <td class="col-score">${status}</td>
       <td class="col-right hide-mobile">${fmtTokens(entry.tokenUsage)}</td>
       <td class="col-right hide-mobile">${fmtDuration(entry.durationMs)}</td>
@@ -830,7 +835,7 @@ function renderSparseIndex(si: SparseIndex): string {
 function renderModals(results: ResultEntry[]): string {
   const promptModals = results
     .map((entry, i) => {
-      if (!entry.prompt) return "";
+      if (!entry.prompt && !entry.agentConfig && !entry.resolvedConfig) return "";
       return renderModal(entry, i);
     })
     .join("");
@@ -846,21 +851,124 @@ function renderModals(results: ResultEntry[]): string {
 }
 
 function renderModal(entry: ResultEntry, index: number): string {
+  const variant = getVariantName(entry.scenarioKey);
+  const baseName = getBaseScenarioName(entry.scenarioName);
+  const resolved = entry.resolvedConfig;
   return `
     <div class="modal-backdrop" data-modal-index="${index}">
       <div class="modal">
         <div class="modal-header">
           <div>
-            <h3>${escapeHtml(entry.scenarioName)}</h3>
-            <span class="modal-subtitle">${escapeHtml(entry.scenarioKey)}</span>
+            <h3>${escapeHtml(baseName)}</h3>
+            ${variant ? `<span class="modal-subtitle">Variant: ${escapeHtml(variant)}</span>` : ""}
           </div>
           <button class="modal-close">&times;</button>
         </div>
         <div class="modal-body">
-          ${renderModalPrompt(entry.prompt)}
+          ${entry.agentConfig ? renderModalAgentConfig(entry.agentConfig, entry.agentName) : ""}
+          ${resolved ? renderModalLimits(resolved.limits) : ""}
+          ${resolved?.skills?.length ? renderModalSkills(resolved.skills) : ""}
+          ${resolved?.setup?.length ? renderModalLifecycle("Setup", resolved.setup) : ""}
+          ${resolved?.teardown?.length ? renderModalLifecycle("Teardown", resolved.teardown) : ""}
+          ${resolved?.mcpServers && Object.keys(resolved.mcpServers).length ? renderModalMcp(resolved.mcpServers) : ""}
+          ${entry.prompt ? renderModalPrompt(entry.prompt) : ""}
           ${entry.rubric ? renderModalRubric(entry.rubric) : ""}
         </div>
       </div>
+    </div>`;
+}
+
+function renderModalAgentConfig(cfg: Record<string, unknown>, agentName: string): string {
+  const rows: string[] = [];
+  const push = (label: string, value: string) => {
+    rows.push(`
+      <tr>
+        <td class="modal-config-label">${escapeHtml(label)}</td>
+        <td><code>${escapeHtml(value)}</code></td>
+      </tr>`);
+  };
+
+  if (typeof cfg.command === "string") push("Command", cfg.command);
+  if (typeof cfg.model === "string") push("Model", cfg.model);
+  if (Array.isArray(cfg.skills) && cfg.skills.length > 0) {
+    push("Skills", (cfg.skills as unknown[]).map((s) => String(s)).join(", "));
+  }
+  if (cfg.flags && typeof cfg.flags === "object") {
+    const entries = Object.entries(cfg.flags as Record<string, unknown>);
+    if (entries.length > 0) {
+      const formatted = entries
+        .map(([k, v]) => (v === true ? `--${k}` : v === false ? `--no-${k}` : `--${k}=${v}`))
+        .join(" ");
+      push("Flags", formatted);
+    }
+  }
+
+  return `
+    <div class="modal-section">
+      <h4>Agent: <code class="modal-section-value">${escapeHtml(agentName)}</code></h4>
+      ${rows.length > 0 ? `<table class="modal-config-table"><tbody>${rows.join("")}</tbody></table>` : ""}
+    </div>`;
+}
+
+function renderModalLimits(limits: ResolvedRunConfig["limits"]): string {
+  if (!limits) return "";
+  const parts: string[] = [];
+  if (limits.time_minutes !== undefined) {
+    const v = limits.time_minutes;
+    parts.push(`<code>${Number.isInteger(v) ? v : v.toFixed(1)} min</code> wall-clock`);
+  }
+  if (limits.tokens !== undefined) {
+    parts.push(`<code>${limits.tokens.toLocaleString()}</code> tokens`);
+  }
+  if (parts.length === 0) return "";
+  return `
+    <div class="modal-section">
+      <h4>Limits</h4>
+      <p class="modal-config-line">${parts.join(" · ")}</p>
+    </div>`;
+}
+
+function renderModalSkills(skills: string[]): string {
+  const items = skills.map((s) => `<li><code>${escapeHtml(s)}</code></li>`).join("");
+  return `
+    <div class="modal-section">
+      <h4>Skills</h4>
+      <ul class="modal-config-list">${items}</ul>
+    </div>`;
+}
+
+function renderModalLifecycle(label: string, actions: LifecycleAction[]): string {
+  const items = actions
+    .map(
+      (a) => `
+      <li>
+        <span class="modal-config-label-inline">${escapeHtml(a.action)}</span>
+        <code>${escapeHtml(a.command)}</code>
+      </li>`,
+    )
+    .join("");
+  return `
+    <div class="modal-section">
+      <h4>${escapeHtml(label)}</h4>
+      <ul class="modal-config-list">${items}</ul>
+    </div>`;
+}
+
+function renderModalMcp(servers: Record<string, McpServerConfig>): string {
+  const items = Object.entries(servers)
+    .map(([name, cfg]) => {
+      const detail = "url" in cfg && cfg.url
+        ? `<code>${escapeHtml(cfg.url)}</code>`
+        : "command" in cfg && cfg.command
+          ? `<code>${escapeHtml([cfg.command, ...(cfg.args ?? [])].join(" "))}</code>`
+          : "";
+      return `<li><span class="modal-config-label-inline">${escapeHtml(name)}</span> ${detail}</li>`;
+    })
+    .join("");
+  return `
+    <div class="modal-section">
+      <h4>MCP servers</h4>
+      <ul class="modal-config-list">${items}</ul>
     </div>`;
 }
 

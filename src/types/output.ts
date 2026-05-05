@@ -1,7 +1,16 @@
 import type { AgentOutput } from "./agent.js";
-import type { AgentConfig } from "./config.js";
-import type { RubricCriterion } from "./scenario.js";
+import type { AgentConfig, McpServerConfig, ScenarioLimitsConfig } from "./config.js";
+import type { LifecycleAction, RubricCriterion } from "./scenario.js";
 import type { ScoredRunResult } from "./scoring.js";
+
+/** Materialized scenario configuration for a single run — limits, skills, lifecycle, and MCP, with defaults already applied. */
+export interface ResolvedRunConfig {
+  limits?: ScenarioLimitsConfig;
+  skills?: string[];
+  setup?: LifecycleAction[];
+  teardown?: LifecycleAction[];
+  mcpServers?: Record<string, McpServerConfig>;
+}
 
 export interface RunOutput {
   version: string;
@@ -22,6 +31,8 @@ export interface BaseRunResult {
   output: AgentOutput;
   /** Path to the agent's workspace directory (available during scoring, before cleanup). */
   workingDirectory?: string;
+  /** Materialized scenario settings (limits, skills, lifecycle, MCP) actually applied to this run. */
+  resolvedConfig?: ResolvedRunConfig;
 }
 
 export interface RunResult extends BaseRunResult {}

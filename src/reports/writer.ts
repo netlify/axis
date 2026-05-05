@@ -166,6 +166,9 @@ function buildResultEntry(result: RunResult | ScoredRunResult, relPath: string):
   entry.prompt = result.prompt;
   entry.rubric = result.rubric;
   entry.agentConfig = result.agentConfig;
+  if (result.resolvedConfig) {
+    entry.resolvedConfig = result.resolvedConfig;
+  }
 
   return entry;
 }
