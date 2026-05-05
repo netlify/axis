@@ -481,12 +481,14 @@ function renderCriterion(c: CriterionGrade): string {
 // --- Category Card ---
 
 function renderCategoryCard(label: string, cat: CategoryScore): string {
+  const headerTitle = `<h3>${escapeHtml(label)}${categoryInfoButton(label)}</h3>`;
+
   // Zero-state: no interactions of this category occurred in the run
   if (cat.interactionCount === 0) {
     return `
       <div class="detail-section">
         <div class="section-header">
-          <h3>${escapeHtml(label)}</h3>
+          ${headerTitle}
           <span class="section-score">${cat.score} / 100</span>
         </div>
         <div class="category-empty-state">${escapeHtml(emptyCategoryMessage(label))}</div>
@@ -508,31 +510,44 @@ function renderCategoryCard(label: string, cat: CategoryScore): string {
     ...(includeNecessity ? [{ label: "Necessity", value: d.necessity }] : []),
   ];
   const imperfectDims = dimEntries.filter((e) => e.value < 100);
+  const isPerfect = cat.score >= 100 && imperfectDims.length === 0;
 
-  // Only show dimensions grid when interactions were deeply evaluated
-  const dimensionsBlock = hasRealAudits
-    ? `<div class="dimensions-grid">${dimEntries.map((e) => dimensionItem(e.label, e.value)).join("")}</div>`
+  const necessityForBreakdown = includeNecessity && cat.necessity.rationale !== "default" ? cat.necessity : null;
+  const breakdownBlock = hasRealAudits
+    ? renderCategoryBreakdown(dimEntries, imperfectDims, nonDefaultAudits, includeRelevance, isPerfect, necessityForBreakdown)
     : "";
-
-  // Deductions: real audit rationales or baseline note
-  const deductionsBlock =
-    imperfectDims.length > 0 ? renderCategoryDeductions(imperfectDims, nonDefaultAudits, hasRealAudits) : "";
 
   return `
     <div class="detail-section">
       <div class="section-header">
-        <h3>${escapeHtml(label)}</h3>
+        ${headerTitle}
         <span class="section-score">${cat.score} / 100</span>
       </div>
       <div class="interaction-meta">
         ${cat.interactionCount} interaction${cat.interactionCount !== 1 ? "s" : ""}
         ${hasRealAudits ? `&middot; ${cat.auditedCount} audited` : ""}
       </div>
-      ${dimensionsBlock}
-      ${deductionsBlock}
-      ${hasRealAudits ? renderAudits(nonDefaultAudits) : ""}
-      ${includeNecessity ? renderNecessity(cat.necessity) : ""}
+      ${breakdownBlock}
     </div>`;
+}
+
+function categoryInfoButton(label: string): string {
+  const text = categoryDescription(label);
+  if (!text) return "";
+  return `<button class="info-btn" data-tooltip="${escapeHtml(text)}" aria-label="What is the ${escapeHtml(label)} score?" type="button">ℹ</button>`;
+}
+
+function categoryDescription(label: string): string {
+  switch (label) {
+    case "Environment":
+      return "Interactions with the local execution environment — filesystem reads/writes, shell commands, processes. Each call is scored on whether it succeeded and how fast it returned.";
+    case "Service":
+      return "Calls to external services — HTTP requests, MCP tools, third-party APIs. Each call is scored on whether it succeeded and how fast it returned.";
+    case "Agent":
+      return "The agent's own decisions across the run — model thinking, tool choice, and judgment. Scored on success, speed, context relevance, and whether each action was necessary.";
+    default:
+      return "";
+  }
 }
 
 function emptyCategoryMessage(label: string): string {
@@ -548,39 +563,77 @@ function emptyCategoryMessage(label: string): string {
   }
 }
 
-function renderCategoryDeductions(
-  imperfectDims: Array<{ label: string; value: number }>,
+function renderCategoryBreakdown(
+  allDims: Array<{ label: string; value: number }>,
+  _imperfectDims: Array<{ label: string; value: number }>,
   audits: InteractionAudit[],
-  _hasRealAudits: boolean,
+  showRelevance: boolean,
+  isPerfect: boolean,
+  necessity: { score: number; unnecessaryIds: number[]; rationale: string } | null,
 ): string {
-  const dimTags = imperfectDims
-    .map((d) => `<span class="dim-tag ${fillColorClass(d.value)}">${d.label}: ${d.value}</span>`)
-    .join("");
+  // Audits with at least one sub-perfect dim that contributes to the score
+  const isImperfectAudit = (a: InteractionAudit): boolean =>
+    a.success < 1 || a.speed < 1 || (showRelevance && a.contextRelevance < 1);
+  const imperfectAudits = audits.filter(isImperfectAudit);
+  const perfectAudits = audits.filter((a) => !isImperfectAudit(a));
 
-  const reasons = audits
-    .map(
-      (a) => `
-      <div class="cat-deduction-item">
-        <span class="cat-deduction-id">#${a.id}</span>
-        <span class="cat-deduction-scores">${renderAuditDimScores(a)}</span>
-        <span class="cat-deduction-rationale">${escapeHtml(a.rationale)}</span>
-      </div>`,
-    )
-    .join("");
+  // Perfect category — show a compact summary and bail
+  if (isPerfect) {
+    return `
+      <div class="dimensions-grid">${allDims.map((e) => dimensionItem(e.label, e.value)).join("")}</div>`;
+  }
+
+  const renderRow = (a: InteractionAudit) => `
+    <div class="cat-deduction-item">
+      <a class="cat-deduction-id interaction-link" data-interaction-id="${a.id}" title="Jump to this interaction in the transcript">Interaction #${a.id}</a>
+      <span class="cat-deduction-scores">${renderAuditDimScores(a, showRelevance)}</span>
+      <span class="cat-deduction-rationale">${escapeHtml(a.rationale)}</span>
+    </div>`;
+
+  const unnecessaryLinks = necessity
+    ? necessity.unnecessaryIds
+        .map((id) => `<a class="interaction-link" data-interaction-id="${id}" title="Jump to this interaction in the transcript">#${id}</a>`)
+        .join(", ")
+    : "";
+  const necessityRow = necessity
+    ? `<div class="cat-deduction-item necessity-row">
+         <span class="cat-deduction-id">Necessity</span>
+         <span class="cat-deduction-scores">${
+           necessity.unnecessaryIds.length > 0
+             ? `<span class="dim-score-tag">Unnecessary: ${unnecessaryLinks}</span>`
+             : ""
+         }</span>
+         <span class="cat-deduction-rationale">${escapeHtml(necessity.rationale)}</span>
+       </div>`
+    : "";
+
+  const imperfectRows = imperfectAudits.map(renderRow).join("");
+  const perfectRows = perfectAudits.map(renderRow).join("");
+  const showAllToggle = perfectAudits.length
+    ? `
+      <button class="audits-toggle">Show ${perfectAudits.length} other passing interaction${perfectAudits.length !== 1 ? "s" : ""}</button>
+      <div class="audits-list">${perfectRows}</div>`
+    : "";
+
+  const hasContent = !!necessityRow || imperfectRows.length > 0 || perfectAudits.length > 0;
 
   return `
-    <div class="deductions-summary">
-      <div class="deductions-header">Score breakdown</div>
-      <div class="dim-tags">${dimTags}</div>
-      ${reasons}
-    </div>`;
+    <div class="dimensions-grid">${allDims.map((e) => dimensionItem(e.label, e.value)).join("")}</div>
+    ${hasContent
+      ? `<div class="deductions-summary">
+           <div class="deductions-header">Score breakdown</div>
+           ${necessityRow}
+           ${imperfectRows}
+           ${showAllToggle}
+         </div>`
+      : ""}`;
 }
 
-function renderAuditDimScores(a: InteractionAudit): string {
+function renderAuditDimScores(a: InteractionAudit, showRelevance: boolean): string {
   const dims: Array<{ label: string; value: number }> = [
     { label: "Success", value: a.success },
     { label: "Speed", value: a.speed },
-    { label: "Relevance", value: a.contextRelevance },
+    ...(showRelevance ? [{ label: "Relevance", value: a.contextRelevance }] : []),
   ];
   return dims
     .filter((d) => d.value < 1)
@@ -588,47 +641,8 @@ function renderAuditDimScores(a: InteractionAudit): string {
     .join("");
 }
 
-function renderAudits(audits: InteractionAudit[]): string {
-  const items = audits.map(renderAuditItem).join("");
-  return `
-    <div class="audits-section">
-      <button class="audits-toggle">Show audits (${audits.length})</button>
-      <div class="audits-list">${items}</div>
-    </div>`;
-}
-
-function renderAuditItem(a: InteractionAudit): string {
-  return `
-    <div class="audit-item">
-      <div class="audit-header">
-        <span class="audit-id">#${a.id}</span>
-        <span class="audit-scores">
-          S:${fmt01(a.success)} Sp:${fmt01(a.speed)} R:${fmt01(a.contextRelevance)}
-        </span>
-      </div>
-      <div class="audit-rationale">${escapeHtml(a.rationale)}</div>
-    </div>`;
-}
-
 function fmt01(v: number): string {
   return (v * 100).toFixed(0);
-}
-
-function renderNecessity(n: { score: number; unnecessaryIds: number[]; rationale: string }): string {
-  if (n.rationale === "default") return "";
-
-  const scoreDisplay = Math.round(n.score * 100);
-  const unnecessary = n.unnecessaryIds.length > 0 ? ` &middot; Unnecessary: #${n.unnecessaryIds.join(", #")}` : "";
-
-  return `
-    <div class="necessity-section">
-      <div class="necessity-header">
-        <span class="necessity-label">Necessity</span>
-        <span class="necessity-score ${scoreColorClass(scoreDisplay)}">${scoreDisplay}/100</span>
-        ${unnecessary}
-      </div>
-      <div class="necessity-rationale">${escapeHtml(n.rationale)}</div>
-    </div>`;
 }
 
 // --- Waterfall Timeline ---
@@ -789,15 +803,18 @@ function renderSparseIndex(si: SparseIndex): string {
       const contentBlock = interaction?.content
         ? `<div class="sparse-line-content"><pre>${escapeHtml(interaction.content)}</pre></div>`
         : "";
+      const idAttr = interaction ? ` data-interaction-id="${interaction.id}"` : "";
 
-      return `<div class="sparse-line ${catClass}${expandable}">${escapeHtml(line)}${contentBlock}</div>`;
+      return `<div class="sparse-line ${catClass}${expandable}"${idAttr}>${escapeHtml(line)}${contentBlock}</div>`;
     })
     .join("");
 
+  const tooltipText =
+    "A condensed, ordered log of every tool call, model response, and decision the agent made during this run, classified as Environment, Service, or Agent. Each numbered line corresponds to the Interaction #N references in the score breakdowns above.";
   return `
     <div class="detail-section">
       <div class="section-header">
-        <h3>Transcript</h3>
+        <h3>Transcript of agent interactions<button class="info-btn" data-tooltip="${escapeHtml(tooltipText)}" aria-label="What is this?" type="button">ℹ</button></h3>
         <span class="section-score">${si.stats.totalInteractions} interactions</span>
       </div>
       <div class="sparse-index-section">

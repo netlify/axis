@@ -84,10 +84,11 @@ export function initInteractions(): void {
   document.querySelectorAll<HTMLButtonElement>(".audits-toggle").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const section = btn.closest(".audits-section");
-      if (!section) return;
-
-      const list = section.querySelector<HTMLElement>(".audits-list");
+      // The audits list is the immediate next sibling of the toggle button.
+      const list =
+        (btn.nextElementSibling as HTMLElement | null)?.classList.contains("audits-list")
+          ? (btn.nextElementSibling as HTMLElement)
+          : btn.parentElement?.querySelector<HTMLElement>(".audits-list") ?? null;
       if (!list) return;
 
       const isVisible = list.classList.contains("visible");
@@ -152,6 +153,34 @@ export function initInteractions(): void {
     if (e.key === "Escape") {
       document.querySelectorAll<HTMLElement>(".modal-backdrop.visible").forEach((b) => b.classList.remove("visible"));
     }
+  });
+
+  // Interaction breadcrumb links — jump from breakdown to transcript line
+  document.querySelectorAll<HTMLElement>(".interaction-link[data-interaction-id]").forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const id = link.dataset.interactionId;
+      if (!id) return;
+      const panel = link.closest<HTMLElement>(".detail-panel");
+      if (!panel) return;
+      const target = panel.querySelector<HTMLElement>(`.sparse-line[data-interaction-id="${CSS.escape(id)}"]`);
+      if (!target) return;
+
+      // Ensure the transcript section is expanded so the target is in flow.
+      const transcript = panel.querySelector<HTMLElement>(".sparse-index-content");
+      const toggle = panel.querySelector<HTMLButtonElement>(".sparse-index-toggle");
+      if (transcript && !transcript.classList.contains("visible")) {
+        transcript.classList.add("visible");
+        if (toggle) toggle.textContent = "Hide transcript";
+      }
+
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.remove("interaction-flash");
+      // Force reflow so the animation re-triggers if clicked twice.
+      void target.offsetWidth;
+      target.classList.add("interaction-flash");
+    });
   });
 
   // Sparse index toggle

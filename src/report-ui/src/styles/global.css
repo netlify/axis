@@ -614,6 +614,23 @@ h3 {
   color: var(--text-secondary);
 }
 
+.section-description {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: -8px 0 16px;
+  max-width: 70ch;
+}
+
+.section-description code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background: var(--bg-alt);
+  color: var(--text-secondary);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 /* --- Goal Achievement Criteria --- */
 
 .criteria-list {
@@ -759,6 +776,37 @@ h3 {
   font-weight: 600;
   color: var(--text);
   margin-right: 8px;
+}
+
+.interaction-link {
+  cursor: pointer;
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.interaction-link:hover {
+  border-bottom-color: var(--accent);
+}
+
+a.cat-deduction-id.interaction-link {
+  color: var(--accent);
+}
+
+@keyframes interaction-flash {
+  0%, 35% {
+    background: var(--yellow-light);
+    box-shadow: inset 3px 0 0 var(--yellow);
+  }
+  100% {
+    background: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+
+.sparse-line.interaction-flash {
+  animation: interaction-flash 1.8s ease-out;
 }
 
 .cat-deduction-scores {
@@ -1282,6 +1330,36 @@ h3 {
 .info-btn:hover {
   background: var(--accent-light);
   border-color: var(--accent);
+}
+
+.info-btn[data-tooltip] {
+  position: relative;
+}
+
+.info-btn[data-tooltip]:hover::after,
+.info-btn[data-tooltip]:focus-visible::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--bg-card);
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-family: var(--font-sans, inherit);
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 6px;
+  width: max-content;
+  max-width: 320px;
+  white-space: normal;
+  text-align: left;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* --- Modal --- */
