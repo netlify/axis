@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2](https://github.com/netlify/axis/compare/v1.2.1...v1.2.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* improving variant reporting ui ([65d26e2](https://github.com/netlify/axis/commit/65d26e2a46ccd23a58cb0cfa358067c207b58383))
+* report layout ([d2d4f06](https://github.com/netlify/axis/commit/d2d4f060ff8bf29bac6180887ba101b3d5e4878a))
+
 ## [1.2.1](https://github.com/netlify/axis/compare/v1.2.0...v1.2.1) (2026-05-05)
 
 
