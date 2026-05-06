@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -19,6 +19,118 @@ describe("loadConfig", () => {
 
   it("throws on missing config file", async () => {
     await expect(loadConfig("/nonexistent/axis.config.json")).rejects.toThrow("Could not read config file");
+  });
+
+  describe("JS/TS configs", () => {
+    let tmpDir: string;
+    const originalCwd = process.cwd();
+
+    afterEach(async () => {
+      process.chdir(originalCwd);
+      if (tmpDir) {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("loads a .js config with an object default export", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-js-cfg-"));
+      const configPath = path.join(tmpDir, "axis.config.js");
+      await fs.writeFile(
+        configPath,
+        `export default { scenarios: "./scenarios", agents: ["mock-agent"] };\n`,
+      );
+
+      const { config, configDir } = await loadConfig(configPath);
+      expect(config.scenarios).toBe("./scenarios");
+      expect(config.agents).toEqual(["mock-agent"]);
+      expect(configDir).toBe(tmpDir);
+    });
+
+    it("loads a .js config with a sync function default export", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-js-cfg-"));
+      const configPath = path.join(tmpDir, "axis.config.js");
+      await fs.writeFile(
+        configPath,
+        `export default () => ({ scenarios: "./scenarios", agents: ["mock-agent"] });\n`,
+      );
+
+      const { config } = await loadConfig(configPath);
+      expect(config.agents).toEqual(["mock-agent"]);
+    });
+
+    it("loads a .js config with an async function default export", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-js-cfg-"));
+      const configPath = path.join(tmpDir, "axis.config.js");
+      await fs.writeFile(
+        configPath,
+        `export default async () => ({ scenarios: "./scenarios", agents: ["mock-agent"] });\n`,
+      );
+
+      const { config } = await loadConfig(configPath);
+      expect(config.agents).toEqual(["mock-agent"]);
+    });
+
+    it("loads a .ts config via jiti", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-ts-cfg-"));
+      const configPath = path.join(tmpDir, "axis.config.ts");
+      await fs.writeFile(
+        configPath,
+        `import type { AxisConfig } from "${path.resolve(import.meta.dirname, "../../../src/types/config.js")}";\n` +
+          `const config: AxisConfig = { scenarios: "./scenarios", agents: ["mock-agent"] };\n` +
+          `export default config;\n`,
+      );
+
+      const { config } = await loadConfig(configPath);
+      expect(config.scenarios).toBe("./scenarios");
+      expect(config.agents).toEqual(["mock-agent"]);
+    });
+
+    it("throws when JS config has no default export", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-js-cfg-"));
+      const configPath = path.join(tmpDir, "axis.config.js");
+      await fs.writeFile(
+        configPath,
+        `export const config = { scenarios: "./scenarios", agents: ["mock-agent"] };\n`,
+      );
+
+      await expect(loadConfig(configPath)).rejects.toThrow("must have a default export");
+    });
+
+    it("defaults scenarios to './scenarios' when the field is omitted", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-default-"));
+      const configPath = path.join(tmpDir, "axis.config.json");
+      await fs.writeFile(configPath, JSON.stringify({ agents: ["mock-agent"] }));
+
+      const { config } = await loadConfig(configPath);
+      expect(config.scenarios).toBe("./scenarios");
+    });
+
+    it("probes default config extensions in priority order (.ts > .js > .json)", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-probe-"));
+      // Write all three — .ts should win
+      await fs.writeFile(
+        path.join(tmpDir, "axis.config.json"),
+        JSON.stringify({ scenarios: "./from-json", agents: ["mock-agent"] }),
+      );
+      await fs.writeFile(
+        path.join(tmpDir, "axis.config.js"),
+        `export default { scenarios: "./from-js", agents: ["mock-agent"] };\n`,
+      );
+      await fs.writeFile(
+        path.join(tmpDir, "axis.config.ts"),
+        `export default { scenarios: "./from-ts", agents: ["mock-agent"] };\n`,
+      );
+
+      process.chdir(tmpDir);
+      const { config } = await loadConfig();
+      expect(config.scenarios).toBe("./from-ts");
+    });
+
+    it("falls back to .json default error when no config file exists", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-probe-"));
+      process.chdir(tmpDir);
+      await expect(loadConfig()).rejects.toThrow(/Could not read config file.*axis\.config\.json/);
+    });
   });
 });
 
@@ -75,7 +187,7 @@ describe("discoverScenarios", () => {
 
   it("throws on nonexistent directory", async () => {
     await expect(discoverScenarios(FIXTURES_DIR, "./nonexistent")).rejects.toThrow(
-      "Could not read scenarios directory",
+      "Could not read scenarios path",
     );
   });
 
@@ -447,6 +559,271 @@ describe("discoverScenarios", () => {
       expect(filtered.every((s) => s.key.startsWith("auth/"))).toBe(true);
 
       await fs.rm(tmpDir, { recursive: true });
+    });
+  });
+
+  describe("array input", () => {
+    let tmpDir: string;
+
+    async function writeScenario(relativePath: string, name: string, extra: Record<string, unknown> = {}) {
+      const fullPath = path.join(tmpDir, relativePath);
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await fs.writeFile(
+        fullPath,
+        JSON.stringify({
+          name,
+          prompt: "test",
+          rubric: [{ check: "test", weight: 1.0 }],
+          ...extra,
+        }),
+      );
+    }
+
+    afterEach(async () => {
+      if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("accepts an array with a single directory entry (equivalent to legacy string form)", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-arr-"));
+      await writeScenario("scenarios/foo.json", "Foo");
+      await writeScenario("scenarios/bar.json", "Bar");
+
+      const scenarios = await discoverScenarios(tmpDir, ["./scenarios"]);
+      expect(scenarios.map((s) => s.key).sort()).toEqual(["bar", "foo"]);
+    });
+
+    it("accepts a string pointing at a single .json file", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-arr-"));
+      await writeScenario("special.json", "Special");
+
+      const scenarios = await discoverScenarios(tmpDir, "./special.json");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].key).toBe("special");
+    });
+
+    it("merges scenarios from multiple directory entries", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-arr-"));
+      await writeScenario("a/foo.json", "A Foo");
+      await writeScenario("b/bar.json", "B Bar");
+
+      const scenarios = await discoverScenarios(tmpDir, ["./a", "./b"]);
+      expect(scenarios.map((s) => s.key).sort()).toEqual(["bar", "foo"]);
+    });
+
+    it("accepts inline scenario objects with a key", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-arr-"));
+
+      const scenarios = await discoverScenarios(tmpDir, [
+        { key: "inline-1", name: "Inline 1", prompt: "p", rubric: "r" },
+        { key: "inline-2", name: "Inline 2", prompt: "p", rubric: "r" },
+      ]);
+
+      expect(scenarios.map((s) => s.key).sort()).toEqual(["inline-1", "inline-2"]);
+    });
+
+    it("mixes path strings and inline scenarios", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-arr-"));
+      await writeScenario("scenarios/on-disk.json", "On Disk");
+
+      const scenarios = await discoverScenarios(tmpDir, [
+        "./scenarios",
+        { key: "inline", name: "Inline", prompt: "p", rubric: "r" },
+      ]);
+
+      expect(scenarios.map((s) => s.key).sort()).toEqual(["inline", "on-disk"]);
+    });
+
+    it("expands variants on inline scenarios using inline key as base", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-arr-"));
+
+      const scenarios = await discoverScenarios(tmpDir, [
+        {
+          key: "params",
+          name: "Params",
+          prompt: "p",
+          rubric: "r",
+          variants: [{ name: "a" }, { name: "b" }],
+        },
+      ]);
+
+      expect(scenarios.map((s) => s.key).sort()).toEqual(["params@a", "params@b"]);
+    });
+
+    it("detects duplicate keys across inline and on-disk scenarios", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-arr-"));
+      await writeScenario("scenarios/clash.json", "On Disk Clash");
+
+      await expect(
+        discoverScenarios(tmpDir, [
+          "./scenarios",
+          { key: "clash", name: "Inline Clash", prompt: "p", rubric: "r" },
+        ]),
+      ).rejects.toThrow("Duplicate scenario key");
+    });
+  });
+
+  describe("module-based scenario files (.js/.ts)", () => {
+    let tmpDir: string;
+
+    afterEach(async () => {
+      if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    async function writeFile(relativePath: string, content: string) {
+      const fullPath = path.join(tmpDir, relativePath);
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await fs.writeFile(fullPath, content);
+    }
+
+    it("discovers .js scenarios with path-derived keys", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "scenarios/foo.js",
+        `export default { name: "Foo", prompt: "p", rubric: "r" };\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].key).toBe("foo");
+      expect(scenarios[0].name).toBe("Foo");
+    });
+
+    it("discovers .ts scenarios via jiti", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "scenarios/typed.ts",
+        `const s = { name: "Typed", prompt: "p", rubric: "r" };\nexport default s;\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].key).toBe("typed");
+    });
+
+    it("derives keys from nested subdirectories for module files", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "scenarios/cms/post.ts",
+        `export default { name: "Post", prompt: "p", rubric: "r" };\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["cms/post"]);
+    });
+
+    it("calls a function default export and uses the resolved object", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "scenarios/dyn.js",
+        `export default async () => ({ name: "Dyn", prompt: "p", rubric: "r" });\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].name).toBe("Dyn");
+    });
+
+    it("silently skips module files with no default export", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile("scenarios/helper.ts", `export const util = () => 42;\n`);
+      await writeFile(
+        "scenarios/real.ts",
+        `export default { name: "Real", prompt: "p", rubric: "r" };\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+    });
+
+    it("silently skips module files whose default is not an object", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile("scenarios/string-default.ts", `export default "not a scenario";\n`);
+      await writeFile("scenarios/array-default.ts", `export default [1, 2, 3];\n`);
+      await writeFile(
+        "scenarios/real.ts",
+        `export default { name: "Real", prompt: "p", rubric: "r" };\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+    });
+
+    it("discovers .json and .ts side-by-side in the same directory", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "scenarios/json-one.json",
+        JSON.stringify({ name: "JSON One", prompt: "p", rubric: "r" }),
+      );
+      await writeFile(
+        "scenarios/ts-one.ts",
+        `export default { name: "TS One", prompt: "p", rubric: "r" };\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key).sort()).toEqual(["json-one", "ts-one"]);
+    });
+
+    it("accepts a module scenario whose declared key matches the path-derived key", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "scenarios/has-key.ts",
+        `export default { key: "has-key", name: "X", prompt: "p", rubric: "r" };\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["has-key"]);
+    });
+
+    it("rejects a module scenario whose declared key does not match the path", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "scenarios/foo.ts",
+        `export default { key: "bar", name: "X", prompt: "p", rubric: "r" };\n`,
+      );
+
+      await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(
+        `declared key "bar" does not match path-derived key "foo"`,
+      );
+    });
+
+    it("expands variants from a module-defined scenario using path-derived base key", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "scenarios/with-variants.ts",
+        `export default {
+          name: "Variants",
+          prompt: "p",
+          rubric: "r",
+          variants: [{ name: "a" }, { name: "b" }],
+        };\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key).sort()).toEqual([
+        "with-variants@a",
+        "with-variants@b",
+      ]);
+    });
+
+    it("loads a single .ts file as a string entry (strict — throws on missing default)", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile(
+        "lone.ts",
+        `export default { name: "Lone", prompt: "p", rubric: "r" };\n`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./lone.ts");
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].key).toBe("lone");
+    });
+
+    it("throws when a single-file string entry has no default export", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
+      await writeFile("lone.ts", `export const x = 1;\n`);
+
+      await expect(discoverScenarios(tmpDir, "./lone.ts")).rejects.toThrow(
+        "must default-export an object",
+      );
     });
   });
 });

@@ -21,13 +21,15 @@ const mcpExample = `{
 <DocsLayout title="Configuration" active="configuration">
   <h1>Configuration Reference</h1>
   <p class="lead">
-    Complete reference for <code>axis.config.json</code>.
+    Complete reference for <code>axis.config.&#123;json|js|mjs|ts&#125;</code>.
   </p>
 
   <h2>Full Example</h2>
   <p>
-    AXIS is configured via an <code>axis.config.json</code> file in your project root. Here is an
-    example showing all available fields:
+    AXIS is configured via an <code>axis.config.*</code> file in your project root. JSON is the
+    default; <a href="#config-formats">JavaScript and TypeScript configs</a> are also supported and
+    let you compose your config programmatically. Here is a JSON example showing all available
+    fields:
   </p>
   <pre><code>{`{
   "scenarios": "./scenarios",
@@ -67,6 +69,95 @@ const mcpExample = `{
   }
 }`}</code></pre>
 
+  <h2 id="config-formats">Config File Formats</h2>
+  <p>
+    AXIS resolves the config file by extension, in priority order:
+    <code>axis.config.ts</code> &rarr; <code>axis.config.js</code> &rarr;
+    <code>axis.config.mjs</code> &rarr; <code>axis.config.json</code>. Use
+    <code>--config &lt;path&gt;</code> to point at a specific file.
+  </p>
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Extension</th>
+        <th>Loader</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>.json</code></td>
+        <td>Native JSON parse</td>
+        <td>Static config, no executable logic.</td>
+      </tr>
+      <tr>
+        <td><code>.js</code> / <code>.mjs</code> / <code>.cjs</code></td>
+        <td>Native dynamic import</td>
+        <td>ESM module. Default export is the config object or a function returning one.</td>
+      </tr>
+      <tr>
+        <td><code>.ts</code> / <code>.mts</code> / <code>.cts</code></td>
+        <td>Loaded via <a href="https://github.com/unjs/jiti" target="_blank" rel="noopener">jiti</a></td>
+        <td>No build step needed. Type-only imports are stripped at runtime.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>JavaScript / TypeScript configs</h3>
+  <p>
+    JS and TS configs let you build the config programmatically. Useful for sharing logic
+    across scenarios, deriving values from environment variables, or generating large numbers of
+    scenarios from a fixture set. The module's default export must be either the config object
+    directly or a (sync or async) function that returns one:
+  </p>
+  <pre><code>{`// axis.config.ts
+import type { AxisConfig, ScenarioInput } from "@netlify/axis";
+import applyLimits from "./scenarios/apply-limits.js";
+import authorScenario from "./scenarios/author-scenario.js";
+
+const dynamicScenarios: ScenarioInput[] = ["alpha", "beta", "gamma"].map((id) => ({
+  key: "smoke-" + id,
+  name: "Smoke test " + id,
+  prompt: "Do thing for " + id,
+  rubric: [{ check: "Did the thing" }],
+}));
+
+export default {
+  scenarios: [
+    "./scenarios",
+    applyLimits,
+    authorScenario,
+    ...dynamicScenarios,
+  ],
+  agents: ["claude-code"],
+  settings: {
+    limits: { run: { time_minutes: 60 } },
+  },
+} satisfies AxisConfig;`}</code></pre>
+  <p>
+    Or as a function (sync or async):
+  </p>
+  <pre><code>{`// axis.config.ts
+import type { AxisConfig } from "@netlify/axis";
+
+export default async () => {
+  const fixtures = await loadFixtures();
+  const config: AxisConfig = {
+    scenarios: fixtures.map(buildScenario),
+    agents: ["claude-code"],
+  };
+  return config;
+};`}</code></pre>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Generating an axis.config file</div>
+    <p>
+      <code>axis init --format ts</code> (or <code>--format js</code>) scaffolds a typed config
+      file alongside a sample JSON scenario. Without <code>--format</code>, AXIS produces a
+      <code>.json</code> config to preserve back-compat.
+    </p>
+  </div>
+
   <h2>Top-Level Fields</h2>
   <table class="table-fields">
     <thead>
@@ -80,9 +171,13 @@ const mcpExample = `{
     <tbody>
       <tr>
         <td><code>scenarios</code></td>
-        <td><code>string</code></td>
-        <td><span class="req-yes">Yes</span></td>
-        <td>Path to the scenarios directory.</td>
+        <td><code>string | (string | ScenarioInput)[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          A path to the scenarios directory, or an array of paths and/or inline scenario objects.
+          Defaults to <code>"./scenarios"</code> when omitted. See
+          <a href="/scenarios#authoring">Authoring scenarios</a> for the full schema.
+        </td>
       </tr>
       <tr>
         <td><code>agents</code></td>
@@ -472,9 +567,11 @@ const mcpExample = `{
 
   <h2>Scenarios</h2>
   <p>
-    Scenarios are JSON files in the configured scenarios directory. The filename (without <code>.json</code>)
-    becomes the scenario key. Nested directories create namespaced keys -for example,
-    <code>scenarios/cms/create-post.json</code> maps to key <code>cms/create-post</code>.
+    Scenarios live in the configured <code>scenarios</code> directory as <code>.json</code>,
+    <code>.js</code>, or <code>.ts</code> files, or are listed inline in
+    <code>axis.config.&#123;js,ts&#125;</code>. The filename (without extension) becomes the scenario
+    key, and nested directories create namespaced keys: <code>scenarios/cms/create-post.ts</code>
+    maps to <code>cms/create-post</code>.
   </p>
   <p>
     Scenarios can define <a href="/scenarios#variants">variants</a> to run the same task under
@@ -482,7 +579,8 @@ const mcpExample = `{
     variant produces a separate job with a key like <code>create-post@variant-name</code>.
   </p>
   <p>
-    See <a href="/scenarios">Writing Scenarios</a> for the complete scenario schema, rubric design
-    guidance, and example scenarios.
+    See <a href="/scenarios">Writing Scenarios</a> for the complete scenario schema, the
+    <a href="/scenarios#authoring">authoring formats</a>, rubric design
+    guidance, and examples.
   </p>
 </DocsLayout>

@@ -36,8 +36,8 @@ describe("validateConfig", () => {
     expect(() => validateConfig(null, "test.json")).toThrow("must be a JSON object");
   });
 
-  it("rejects missing scenarios field", () => {
-    expect(() => validateConfig({ agents: [] }, "test.json")).toThrow('"scenarios" must be a string');
+  it("accepts a config without a scenarios field (loader fills in the default)", () => {
+    expect(() => validateConfig({ agents: ["claude-code"] }, "test.json")).not.toThrow();
   });
 
   it("rejects missing agents field", () => {
@@ -51,6 +51,46 @@ describe("validateConfig", () => {
   it("rejects agent object without adapter", () => {
     const config = { scenarios: "./s", agents: [{}] };
     expect(() => validateConfig(config, "test.json")).toThrow('must have an "adapter" string');
+  });
+
+  it("accepts scenarios as an array of strings", () => {
+    const config = { scenarios: ["./a", "./b"], agents: ["claude-code"] };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("accepts scenarios as a mixed array of strings and inline scenarios", () => {
+    const config = {
+      scenarios: ["./a", { key: "inline-1", name: "Inline", prompt: "p", rubric: "r" }],
+      agents: ["claude-code"],
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("rejects scenarios array containing non-string non-object", () => {
+    const config = { scenarios: ["./a", 42], agents: ["claude-code"] };
+    expect(() => validateConfig(config, "test.json")).toThrow(
+      "scenarios[1] must be a string path or a scenario object",
+    );
+  });
+
+  it("rejects inline scenario without a key", () => {
+    const config = {
+      scenarios: [{ name: "No Key", prompt: "p", rubric: "r" }],
+      agents: ["claude-code"],
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow(
+      `inline scenarios must include a non-empty "key" string`,
+    );
+  });
+
+  it("rejects inline scenario with empty-string key", () => {
+    const config = {
+      scenarios: [{ key: "", name: "Empty Key", prompt: "p", rubric: "r" }],
+      agents: ["claude-code"],
+    };
+    expect(() => validateConfig(config, "test.json")).toThrow(
+      `inline scenarios must include a non-empty "key" string`,
+    );
   });
 
   it("rejects agent with non-array scenarios", () => {
@@ -378,6 +418,27 @@ describe("validateScenario", () => {
 
   it("accepts a valid scenario", () => {
     expect(() => validateScenario(validScenario, "test.json")).not.toThrow();
+  });
+
+  it("allows a file-mode scenario to declare key (loader checks the value matches path)", () => {
+    const scenario = { ...validScenario, key: "some-key" };
+    expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("rejects a file-mode scenario with an empty-string key", () => {
+    const scenario = { ...validScenario, key: "" };
+    expect(() => validateScenario(scenario, "test.json")).toThrow(
+      `"key" must be a non-empty string`,
+    );
+  });
+
+  it("inline mode requires a non-empty key", () => {
+    expect(() => validateScenario(validScenario, "config.ts", "inline")).toThrow(
+      `inline scenarios must include a non-empty "key" string`,
+    );
+    expect(() =>
+      validateScenario({ ...validScenario, key: "ok" }, "config.ts", "inline"),
+    ).not.toThrow();
   });
 
   it("accepts a scenario with setup and teardown", () => {

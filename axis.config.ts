@@ -1,4 +1,5 @@
-{
+import type { AxisConfig } from "./dist/types/index.js";
+  export default {
   "scenarios": "./scenarios",
   "agents": [
     "codex"
@@ -11,4 +12,4 @@
       }
     }
   }
-}
+} satisfies AxisConfig;

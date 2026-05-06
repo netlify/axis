@@ -66,11 +66,26 @@ function prompt(rl: readline.Interface, question: string, defaultValue: string):
   });
 }
 
+type ConfigFormat = "json" | "js" | "ts";
+const CONFIG_FORMATS: ConfigFormat[] = ["json", "js", "ts"];
+
+function renderConfigFile(format: ConfigFormat, config: { scenarios: string; agents: string[] }): string {
+  const body = JSON.stringify(config, null, 2);
+  if (format === "json") return body + "\n";
+  if (format === "js") return `export default ${body};\n`;
+  return (
+    `import type { AxisConfig } from "@netlify/axis";\n\n` +
+    `const config: AxisConfig = ${body};\n\n` +
+    `export default config;\n`
+  );
+}
+
 program
   .command("init")
   .description("Initialize a new AXIS configuration and sample scenario")
   .option("-s, --scenarios <path>", "path to scenarios directory", "./scenarios")
   .option("-a, --agent <names>", "agent(s) to include (comma-separated, e.g. claude-code,codex)")
+  .option("--format <format>", `config file format (${CONFIG_FORMATS.join(", ")})`, "json")
   .option("-f, --force", "overwrite existing files")
   .action(async (opts) => {
     let scenariosPath: string = opts.scenarios;
@@ -80,8 +95,9 @@ program
           .filter(Boolean)
           .map((a: string) => a.toLowerCase())
       : [];
+    let format: ConfigFormat = opts.format;
 
-    const hasExplicitFlags = opts.agent || opts.scenarios !== "./scenarios";
+    const hasExplicitFlags = opts.agent || opts.scenarios !== "./scenarios" || opts.format !== "json";
     const interactive = process.stdin.isTTY && !hasExplicitFlags;
 
     if (interactive) {
@@ -97,7 +113,14 @@ program
         .split(/[\s,]+/)
         .filter(Boolean)
         .map((a) => a.toLowerCase());
+      const formatAnswer = await prompt(rl, `  Config format [${CONFIG_FORMATS.join(", ")}] (${format}): `, format);
+      format = formatAnswer.toLowerCase() as ConfigFormat;
       rl.close();
+    }
+
+    if (!CONFIG_FORMATS.includes(format)) {
+      process.stderr.write(`\n  Invalid --format "${format}". Must be one of: ${CONFIG_FORMATS.join(", ")}.\n\n`);
+      process.exit(1);
     }
 
     // Filter out unknown agents (warn the user about which were ignored)
@@ -114,14 +137,15 @@ program
 
     if (agents.length === 0) agents = ["claude-code"];
 
-    const configPath = path.resolve("axis.config.json");
+    const configFilename = `axis.config.${format}`;
+    const configPath = path.resolve(configFilename);
     const scenariosDir = path.resolve(scenariosPath);
     const scenarioFile = path.join(scenariosDir, "hello-world.json");
 
     // Check for existing files
     if (!opts.force) {
       if (fs.existsSync(configPath)) {
-        process.stderr.write("\n  axis.config.json already exists. Use --force to overwrite.\n\n");
+        process.stderr.write(`\n  ${configFilename} already exists. Use --force to overwrite.\n\n`);
         process.exit(1);
       }
       if (fs.existsSync(scenarioFile)) {
@@ -145,10 +169,10 @@ program
     };
 
     fs.mkdirSync(scenariosDir, { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+    fs.writeFileSync(configPath, renderConfigFile(format, config));
     fs.writeFileSync(scenarioFile, JSON.stringify(scenario, null, 2) + "\n");
 
-    process.stdout.write(`\n  Created axis.config.json\n`);
+    process.stdout.write(`\n  Created ${configFilename}\n`);
     process.stdout.write(`  Created ${path.relative(".", scenarioFile)}\n\n`);
     process.stdout.write(`  Run \`axis run\` to execute your first scenario.\n\n`);
   });
@@ -156,7 +180,7 @@ program
 // --- Shared run pipeline ---
 
 interface RunPipelineOptions {
-  configPath: string;
+  configPath?: string;
   scenario?: string;
   agent?: string;
   concurrency?: number;
@@ -241,7 +265,7 @@ async function executeRunPipeline(
 program
   .command("run")
   .description("Run scenarios against configured agents")
-  .option("-c, --config <path>", "path to axis.config.json", "axis.config.json")
+  .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
   .option("-s, --scenario <key>", "run a specific scenario by key (e.g. hello-world, cms/create-post)")
   .option("-a, --agent <name>", "run with a specific agent only")
   .option("--json", "output results as JSON to stdout", false)
@@ -399,7 +423,7 @@ program
   .description("View past AXIS reports")
   .argument("[reportId]", "report ID or 'latest' (omit to list all)")
   .argument("[scenarioKey]", "scenario key to view detailed result")
-  .option("-c, --config <path>", "path to axis.config.json", "axis.config.json")
+  .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
   .option("-a, --agent <name...>", "filter scenario detail to specific agent(s), repeatable")
   .option("--json", "output as JSON", false)
   .option("--html", "open report as HTML in browser", false)
@@ -531,7 +555,7 @@ baselineCmd
   .description(
     `Create or update a baseline from the latest (or specific) report (default name: "${DEFAULT_BASELINE_NAME}")`,
   )
-  .option("-c, --config <path>", "path to axis.config.json", "axis.config.json")
+  .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
   .option("--from <reportId>", "use a specific report instead of latest")
   .action(async (name: string | undefined, opts) => {
     try {
@@ -566,7 +590,7 @@ baselineCmd
 baselineCmd
   .command("list")
   .description("List all baselines")
-  .option("-c, --config <path>", "path to axis.config.json", "axis.config.json")
+  .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
   .action(async (opts) => {
     try {
       const { configDir } = await loadConfig(opts.config);
@@ -587,7 +611,7 @@ baselineCmd
 baselineCmd
   .command("show [name]")
   .description(`Show baseline contents (default name: "${DEFAULT_BASELINE_NAME}")`)
-  .option("-c, --config <path>", "path to axis.config.json", "axis.config.json")
+  .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
   .option("--json", "output as JSON", false)
   .action(async (name: string | undefined, opts) => {
     try {
@@ -614,7 +638,7 @@ baselineCmd
 baselineCmd
   .command("compare [name]")
   .description(`Compare a report against a baseline (default name: "${DEFAULT_BASELINE_NAME}")`)
-  .option("-c, --config <path>", "path to axis.config.json", "axis.config.json")
+  .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
   .option("--report <reportId>", "compare a specific report instead of latest")
   .option("--json", "output as JSON", false)
   .action(async (name: string | undefined, opts) => {
@@ -656,7 +680,7 @@ baselineCmd
 baselineCmd
   .command("delete [name]")
   .description(`Delete a baseline (default name: "${DEFAULT_BASELINE_NAME}")`)
-  .option("-c, --config <path>", "path to axis.config.json", "axis.config.json")
+  .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
   .action(async (name: string | undefined, opts) => {
     try {
       const baselineName = name ?? DEFAULT_BASELINE_NAME;

@@ -755,13 +755,20 @@ details.example-collapse summary span {
 }
 
 details.example-collapse .example-body {
-  padding: 0 20px 20px;
+  padding: 16px 20px 20px;
   border-top: 1px solid var(--border);
 }
 
-details.example-collapse .example-body pre {
-  margin-top: 16px;
+details.example-collapse .example-body > :first-child {
+  margin-top: 0;
+}
+
+details.example-collapse .example-body > :last-child {
   margin-bottom: 0;
+}
+
+details.example-collapse .example-body pre {
+  margin-bottom: 16px;
 }
 
 /* --- Footer --- */

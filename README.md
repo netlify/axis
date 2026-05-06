@@ -1,6 +1,6 @@
 # AXIS - Agent eXperience Index Score
 
-Full documentation lives at **https://axisproject.ai**:
+Full documentation lives at **https://axis.run**:
 
 AXIS is a synthetic testing framework for measuring how well systems support AI agent interaction. Think [Lighthouse](https://developer.chrome.com/docs/lighthouse), but instead of scoring user experience, AXIS scores **agent experience**.
 
@@ -48,14 +48,14 @@ AXIS executes the scenario, scores the result, and writes a report to `.axis/rep
 
 ## Documentation
 
-Full documentation lives at **https://axisproject.ai**:
+Full documentation lives at **https://axis.run**:
 
-- [Overview](https://axisproject.ai/) - what AXIS measures and why
-- [Quick Start](https://axisproject.ai/quickstart) - install through your first scored run
-- [Configuration](https://axisproject.ai/configuration) - `axis.config.json`, scenarios, MCP servers, skills
-- [CLI Reference](https://axisproject.ai/cli) - `axis run`, `axis reports`, `axis baseline`
-- [Running Tests](https://axisproject.ai/running) - execution model, workspace isolation, custom adapters, CI integration
-- [Scoring Framework](https://axisproject.ai/scoring) - the four dimensions, signals, calibration
+- [Overview](https://axis.run/) - what AXIS measures and why
+- [Quick Start](https://axis.run/quickstart) - install through your first scored run
+- [Configuration](https://axis.run/configuration) - `axis.config.json`, scenarios, MCP servers, skills
+- [CLI Reference](https://axis.run/cli) - `axis run`, `axis reports`, `axis baseline`
+- [Running Tests](https://axis.run/running) - execution model, workspace isolation, custom adapters, CI integration
+- [Scoring Framework](https://axis.run/scoring) - the four dimensions, signals, calibration
 
 ## Programmatic API
 

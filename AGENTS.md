@@ -81,7 +81,7 @@ For built-in adapters, register the factory in `src/adapters/registry.ts`. Exter
 
 ## Documentation Policy
 
-User-facing documentation lives in `src/docs-site/` (Astro), published at https://axisproject.ai. All changes to the CLI, scoring system, or configuration schema **must** be reflected there -the docs site is canonical and must stay in sync with the implementation.
+User-facing documentation lives in `src/docs-site/` (Astro), published at https://axis.run. All changes to the CLI, scoring system, or configuration schema **must** be reflected there -the docs site is canonical and must stay in sync with the implementation.
 
 `README.md` is intentionally lean: tagline, quick start, link tree to the docs site, and the programmatic API surface. Don't expand it back into a full reference -update the docs site instead.
 

@@ -8,9 +8,7 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
 
   const obj = data as Record<string, unknown>;
 
-  if (typeof obj.scenarios !== "string") {
-    throw new Error(`Invalid config at ${filePath}: "scenarios" must be a string path`);
-  }
+  validateScenariosField(obj.scenarios, filePath);
 
   if (!Array.isArray(obj.agents)) {
     throw new Error(`Invalid config at ${filePath}: "agents" must be an array`);
@@ -71,12 +69,61 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
   }
 }
 
-export function validateScenario(data: unknown, filePath: string): asserts data is Scenario {
+function validateScenariosField(data: unknown, filePath: string): void {
+  if (data === undefined) return; // optional — loader fills in the default
+  if (typeof data === "string") return;
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      `Invalid config at ${filePath}: "scenarios" must be a string path or an array of paths and/or scenario objects`,
+    );
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    const entry = data[i];
+    if (typeof entry === "string") continue;
+    if (typeof entry !== "object" || entry === null) {
+      throw new Error(
+        `Invalid config at ${filePath}: scenarios[${i}] must be a string path or a scenario object`,
+      );
+    }
+    validateScenario(entry, `${filePath} (scenarios[${i}])`, "inline");
+  }
+}
+
+/**
+ * Validates a scenario object.
+ *
+ * @param mode  "file" — loaded from a JSON scenario file; the loader will assign
+ *              the `key` from the file path and rejects any user-supplied `key`.
+ *              "inline" — declared inline in `axis.config.*`; the user must
+ *              provide a non-empty `key` string.
+ */
+export function validateScenario(
+  data: unknown,
+  filePath: string,
+  mode: "file" | "inline" = "file",
+): asserts data is Scenario {
   if (typeof data !== "object" || data === null) {
     throw new Error(`Invalid scenario at ${filePath}: must be a JSON object`);
   }
 
   const obj = data as Record<string, unknown>;
+
+  if (mode === "inline") {
+    if (typeof obj.key !== "string" || obj.key.length === 0) {
+      throw new Error(
+        `Invalid scenario at ${filePath}: inline scenarios must include a non-empty "key" string`,
+      );
+    }
+  } else if (obj.key !== undefined) {
+    // File-mode: an explicit `key` is allowed (helpers like `withSharedVariants` may
+    // require it on their input), but it must be a non-empty string. The loader
+    // verifies it matches the path-derived key — see finalizeScenarioObject in loader.ts.
+    if (typeof obj.key !== "string" || obj.key.length === 0) {
+      throw new Error(`Invalid scenario at ${filePath}: "key" must be a non-empty string`);
+    }
+  }
 
   if (typeof obj.name !== "string") {
     throw new Error(`Invalid scenario at ${filePath}: missing required field "name"`);

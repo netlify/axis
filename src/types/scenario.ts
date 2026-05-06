@@ -1,7 +1,11 @@
 import type { McpServerConfig, ScenarioLimitsConfig } from "./config.js";
 
 export interface Scenario {
-  /** Stable identifier derived from file path relative to scenarios root, sans .json */
+  /**
+   * Stable identifier. For on-disk JSON scenarios the loader derives it from the file path
+   * (relative to the scenarios root, sans extension). For inline scenarios declared in
+   * `axis.config.{js,ts,json}`, authors must provide it themselves.
+   */
   key: string;
   name: string;
   /** When true, the scenario is excluded from runs. */
@@ -40,6 +44,13 @@ export interface ScenarioVariant {
   /** Per-variant time/token limits. Overrides parent scenario and default limits. */
   limits?: ScenarioLimitsConfig;
 }
+
+/**
+ * User-facing shape for inline scenarios declared in `axis.config.{js,ts,json}`.
+ * Identical to {@link Scenario} but explicit about the contract: `key` is required
+ * (the loader does not derive it from a file path for inline entries).
+ */
+export type ScenarioInput = Scenario;
 
 export interface LifecycleAction {
   action: "run_script";

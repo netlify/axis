@@ -31,17 +31,23 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   </p>
   <pre><code>axis init</code></pre>
   <p>
-    In an interactive terminal, this prompts you for the scenarios directory and which agents to
-    include (comma-separated, e.g. <code>claude-code,codex,gemini</code>). It then creates two files:
+    In an interactive terminal, this prompts you for the scenarios directory, which agents to
+    include (comma-separated, e.g. <code>claude-code,codex,gemini</code>), and the config file
+    format. It then creates two files:
   </p>
   <ul>
-    <li><code>axis.config.json</code> -minimal config with your chosen scenarios path and agents.</li>
+    <li><code>axis.config.&#123;json|js|ts&#125;</code> -minimal config with your chosen scenarios path and agents.</li>
     <li><code>scenarios/hello-world.json</code> -a sample scenario that asks the agent to create a file with specific content.</li>
   </ul>
   <p>
-    To skip the prompts, pass flags directly:
+    To skip the prompts, pass flags directly. Use <code>--format ts</code> (or <code>js</code>) to
+    scaffold a typed config; the default is <code>json</code>:
   </p>
-  <pre><code>axis init --agent claude-code,codex --scenarios ./scenarios</code></pre>
+  <pre><code>axis init --agent claude-code,codex --scenarios ./scenarios --format ts</code></pre>
+  <p>
+    See <a href="/configuration#config-formats">Config file formats</a> for the difference between
+    JSON, JS, and TS configs and when to reach for each.
+  </p>
   <p>
     See the <a href="/configuration">Configuration Reference</a> for additional options like scoring
     weights, MCP servers, and custom agents, and <a href="/scenarios">Writing Scenarios</a> for guidance

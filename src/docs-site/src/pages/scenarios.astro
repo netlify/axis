@@ -12,24 +12,11 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 
   <h2>Anatomy of a Scenario</h2>
   <p>
-    A scenario is a JSON file in your configured scenarios directory. Here is a complete example:
+    A scenario is an object with a name, prompt, rubric, and optional lifecycle hooks. The same
+    shape applies whether you author it as JSON, a JavaScript or TypeScript module, or an inline
+    entry in <code>axis.config.&#123;js,ts&#125;</code>. See
+    <a href="#authoring">Authoring Scenarios</a> below for the available formats.
   </p>
-  <pre><code>{`{
-  "name": "Debug and fix a broken script",
-  "prompt": "There is a JavaScript file at src/add.js that has a bug. Find it, fix it, and verify the fix by running the test.",
-  "rubric": [
-    { "check": "Agent identified the bug (subtraction instead of addition)", "weight": 0.3 },
-    { "check": "Agent fixed the bug so add(a, b) returns a + b", "weight": 0.4 },
-    { "check": "Agent ran the test and it passed", "weight": 0.3 }
-  ],
-  "setup": [
-    { "action": "run_script", "command": "mkdir -p src && echo 'function add(a,b) { return a-b; }\\nmodule.exports = { add };' > src/add.js" },
-    { "action": "run_script", "command": "mkdir -p test && echo 'const {add} = require(\\\"../src/add\\\");\\nconsole.log(add(2,3) === 5 ? \\\"PASS\\\" : \\\"FAIL\\\");' > test/add.test.js" }
-  ],
-  "teardown": [
-    { "action": "run_script", "command": "rm -rf src test" }
-  ]
-}`}</code></pre>
 
   <table class="table-fields">
     <thead>
@@ -103,6 +90,124 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       </tr>
     </tbody>
   </table>
+
+  <h2 id="authoring">Authoring Scenarios</h2>
+  <p>
+    Scenarios live in the configured <code>scenarios</code> directory or are listed inline in
+    <code>axis.config.&#123;js,ts&#125;</code>. The three formats below are interchangeable for
+    the shape itself; pick the one that matches how you want to manage the scenario.
+  </p>
+
+  <details class="example-collapse">
+    <summary>
+      <strong>As a JSON file</strong>
+      <span>The simplest form. <code>axis init</code> scaffolds this by default.</span>
+    </summary>
+    <div class="example-body">
+      <p>
+        JSON scenarios live in your scenarios directory. The filename (without
+        <code>.json</code>) becomes the scenario key. Do <strong>not</strong> include a
+        <code>key</code> field, since the loader derives it from the file path.
+      </p>
+      <pre><code>{`{
+  "name": "Debug and fix a broken script",
+  "prompt": "There is a JavaScript file at src/add.js that has a bug. Find it, fix it, and verify the fix by running the test.",
+  "rubric": [
+    { "check": "Agent identified the bug (subtraction instead of addition)", "weight": 0.3 },
+    { "check": "Agent fixed the bug so add(a, b) returns a + b", "weight": 0.4 },
+    { "check": "Agent ran the test and it passed", "weight": 0.3 }
+  ],
+  "setup": [
+    { "action": "run_script", "command": "mkdir -p src && echo 'function add(a,b) { return a-b; }\\nmodule.exports = { add };' > src/add.js" },
+    { "action": "run_script", "command": "mkdir -p test && echo 'const {add} = require(\\\"../src/add\\\");\\nconsole.log(add(2,3) === 5 ? \\\"PASS\\\" : \\\"FAIL\\\");' > test/add.test.js" }
+  ],
+  "teardown": [
+    { "action": "run_script", "command": "rm -rf src test" }
+  ]
+}`}</code></pre>
+    </div>
+  </details>
+
+  <details class="example-collapse">
+    <summary>
+      <strong>As a JavaScript or TypeScript module</strong>
+      <span>Default-export a scenario object or function for typed authoring.</span>
+    </summary>
+    <div class="example-body">
+      <p>
+        Drop a <code>.ts</code>, <code>.js</code>, <code>.mjs</code>, <code>.cjs</code>,
+        <code>.mts</code>, or <code>.cts</code> file into the scenarios directory. The default
+        export must resolve to a scenario object: either the object itself, or a (sync or async)
+        function returning one. The key is path-derived; an explicit <code>key</code> field is
+        allowed but must match.
+      </p>
+      <pre><code>{`// scenarios/refactor-add.ts
+import type { ScenarioInput } from "@netlify/axis";
+
+export default {
+  name: "Refactor a buggy add() function",
+  prompt: "There is a bug in src/add.js. Find it, fix it, and verify the fix.",
+  rubric: [
+    { check: "Agent identified the bug", weight: 0.3 },
+    { check: "Fix is correct", weight: 0.4 },
+    { check: "Verification was run", weight: 0.3 },
+  ],
+} satisfies ScenarioInput;`}</code></pre>
+      <p>
+        A function default export is handy for env-driven prompts or fixture-derived rubrics:
+      </p>
+      <pre><code>{`// scenarios/dynamic.ts
+export default async () => ({
+  name: "Dynamic scenario",
+  prompt: "Run task for " + (process.env.TARGET_ENV ?? "staging"),
+  rubric: [{ check: "Task ran cleanly" }],
+});`}</code></pre>
+      <div class="callout callout-info">
+        <div class="callout-title">Helpers and shared logic</div>
+        <p>
+          Module files in the scenarios directory whose default export is missing or is not a
+          scenario object are silently skipped, so helpers, fixtures, and shared utilities can
+          live alongside scenarios without any special configuration.
+        </p>
+      </div>
+    </div>
+  </details>
+
+  <details class="example-collapse">
+    <summary>
+      <strong>Inline in axis.config</strong>
+      <span>Generate scenarios programmatically (table-driven or env-parameterized).</span>
+    </summary>
+    <div class="example-body">
+      <p>
+        In <code>axis.config.&#123;js,ts&#125;</code>, the <code>scenarios</code> field can mix
+        directory paths, single-file paths, and inline scenario objects. Inline objects
+        <strong>require</strong> an explicit <code>key</code> since there is no path to derive
+        one from.
+      </p>
+      <pre><code>{`// axis.config.ts
+import type { AxisConfig } from "@netlify/axis";
+import refactorAdd from "./scenarios/refactor-add.js";
+
+export default {
+  scenarios: [
+    "./scenarios",          // directory walked for .json/.ts/.js scenarios
+    refactorAdd,             // module-imported scenario
+    {                        // pure inline literal; key required
+      key: "smoke-test",
+      name: "Smoke test",
+      prompt: "Verify the build runs cleanly.",
+      rubric: [{ check: "Build succeeded" }],
+    },
+  ],
+  agents: ["claude-code"],
+} satisfies AxisConfig;`}</code></pre>
+      <p>
+        Reach for inline scenarios when you want to generate them from a fixture set, share
+        base configuration across many entries, or parameterize by environment.
+      </p>
+    </div>
+  </details>
 
   <h2>Writing Effective Prompts</h2>
   <p>
@@ -311,13 +416,13 @@ scenarios/
 
   <h2>Scenario Organization</h2>
   <p>
-    The filename (without <code>.json</code>) becomes the scenario key used in reports, CLI commands,
+    The filename (without its extension) becomes the scenario key used in reports, CLI commands,
     and baseline comparisons. Nested directories create namespaced keys.
   </p>
   <ul>
     <li><code>scenarios/hello-world.json</code> &rarr; key <code>hello-world</code></li>
-    <li><code>scenarios/cms/create-post.json</code> &rarr; key <code>cms/create-post</code></li>
-    <li><code>scenarios/api/auth/login.json</code> &rarr; key <code>api/auth/login</code></li>
+    <li><code>scenarios/cms/create-post.ts</code> &rarr; key <code>cms/create-post</code></li>
+    <li><code>scenarios/api/auth/login.js</code> &rarr; key <code>api/auth/login</code></li>
   </ul>
   <p>
     Use directories to group related scenarios. Agents can be configured to run only specific
