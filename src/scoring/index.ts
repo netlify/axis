@@ -32,7 +32,10 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   const normalized = normalizeTranscript(result.output.transcript);
 
   // Step 2: Build sparse index (deterministic) and populate content for reports
-  const sparseIndex = buildSparseIndex(normalized);
+  const sparseIndex = buildSparseIndex(normalized, {
+    agentStartTime: result.output.metadata.startTime,
+    agentEndTime: result.output.metadata.endTime,
+  });
   populateInteractionContent(sparseIndex, normalized);
 
   // Step 3: Write raw data to report dir so LLM judges can read it

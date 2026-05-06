@@ -14,14 +14,26 @@ const MAX_OUTCOME_CHARS = 40;
  *
  * Purely deterministic — no LLM calls, no side effects.
  */
-export function buildSparseIndex(normalized: NormalizedTranscript): SparseIndex {
+export interface BuildSparseIndexOptions {
+  /** Wall-clock timestamps of the agent process (ISO strings). When provided, used to compute startupMs/shutdownMs gaps. */
+  agentStartTime?: string;
+  agentEndTime?: string;
+}
+
+export function buildSparseIndex(
+  normalized: NormalizedTranscript,
+  options: BuildSparseIndexOptions = {},
+): SparseIndex {
   const { entries } = normalized;
   const interactions: Interaction[] = [];
   const lines: string[] = [];
   const visited = new Set<number>();
 
-  // Reference timestamp for computing startMs offsets
-  const timeZero = entries.length > 0 ? new Date(entries[0].timestamp).getTime() : 0;
+  // Reference timestamp for computing startMs offsets — prefer the agent's spawn time
+  // so the timeline span matches the agent process lifetime. Fall back to first event.
+  const firstEntryMs = entries.length > 0 ? new Date(entries[0].timestamp).getTime() : 0;
+  const agentStartMs = options.agentStartTime ? new Date(options.agentStartTime).getTime() : 0;
+  const timeZero = agentStartMs > 0 ? agentStartMs : firstEntryMs;
 
   let nextId = 1;
 
@@ -46,6 +58,17 @@ export function buildSparseIndex(normalized: NormalizedTranscript): SparseIndex 
   }
 
   const stats = computeStats(interactions);
+
+  // Compute startup/shutdown gaps relative to the agent process lifetime, if known.
+  if (options.agentStartTime && options.agentEndTime && entries.length > 0) {
+    const agentEndMs = new Date(options.agentEndTime).getTime();
+    const firstEventMs = new Date(entries[0].timestamp).getTime();
+    const lastEventMs = new Date(entries[entries.length - 1].timestamp).getTime();
+    const startupMs = Math.max(0, firstEventMs - agentStartMs);
+    const shutdownMs = Math.max(0, agentEndMs - lastEventMs);
+    if (startupMs > 0) stats.startupMs = startupMs;
+    if (shutdownMs > 0) stats.shutdownMs = shutdownMs;
+  }
 
   return { lines, interactions, stats };
 }

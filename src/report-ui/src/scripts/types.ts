@@ -137,6 +137,10 @@ export interface SparseIndex {
     totalErrors: number;
     totalDurationMs: number;
     wallClockMs: number;
+    /** Time from agent process spawn to first traced interaction. */
+    startupMs?: number;
+    /** Time from last traced interaction to agent process exit. */
+    shutdownMs?: number;
   };
 }
 

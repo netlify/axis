@@ -790,7 +790,8 @@ h3 {
   border-bottom-color: var(--accent);
 }
 
-a.cat-deduction-id.interaction-link {
+a.cat-deduction-id.interaction-link,
+a.wf-id.interaction-link {
   color: var(--accent);
 }
 
@@ -1140,6 +1141,131 @@ a.cat-deduction-id.interaction-link {
 
 .wf-bar-error {
   background: var(--danger) !important;
+}
+
+/* Hover tooltip on timeline bars */
+.wf-track {
+  position: relative;
+}
+
+.wf-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: none;
+  background: var(--text);
+  color: var(--bg-card);
+  padding: 10px 12px;
+  border-radius: 6px;
+  width: max-content;
+  max-width: 360px;
+  z-index: 20;
+  pointer-events: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-sans, inherit);
+  text-transform: none;
+  letter-spacing: normal;
+  text-align: left;
+  font-weight: 400;
+}
+
+.wf-bar:hover .wf-tooltip {
+  display: block;
+}
+
+/* Bars in the right portion of the timeline should anchor their tooltip to the right
+   so it doesn't overflow the page. */
+.wf-track .wf-bar.wf-tip-right .wf-tooltip {
+  left: auto;
+  right: 0;
+}
+
+.wf-tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.8125rem;
+}
+
+.wf-tooltip-id {
+  font-family: var(--font-mono);
+  color: var(--bg-alt);
+  font-size: 0.75rem;
+}
+
+.wf-tooltip-tool {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--bg-card);
+  word-break: break-all;
+}
+
+.wf-tooltip-cat {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.wf-tooltip-cat-env { background: var(--cat-env); color: var(--text); }
+.wf-tooltip-cat-svc { background: var(--cat-svc); color: var(--text); }
+.wf-tooltip-cat-agent { background: var(--cat-agent); color: var(--text); }
+
+.wf-tooltip-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 0.75rem;
+  color: var(--bg-alt);
+  margin-bottom: 4px;
+}
+
+.wf-tooltip-meta strong {
+  color: var(--bg-card);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.wf-tooltip-error {
+  color: #fca5a5;
+  font-weight: 600;
+}
+
+.wf-tooltip-snippet {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow: hidden;
+  line-height: 1.45;
+  color: var(--bg-card);
+}
+
+.wf-lifecycle .wf-bar {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--mid-gray),
+    var(--mid-gray) 4px,
+    var(--light-gray) 4px,
+    var(--light-gray) 8px
+  );
+  opacity: 0.7;
+}
+
+.wf-lifecycle .wf-tool {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.wf-lifecycle .wf-cat {
+  color: var(--text-muted);
 }
 
 /* Show all button */

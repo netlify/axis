@@ -385,7 +385,7 @@ function renderDetailRow(entry: ResultEntry, index: number, scenarioKey?: string
       <td colspan="${colspan}">
         <div class="detail-panel">
           ${entry.error ? `<div class="error-banner">${escapeHtml(entry.error)}</div>` : ""}
-          ${entry.score ? renderScoreDetail(entry.score) : renderUnscoredDetail(entry)}
+          ${entry.score ? renderScoreDetail(entry.score, entry.durationMs) : renderUnscoredDetail(entry)}
         </div>
       </td>
     </tr>`;
@@ -416,7 +416,7 @@ function renderUnscoredDetail(entry: ResultEntry): string {
 
 // --- Score Detail ---
 
-function renderScoreDetail(score: ScoreResult): string {
+function renderScoreDetail(score: ScoreResult, totalDurationMs: number): string {
   return `
     <div class="score-overview">
       ${scoreBadge(score.axisScore, true)}
@@ -428,7 +428,7 @@ function renderScoreDetail(score: ScoreResult): string {
       </div>
     </div>
     <div class="detail-sections">
-      ${score.sparseIndex ? renderWaterfall(score.sparseIndex) : ""}
+      ${score.sparseIndex ? renderWaterfall(score.sparseIndex, totalDurationMs) : ""}
       ${renderGoalAchievement(score.goalAchievement)}
       ${renderCategoryCard("Environment", score.environment)}
       ${renderCategoryCard("Service", score.service)}
@@ -659,18 +659,31 @@ interface TickMark {
 
 const WATERFALL_COLLAPSE_THRESHOLD = 30;
 
-function renderWaterfall(si: SparseIndex): string {
+function renderWaterfall(si: SparseIndex, totalDurationMs: number): string {
   const { interactions } = si;
   const hasTimingData = interactions.some((ix) => ix.startMs !== null);
   if (!hasTimingData || interactions.length === 0) return "";
 
-  const wallClockMs = si.stats.wallClockMs || computeWallClock(interactions);
+  // Prefer the agent's full run duration so the timeline matches the row's reported duration.
+  // Fall back to the interaction window if the entry's duration is missing.
+  const wallClockMs = totalDurationMs > 0
+    ? totalDurationMs
+    : si.stats.wallClockMs || computeWallClock(interactions);
   if (wallClockMs <= 0) return "";
 
   const ticks = computeTickMarks(wallClockMs);
   const shouldCollapse = interactions.length > WATERFALL_COLLAPSE_THRESHOLD;
   const visible = shouldCollapse ? interactions.slice(0, WATERFALL_COLLAPSE_THRESHOLD) : interactions;
   const overflow = shouldCollapse ? interactions.slice(WATERFALL_COLLAPSE_THRESHOLD) : [];
+
+  const startupBar =
+    si.stats.startupMs && si.stats.startupMs > 0
+      ? renderLifecycleBar("agent startup", 0, si.stats.startupMs, wallClockMs)
+      : "";
+  const shutdownBar =
+    si.stats.shutdownMs && si.stats.shutdownMs > 0
+      ? renderLifecycleBar("agent shutdown", wallClockMs - si.stats.shutdownMs, si.stats.shutdownMs, wallClockMs)
+      : "";
 
   return `
     <div class="detail-section">
@@ -689,8 +702,13 @@ function renderWaterfall(si: SparseIndex): string {
           <div class="wf-dur-col">Duration</div>
         </div>
         <div class="waterfall-body">
+          ${startupBar}
           ${visible.map((ix) => renderWaterfallRow(ix, wallClockMs)).join("")}
-          ${shouldCollapse ? `<div class="wf-overflow" style="display:none">${overflow.map((ix) => renderWaterfallRow(ix, wallClockMs)).join("")}</div>` : ""}
+          ${
+            shouldCollapse
+              ? `<div class="wf-overflow" style="display:none">${overflow.map((ix) => renderWaterfallRow(ix, wallClockMs)).join("")}${shutdownBar}</div>`
+              : shutdownBar
+          }
         </div>
         ${shouldCollapse ? `<button class="wf-show-all">Show all ${interactions.length} interactions</button>` : ""}
         <div class="wf-legend">
@@ -712,28 +730,68 @@ function renderWaterfallRow(ix: Interaction, totalMs: number): string {
   const label = ix.toolName ?? "thinking";
   const catLabel = ix.categories.includes("environment") ? "env" : ix.categories.includes("service") ? "svc" : "agent";
 
-  const titleParts = [
-    `#${ix.id} ${label} (${catLabel})`,
-    ix.durationMs !== null ? `Duration: ${fmtDuration(ix.durationMs)}` : null,
-    `Context: ${fmtSize(ix.contextBytes)}`,
-    ix.hasError ? "ERROR" : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
   return `
     <div class="wf-row ${catClass}">
       <div class="wf-label-col">
-        <span class="wf-id">#${ix.id}</span>
+        <a class="wf-id interaction-link" data-interaction-id="${ix.id}" title="Jump to this interaction in the transcript">#${ix.id}</a>
         <span class="wf-cat">${catLabel}</span>
         <span class="wf-tool">${escapeHtml(label)}</span>
       </div>
       <div class="wf-timeline-col">
         <div class="wf-track">
-          <div class="wf-bar${errorClass}" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%" title="${escapeHtml(titleParts)}"></div>
+          <div class="wf-bar${errorClass}${leftPct > 60 ? " wf-tip-right" : ""}" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%">
+            ${renderWaterfallTooltip(ix, label, catLabel)}
+          </div>
         </div>
       </div>
       <div class="wf-dur-col">${ix.durationMs !== null ? fmtDuration(ix.durationMs) : "\u2014"}</div>
+    </div>`;
+}
+
+function renderWaterfallTooltip(ix: Interaction, label: string, catLabel: string): string {
+  const meta: string[] = [];
+  if (ix.durationMs !== null) meta.push(`<span><strong>Duration</strong> ${escapeHtml(fmtDuration(ix.durationMs))}</span>`);
+  meta.push(`<span><strong>Context</strong> ${escapeHtml(fmtSize(ix.contextBytes))}</span>`);
+  if (ix.startMs !== null) meta.push(`<span><strong>Start</strong> +${escapeHtml(fmtDuration(ix.startMs))}</span>`);
+  if (ix.hasError) meta.push(`<span class="wf-tooltip-error">Error</span>`);
+
+  const snippet = ix.content ? truncateForTooltip(ix.content, 280) : "";
+
+  return `
+    <div class="wf-tooltip">
+      <div class="wf-tooltip-header">
+        <span class="wf-tooltip-id">#${ix.id}</span>
+        <span class="wf-tooltip-tool">${escapeHtml(label)}</span>
+        <span class="wf-tooltip-cat wf-tooltip-cat-${escapeHtml(catLabel)}">${escapeHtml(catLabel)}</span>
+      </div>
+      <div class="wf-tooltip-meta">${meta.join("")}</div>
+      ${snippet ? `<pre class="wf-tooltip-snippet">${escapeHtml(snippet)}</pre>` : ""}
+    </div>`;
+}
+
+function truncateForTooltip(text: string, max: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed;
+  return trimmed.slice(0, max - 1) + "\u2026";
+}
+
+function renderLifecycleBar(label: string, startMs: number, durationMs: number, totalMs: number): string {
+  const leftPct = (startMs / totalMs) * 100;
+  const widthPct = Math.max(0.4, (durationMs / totalMs) * 100);
+  const title = `${label} — ${fmtDuration(durationMs)}`;
+  return `
+    <div class="wf-row wf-lifecycle">
+      <div class="wf-label-col">
+        <span class="wf-id">—</span>
+        <span class="wf-cat">sys</span>
+        <span class="wf-tool">${escapeHtml(label)}</span>
+      </div>
+      <div class="wf-timeline-col">
+        <div class="wf-track">
+          <div class="wf-bar" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%" title="${escapeHtml(title)}"></div>
+        </div>
+      </div>
+      <div class="wf-dur-col">${fmtDuration(durationMs)}</div>
     </div>`;
 }
 

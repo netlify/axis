@@ -64,6 +64,10 @@ export interface SparseIndex {
     totalDurationMs: number;
     /** Wall-clock elapsed time from first to last interaction end. */
     wallClockMs: number;
+    /** Time from agent process spawn to the first traced interaction (model warmup, auth, etc.). */
+    startupMs?: number;
+    /** Time from the last traced interaction to agent process exit (final response, teardown). */
+    shutdownMs?: number;
   };
 }
 
