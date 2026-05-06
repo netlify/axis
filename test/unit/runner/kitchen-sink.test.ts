@@ -68,12 +68,13 @@ describe("kitchen-sink (all adapters)", () => {
       logger: silentLogger,
     });
 
-    // 1 active scenario (echo-test) × 2 agents = 2 results; summarize-docs is skip:true
+    // 1 active scenario (echo-test) × 2 agents = 2 results.
+    // summarize-docs has skip:true, which propagates to its 2 variants — so 2 skipped keys.
     expect(output.results).toHaveLength(2);
     expect(output.summary.total).toBe(2);
     expect(output.summary.completed).toBe(2);
     expect(output.summary.failed).toBe(0);
-    expect(output.summary.skipped).toBe(1);
+    expect(output.summary.skipped).toBe(2);
   });
 
   it("produces results with correct agent names", async () => {

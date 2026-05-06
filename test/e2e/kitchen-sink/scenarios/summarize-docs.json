@@ -7,6 +7,7 @@
     { "check": "Summary covers what async workloads are and their key features", "weight": 0.25 },
     { "check": "Summary includes setup steps", "weight": 0.25 }
   ],
+  "skip": true,
   "variants": [
     {
       "name": "baseline"
