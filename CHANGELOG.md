@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/netlify/axis/compare/v1.3.0...v1.3.1) (2026-05-06)
+
+
+### Bug Fixes
+
+* tests ([04b28d2](https://github.com/netlify/axis/commit/04b28d26b85907b6c545ad3b1676ae8c8c203b52))
+
 ## [1.3.0](https://github.com/netlify/axis/compare/v1.2.2...v1.3.0) (2026-05-06)
 
 
