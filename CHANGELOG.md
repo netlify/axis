@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/netlify/axis/compare/v1.2.2...v1.3.0) (2026-05-06)
+
+
+### Features
+
+* dynamic configs and axis for axis ([eaa8f9d](https://github.com/netlify/axis/commit/eaa8f9d5edd8bbd5b3ce8801f1e12485b501b8e6))
+* improve the rendering of timeline ([e80fb67](https://github.com/netlify/axis/commit/e80fb67fc4c7070cef350d08bcc8deae4c8cdd75))
+
+
+### Bug Fixes
+
+* improving web search details ([6275565](https://github.com/netlify/axis/commit/6275565a2101bb77dfe1b0488589b2c1a2ad1430))
+
 ## [1.2.2](https://github.com/netlify/axis/compare/v1.2.1...v1.2.2) (2026-05-05)
 
 
