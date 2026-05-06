@@ -56,16 +56,21 @@ export function extractFields(entry: TranscriptEntry): ExtractedFields {
         toolId: extractToolId(content),
       };
 
-    case "tool_result":
+    case "tool_result": {
+      // Some adapters (e.g. codex web_search) emit the tool_use BEFORE the input
+      // is finalized — the populated input arrives on the tool_result. Extract it
+      // so downstream logic can recover the input from the completed entry.
+      const toolInput = extractToolInput(content);
       return {
         text: null,
         toolName: extractToolName(content),
-        toolInput: null,
-        toolInputSummary: null,
+        toolInput,
+        toolInputSummary: summarizeInput(toolInput),
         toolResultText: extractToolResultText(content),
         errorMessage: null,
         toolId: extractToolId(content),
       };
+    }
 
     case "error":
       return {
@@ -119,6 +124,9 @@ export function extractToolName(content: Record<string, unknown>): string | null
   if (typeof content.type === "string" && content.type === "web_search") {
     return "web_search";
   }
+  if (typeof content.type === "string" && content.type === "file_change") {
+    return "file_change";
+  }
 
   // Claude Code nested: { message: { content: [{ type: "tool_use", name: "..." }] } }
   const nested = extractNestedBlock(content, "tool_use");
@@ -146,6 +154,28 @@ function extractToolInput(content: Record<string, unknown>): Record<string, unkn
   // Codex command_execution: { command: "echo hello" }
   if (typeof content.command === "string") {
     return { command: content.command };
+  }
+
+  // Codex web_search: { type: "web_search", query: "..." }
+  if (typeof content.query === "string" && content.query.length > 0) {
+    return { query: content.query };
+  }
+
+  // Codex generic args field: { arguments: "..." } (function_call payloads)
+  if (typeof content.arguments === "string") {
+    return { arguments: content.arguments };
+  }
+
+  // Codex file_change: { changes: [{ path, kind }, ...] }
+  if (Array.isArray(content.changes) && content.changes.length > 0) {
+    const summary = (content.changes as Array<Record<string, unknown>>)
+      .map((c) => {
+        const kind = typeof c.kind === "string" ? c.kind : "change";
+        const p = typeof c.path === "string" ? c.path : "(unknown)";
+        return `${kind}: ${p}`;
+      })
+      .join("; ");
+    return { changes: summary };
   }
 
   return null;
@@ -185,6 +215,9 @@ function extractToolResultText(content: Record<string, unknown>): string | null 
       if (parts.length > 0) return parts.join(" | ");
     }
   }
+
+  // Codex command_execution: { aggregated_output: "..." }
+  if (typeof content.aggregated_output === "string") return content.aggregated_output;
 
   // Gemini / Codex: { output: "..." }
   if (typeof content.output === "string") return content.output;

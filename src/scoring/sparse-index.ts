@@ -167,6 +167,8 @@ function buildToolInteraction(
   let resultText: string | null = null;
   let durationMs: number | null = null;
   let hasError = false;
+  let pairedInputSummary: string | null = null;
+  let pairedToolInput: Record<string, unknown> | null = null;
 
   // Include paired tool_result
   if (entry.pairedIndex !== null && !visited.has(entry.pairedIndex)) {
@@ -175,6 +177,8 @@ function buildToolInteraction(
     visited.add(entry.pairedIndex);
     resultText = paired.toolResultText;
     hasError = paired.isError;
+    pairedInputSummary = paired.toolInputSummary;
+    pairedToolInput = paired.toolInput;
 
     // Estimate duration from timestamps
     if (entry.timestamp && paired.timestamp) {
@@ -198,9 +202,13 @@ function buildToolInteraction(
     }
   }
 
-  const inputSummary = entry.toolInputSummary ? `(${truncate(entry.toolInputSummary, 60)})` : "";
+  // Some adapters emit empty inputs on the tool_use (e.g. codex web_search) and the
+  // populated input only appears on the paired tool_result. Fall back to that.
+  const effectiveInputSummary = entry.toolInputSummary ?? pairedInputSummary;
+  const effectiveToolInput = entry.toolInput ?? pairedToolInput;
+  const inputSummary = effectiveInputSummary ? `(${truncate(effectiveInputSummary, 60)})` : "";
   const detail = `${toolName}${inputSummary}`;
-  const inputBytes = entry.toolInput ? textSize(JSON.stringify(entry.toolInput)) : textSize(entry.toolInputSummary);
+  const inputBytes = effectiveToolInput ? textSize(JSON.stringify(effectiveToolInput)) : textSize(effectiveInputSummary);
   const contextBytes = inputBytes + textSize(resultText);
   const outcome = buildOutcome(hasError, durationMs, contextBytes);
 
@@ -378,9 +386,20 @@ export function populateInteractionContent(sparseIndex: SparseIndex, normalized:
           break;
         case "tool_use": {
           parts.push(`[TOOL_USE] ${entry.toolName ?? "unknown"}`);
-          if (entry.toolInputSummary) parts.push(`  Input: ${entry.toolInputSummary}`);
-          if (entry.toolInput) {
-            const inputStr = JSON.stringify(entry.toolInput);
+          // Some adapters emit empty inputs on tool_use start (e.g. codex web_search):
+          // the populated input lands on the paired tool_result. Fall back to it.
+          let inputSummary = entry.toolInputSummary;
+          let toolInput = entry.toolInput;
+          if (!inputSummary && entry.pairedIndex !== null) {
+            const paired = normalized.entries[entry.pairedIndex];
+            if (paired?.toolInputSummary) {
+              inputSummary = paired.toolInputSummary;
+              toolInput = paired.toolInput;
+            }
+          }
+          if (inputSummary) parts.push(`  Input: ${inputSummary}`);
+          if (toolInput) {
+            const inputStr = JSON.stringify(toolInput);
             parts.push(`  Full input: ${inputStr.length > 800 ? inputStr.slice(0, 800) + "..." : inputStr}`);
           }
           break;
