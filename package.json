@@ -1,6 +1,6 @@
 {
   "name": "@netlify/axis",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Agent eXperience Index Score — synthetic testing for AI agent interaction",
   "type": "module",
   "main": "./dist/index.js",
