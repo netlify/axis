@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/netlify/axis/compare/v1.3.1...v1.4.0) (2026-05-07)
+
+
+### Features
+
+* support artifacts ([a150cfa](https://github.com/netlify/axis/commit/a150cfa35248bfdd0c766eb0ed7184e3f8520de1))
+* support artifacts ([9721093](https://github.com/netlify/axis/commit/97210933ce8448ee01dd786323e9ad79a1148389))
+
 ## [1.3.1](https://github.com/netlify/axis/compare/v1.3.0...v1.3.1) (2026-05-06)
 
 
