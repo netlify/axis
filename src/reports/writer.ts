@@ -88,8 +88,15 @@ export function finalizeReport(reportDir: string, output: ScoredOutput | RunOutp
     // Strip rawOutput from scenario JSON — written separately in phase 2
     const { rawOutput: _rawOutput, ...outputWithoutRaw } = result.output;
 
+    // Strip artifacts from scenario JSON — embedded in the manifest entry
+    // and copied to disk under scenarios/{key}/{agent}/artifacts/ already.
+    const { artifacts: _artifacts, ...resultWithoutArtifacts } = result;
+
     // Strip sparseIndex from score — written separately in phase 2
-    let resultToWrite: typeof result = { ...result, output: outputWithoutRaw };
+    let resultToWrite: typeof result = {
+      ...(resultWithoutArtifacts as typeof result),
+      output: outputWithoutRaw,
+    };
     if (isScoredResult(result) && result.score.sparseIndex) {
       const { sparseIndex: _sparseIndex, ...scoreWithoutIndex } = result.score;
       resultToWrite = { ...resultToWrite, score: scoreWithoutIndex } as typeof result;
@@ -168,6 +175,9 @@ function buildResultEntry(result: RunResult | ScoredRunResult, relPath: string):
   entry.agentConfig = result.agentConfig;
   if (result.resolvedConfig) {
     entry.resolvedConfig = result.resolvedConfig;
+  }
+  if (result.artifacts && result.artifacts.length > 0) {
+    entry.artifacts = result.artifacts;
   }
 
   return entry;

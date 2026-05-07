@@ -215,6 +215,12 @@ export default async () => {
         <td><span class="req-no">No</span></td>
         <td>Custom agent module paths, keyed by agent name.</td>
       </tr>
+      <tr>
+        <td><code>artifacts</code></td>
+        <td><code>string[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>Glob patterns of files to capture from each scenario's workspace after teardown. Merged with per-scenario <code>artifacts</code>.</td>
+      </tr>
     </tbody>
   </table>
 

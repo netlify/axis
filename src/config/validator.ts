@@ -67,6 +67,10 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
   if (obj.skills !== undefined) {
     validateSkillsSources(obj.skills, filePath, "skills");
   }
+
+  if (obj.artifacts !== undefined) {
+    validateArtifactPatterns(obj.artifacts, filePath, "artifacts");
+  }
 }
 
 function validateScenariosField(data: unknown, filePath: string): void {
@@ -183,6 +187,10 @@ export function validateScenario(
     validateLifecycleActions(obj.teardown, filePath, "teardown");
   }
 
+  if (obj.artifacts !== undefined) {
+    validateArtifactPatterns(obj.artifacts, filePath, "artifacts");
+  }
+
   if (obj.variants !== undefined) {
     validateVariants(obj.variants, filePath);
   }
@@ -274,6 +282,10 @@ function validateVariants(data: unknown, filePath: string): void {
 
     if (variant.limits !== undefined) {
       validateLimits(variant.limits, filePath, `variants[${i}].limits`);
+    }
+
+    if (variant.artifacts !== undefined) {
+      validateArtifactPatterns(variant.artifacts, filePath, `variants[${i}].artifacts`);
     }
   }
 }
@@ -374,6 +386,12 @@ function validateLimits(data: unknown, filePath: string, field: string): void {
     if (typeof obj.tokens !== "number" || !Number.isInteger(obj.tokens) || obj.tokens <= 0) {
       throw new Error(`Invalid config at ${filePath}: "${field}.tokens" must be a positive integer`);
     }
+  }
+}
+
+function validateArtifactPatterns(data: unknown, filePath: string, field: string): void {
+  if (!Array.isArray(data) || !data.every((v: unknown) => typeof v === "string" && v.length > 0)) {
+    throw new Error(`Invalid config at ${filePath}: "${field}" must be an array of non-empty glob strings`);
   }
 }
 

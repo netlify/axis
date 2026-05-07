@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { silentLogger } from "../../../src/types/output.js";
 
@@ -729,5 +731,174 @@ describe("run", () => {
     expect(output.summary.total).toBe(1);
     expect(output.summary.completed).toBe(0);
     expect(output.summary.failed).toBe(1);
+  });
+});
+
+describe("artifact capture", () => {
+  let tmp: string;
+  let reportDir: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "axis-artifact-cfg-"));
+    reportDir = fs.mkdtempSync(path.join(os.tmpdir(), "axis-artifact-report-"));
+
+    fs.writeFileSync(
+      path.join(tmp, "axis.config.json"),
+      JSON.stringify({
+        scenarios: [
+          {
+            key: "with-artifacts",
+            name: "With Artifacts",
+            prompt: "make some files",
+            rubric: "files were made",
+            artifacts: ["*.log", "out/**"],
+          },
+        ],
+        agents: ["mock-agent"],
+      }),
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(reportDir, { recursive: true, force: true });
+  });
+
+  it("captures artifacts after teardown and attaches them to the result", async () => {
+    const mockAdapter = {
+      name: "mock-agent",
+      run: vi.fn().mockImplementation(async (input) => {
+        // Drop a few files into the workspace as if the agent created them
+        fs.writeFileSync(path.join(input.workingDirectory, "build.log"), "compile ok\n");
+        fs.mkdirSync(path.join(input.workingDirectory, "out"), { recursive: true });
+        fs.writeFileSync(path.join(input.workingDirectory, "out", "result.json"), '{"ok":true}');
+        fs.writeFileSync(path.join(input.workingDirectory, "ignored.tmp"), "skip me");
+        return {
+          transcript: [],
+          result: "done",
+          metadata: {
+            startTime: new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            durationMs: 5,
+            exitCode: 0,
+          },
+        };
+      }),
+    };
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    const output = await run({
+      configPath: path.join(tmp, "axis.config.json"),
+      logger: silentLogger,
+      reportDir,
+    });
+
+    expect(output.results).toHaveLength(1);
+    const artifacts = output.results[0].artifacts;
+    expect(artifacts).toBeDefined();
+    expect(artifacts!.map((a) => a.path).sort()).toEqual(["build.log", "out/result.json"]);
+
+    const logEntry = artifacts!.find((a) => a.path === "build.log")!;
+    expect(logEntry.mimeType).toBe("text/plain");
+    expect(Buffer.from(logEntry.content, "base64").toString("utf8")).toBe("compile ok\n");
+
+    // Files copied to disk under reportDir
+    expect(fs.existsSync(path.join(reportDir, "scenarios/with-artifacts/mock-agent/artifacts/build.log"))).toBe(true);
+    expect(fs.existsSync(path.join(reportDir, "scenarios/with-artifacts/mock-agent/artifacts/out/result.json"))).toBe(
+      true,
+    );
+  });
+
+  it("skips capture when no patterns are configured", async () => {
+    fs.writeFileSync(
+      path.join(tmp, "axis.config.json"),
+      JSON.stringify({
+        scenarios: [
+          {
+            key: "no-artifacts",
+            name: "No Artifacts",
+            prompt: "x",
+            rubric: "x",
+          },
+        ],
+        agents: ["mock-agent"],
+      }),
+    );
+
+    const mockAdapter = {
+      name: "mock-agent",
+      run: vi.fn().mockImplementation(async (input) => {
+        fs.writeFileSync(path.join(input.workingDirectory, "stuff.log"), "x");
+        return {
+          transcript: [],
+          result: "done",
+          metadata: {
+            startTime: new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            durationMs: 5,
+            exitCode: 0,
+          },
+        };
+      }),
+    };
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    const output = await run({
+      configPath: path.join(tmp, "axis.config.json"),
+      logger: silentLogger,
+      reportDir,
+    });
+
+    expect(output.results[0].artifacts).toBeUndefined();
+    expect(fs.existsSync(path.join(reportDir, "scenarios"))).toBe(false);
+  });
+
+  it("merges top-level config artifacts with scenario artifacts", async () => {
+    fs.writeFileSync(
+      path.join(tmp, "axis.config.json"),
+      JSON.stringify({
+        scenarios: [
+          {
+            key: "merged",
+            name: "Merged",
+            prompt: "x",
+            rubric: "x",
+            artifacts: ["scenario.txt"],
+          },
+        ],
+        agents: ["mock-agent"],
+        artifacts: ["config.txt"],
+      }),
+    );
+
+    const mockAdapter = {
+      name: "mock-agent",
+      run: vi.fn().mockImplementation(async (input) => {
+        fs.writeFileSync(path.join(input.workingDirectory, "config.txt"), "c");
+        fs.writeFileSync(path.join(input.workingDirectory, "scenario.txt"), "s");
+        fs.writeFileSync(path.join(input.workingDirectory, "neither.txt"), "n");
+        return {
+          transcript: [],
+          result: "done",
+          metadata: {
+            startTime: new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            durationMs: 5,
+            exitCode: 0,
+          },
+        };
+      }),
+    };
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    const output = await run({
+      configPath: path.join(tmp, "axis.config.json"),
+      logger: silentLogger,
+      reportDir,
+    });
+
+    const paths = (output.results[0].artifacts ?? []).map((a) => a.path).sort();
+    expect(paths).toEqual(["config.txt", "scenario.txt"]);
   });
 });

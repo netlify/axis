@@ -365,6 +365,29 @@ describe("discoverScenarios", () => {
       await fs.rm(tmpDir, { recursive: true });
     });
 
+    it("variant artifacts replace parent (not merge)", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
+      await writeScenarioJson("scenarios/test.json", {
+        name: "Parent",
+        prompt: "test",
+        rubric: "test",
+        artifacts: ["parent.log", "shared.log"],
+        variants: [
+          { name: "with-override", artifacts: ["variant.log"] },
+          { name: "inherits" },
+        ],
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      const overridden = scenarios.find((s) => s.key === "test@with-override")!;
+      const inherited = scenarios.find((s) => s.key === "test@inherits")!;
+
+      expect(overridden.artifacts).toEqual(["variant.log"]);
+      expect(inherited.artifacts).toEqual(["parent.log", "shared.log"]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
     it("variant setup/teardown replace parent (not merge)", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-test-"));
       await writeScenarioJson("scenarios/test.json", {

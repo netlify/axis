@@ -430,6 +430,40 @@ describe("finalizeReport", () => {
     expect(manifest.name).toBe("My Project");
   });
 
+  it("propagates artifacts to manifest entry and strips them from scenario JSON", () => {
+    const scored = makeScoredOutput();
+    scored.results[0].artifacts = [
+      {
+        path: "build.log",
+        size: 5,
+        mimeType: "text/plain",
+        content: Buffer.from("hello").toString("base64"),
+      },
+    ];
+
+    const { reportDir } = initReport(scored.timestamp, tmpDir);
+    finalizeReport(reportDir, scored);
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(reportDir, "report.json"), "utf-8"));
+    expect(manifest.results[0].artifacts).toHaveLength(1);
+    expect(manifest.results[0].artifacts[0].path).toBe("build.log");
+    expect(manifest.results[0].artifacts[0].mimeType).toBe("text/plain");
+
+    const scenarioJson = JSON.parse(
+      fs.readFileSync(path.join(reportDir, "scenarios/cms/create-post/claude-code.json"), "utf-8"),
+    );
+    expect(scenarioJson.artifacts).toBeUndefined();
+  });
+
+  it("omits artifacts from manifest when none captured", () => {
+    const output = makeScoredOutput();
+    const { reportDir } = initReport(output.timestamp, tmpDir);
+    finalizeReport(reportDir, output);
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(reportDir, "report.json"), "utf-8"));
+    expect(manifest.results[0].artifacts).toBeUndefined();
+  });
+
   it("strips rawOutput and sparseIndex from scenario JSON", () => {
     const scored = makeScoredOutput();
     scored.results[0].output.rawOutput = ['{"type":"result"}'];

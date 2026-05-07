@@ -221,6 +221,7 @@ async function executeRunPipeline(
     registerCleanup,
     debug: opts.debug,
     refreshSkills: opts.refreshSkills,
+    reportDir,
     onResult: opts.score
       ? (result: RunResult): Promise<void> => {
           const scoring = scoreRunResult(result, {
@@ -244,6 +245,16 @@ async function executeRunPipeline(
 
   if (opts.score && runOutput.results.length > 0) {
     const scoredResults = await Promise.all(scoringPromises);
+    // Artifacts are captured during cleanup (after scoring) — propagate them
+    // onto the scored results so they appear in the final manifest.
+    for (const scored of scoredResults) {
+      const match = runOutput.results.find(
+        (r) => r.scenarioKey === scored.scenarioKey && r.agentName === scored.agentName,
+      );
+      if (match?.artifacts && match.artifacts.length > 0) {
+        scored.artifacts = match.artifacts;
+      }
+    }
     output = buildScoredOutput(runOutput, scoredResults);
   } else {
     output = runOutput;

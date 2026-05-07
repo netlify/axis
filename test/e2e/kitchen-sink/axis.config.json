@@ -1,4 +1,5 @@
 {
   "scenarios": "./scenarios",
-  "agents": ["claude-code", "codex"]
+  "agents": ["claude-code", "codex"],
+  "artifacts": ["./*.md"]
 }

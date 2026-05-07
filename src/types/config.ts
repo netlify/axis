@@ -23,6 +23,11 @@ export interface AxisConfig {
   mcp_servers?: Record<string, McpServerConfig>;
   /** Skills available to all agents. Merged with per-agent skills. Each entry is a local path, GitHub shorthand (owner/repo), or GitHub URL. */
   skills?: string[];
+  /**
+   * Glob patterns of files to capture into the report after teardown. Patterns
+   * are relative to each scenario's workspace. Merged with per-scenario artifacts.
+   */
+  artifacts?: string[];
 }
 
 /** A skill resolved from its source reference to an on-disk directory. */

@@ -2005,6 +2005,269 @@ a.wf-id.interaction-link {
   }
 }
 
+/* --- Artifacts --- */
+
+.artifacts-section {
+  margin-top: 20px;
+}
+
+.artifacts-count {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.artifacts-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.artifacts-toggle,
+.artifacts-download-all {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.artifacts-toggle:hover,
+.artifacts-download-all:hover {
+  background: var(--bg-hover, var(--border));
+}
+
+/* File tree */
+
+.art-tree-root {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0 0;
+  font-size: 0.8125rem;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
+
+.art-tree-root[hidden] {
+  display: none;
+}
+
+.art-tree-root ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.art-tree-row,
+.art-tree-folder-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px 4px 0;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: default;
+  text-align: left;
+  font-family: inherit;
+}
+
+.art-tree-folder-toggle {
+  cursor: pointer;
+}
+
+.art-tree-row:hover,
+.art-tree-folder-toggle:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+}
+
+.art-tree-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  transition: transform 0.1s ease;
+  flex-shrink: 0;
+}
+
+.art-tree-dir:not(.collapsed) > .art-tree-folder-toggle .art-tree-chevron {
+  transform: rotate(90deg);
+}
+
+.art-tree-icon {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.art-tree-dir-icon {
+  color: var(--accent, var(--text-secondary));
+}
+
+.art-tree-name {
+  flex: 1;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.art-tree-size {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: auto;
+  padding-left: 12px;
+}
+
+.art-tree-eye,
+.art-tree-download {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.art-tree-eye:hover,
+.art-tree-download:hover {
+  background: var(--bg-card, transparent);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+.art-tree-dir.collapsed > .art-tree-children {
+  display: none;
+}
+
+/* Artifact modal preview */
+
+.modal-backdrop.artifact-modal .modal.artifact-modal-content {
+  width: min(900px, 92vw);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.artifact-modal .modal-header h3 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+.artifact-modal-meta {
+  font-size: 0.7rem !important;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.artifact-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.artifact-modal-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.artifact-modal-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.artifact-modal-download:hover {
+  background: var(--bg-hover, var(--border));
+}
+
+.artifact-modal-preview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+
+.artifact-text {
+  margin: 0;
+  padding: 12px 16px;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre;
+  overflow: auto;
+}
+
+.artifact-image {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  height: auto;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+.artifact-not-previewable {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.artifact-not-previewable p {
+  margin: 0 0 4px;
+}
+
+.artifact-not-previewable-meta {
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: 0.75rem;
+}
+
 /* --- Print --- */
 
 @media print {
@@ -2045,5 +2308,21 @@ a.wf-id.interaction-link {
 
   .modal-backdrop {
     display: none !important;
+  }
+
+  .artifacts-toggle,
+  .artifacts-download-all,
+  .art-tree-eye,
+  .art-tree-download {
+    display: none !important;
+  }
+
+  /* Always expand the tree on print */
+  .art-tree-root[hidden] {
+    display: block !important;
+  }
+
+  .art-tree-dir.collapsed > .art-tree-children {
+    display: block !important;
   }
 }

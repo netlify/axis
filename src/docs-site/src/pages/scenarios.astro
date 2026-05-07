@@ -83,6 +83,18 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <td>Time and token limits for this scenario. Overrides <a href="/configuration#limits">default scenario limits</a>. Fields: <code>time_minutes</code>, <code>tokens</code>.</td>
       </tr>
       <tr>
+        <td><code>artifacts</code></td>
+        <td><code>string[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Glob patterns of files to capture from the workspace after teardown. Captured files are
+          stored under <code>.axis/reports/&lt;id&gt;/scenarios/&lt;key&gt;/&lt;agent&gt;/artifacts/</code>
+          and embedded in the HTML report so they can be previewed and downloaded directly. Patterns
+          support <code>*</code>, <code>**</code>, <code>?</code>, and character classes. Merged with
+          top-level <a href="/configuration"><code>artifacts</code></a>.
+        </td>
+      </tr>
+      <tr>
         <td><code>variants</code></td>
         <td><code>object[]</code></td>
         <td><span class="req-no">No</span></td>
@@ -319,7 +331,7 @@ export default {
     </p>
   </div>
 
-  <h2>Setup and Teardown</h2>
+  <h2 id="setup-teardown">Setup and Teardown</h2>
   <p>
     Setup actions run before the agent starts. Use them to create the starting state that the
     scenario depends on: files to edit, databases to seed, servers to start.
@@ -413,6 +425,70 @@ scenarios/
       state in teardown.
     </li>
   </ul>
+
+  <h2 id="artifacts">Artifacts</h2>
+  <p>
+    Use <code>artifacts</code> to capture files the agent produced during the run. Each entry is a
+    glob pattern relative to the scenario's workspace; matching files are copied into the report
+    after teardown so you can inspect them later without keeping the workspace around.
+  </p>
+
+  <pre><code>{`{
+  "name": "Generate API summary",
+  "prompt": "Fetch the docs and write summary.md.",
+  "rubric": "summary.md exists and covers the docs.",
+  "artifacts": [
+    "summary.md",
+    "*.log",
+    "out/**",
+    "screenshots/*.png"
+  ]
+}`}</code></pre>
+
+  <p>
+    Captures run after <a href="#setup-teardown">teardown</a>, so any cleanup scripts you write
+    don't need to dance around the files you want to keep. You can also set an <code>artifacts</code>
+    array at the top level of <code>axis.config.json</code> to capture the same patterns from every
+    scenario; the two lists are merged.
+  </p>
+
+  <h3>Glob syntax</h3>
+  <ul>
+    <li><code>*</code> matches any characters within a single path segment.</li>
+    <li><code>**</code> matches any number of path segments (including zero).</li>
+    <li><code>?</code> matches a single character within a segment.</li>
+    <li><code>[abc]</code> / <code>[a-z]</code> match character classes; <code>[!abc]</code> negates.</li>
+  </ul>
+
+  <h3>Where captured files live</h3>
+  <p>
+    Each captured file is copied to disk under the report directory, preserving its path relative
+    to the workspace:
+  </p>
+  <pre><code>{`.axis/reports/<id>/scenarios/<scenario-key>/<agent>/artifacts/...`}</code></pre>
+  <p>
+    The same files are also embedded (base64) into the report manifest so the HTML report can
+    preview and download them entirely client-side &mdash; no local server needed, even when the
+    HTML report is opened directly from disk.
+  </p>
+
+  <h3>Viewing artifacts in the HTML report</h3>
+  <p>
+    Each scenario row gets an <strong>Artifacts</strong> panel when files were captured. Click
+    <strong>Show artifacts</strong> to reveal a collapsible file tree, the eye icon to open a
+    modal preview (text-like files render as text, images as images), or the download arrow for a
+    single file. <strong>Download all (.zip)</strong> bundles every captured file into one
+    archive in the browser.
+  </p>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">Mind the size</div>
+    <p>
+      Artifact contents are embedded in the report HTML, so capturing very large files (multi-MB
+      logs, full builds, video) inflates every shared report. Capture targeted, diagnostic files
+      &mdash; not entire build outputs.
+    </p>
+  </div>
 
   <h2>Scenario Organization</h2>
   <p>
@@ -542,6 +618,11 @@ scenarios/
         <td><code>limits</code></td>
         <td><code>object</code></td>
         <td>Replaces the parent's limits. Fields: <code>time_minutes</code>, <code>tokens</code>.</td>
+      </tr>
+      <tr>
+        <td><code>artifacts</code></td>
+        <td><code>string[]</code></td>
+        <td>Replaces the parent's scenario-level artifact globs (top-level <code>artifacts</code> still merge in).</td>
       </tr>
       <tr>
         <td><code>skip</code></td>

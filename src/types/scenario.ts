@@ -23,6 +23,11 @@ export interface Scenario {
   /** Per-scenario time/token limits. Overrides settings.limits.scenario defaults. */
   limits?: ScenarioLimitsConfig;
   /**
+   * Glob patterns (relative to the workspace) of files to capture into the report
+   * after teardown. Merged with top-level `artifacts` from {@link AxisConfig}.
+   */
+  artifacts?: string[];
+  /**
    * When defined, the scenario becomes a template. Only variants run;
    * the base scenario does not execute on its own. Each variant inherits
    * all fields from the parent and can override any of them.
@@ -43,6 +48,8 @@ export interface ScenarioVariant {
   mcp_servers?: Record<string, McpServerConfig>;
   /** Per-variant time/token limits. Overrides parent scenario and default limits. */
   limits?: ScenarioLimitsConfig;
+  /** Glob patterns of files to capture as artifacts. Replaces parent scenario's artifacts when set. */
+  artifacts?: string[];
 }
 
 /**

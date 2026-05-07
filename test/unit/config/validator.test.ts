@@ -407,6 +407,18 @@ describe("validateConfig", () => {
     };
     expect(() => validateConfig(config, "test.json")).toThrow('"agents[0].skills" must be an array of strings');
   });
+
+  it("accepts a top-level artifacts array", () => {
+    const config = { scenarios: "./s", agents: ["x"], artifacts: ["*.log"] };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("rejects a non-array top-level artifacts", () => {
+    const config = { scenarios: "./s", agents: ["x"], artifacts: "*.log" };
+    expect(() => validateConfig(config, "test.json")).toThrow(
+      `"artifacts" must be an array of non-empty glob strings`,
+    );
+  });
 });
 
 describe("validateScenario", () => {
@@ -448,6 +460,32 @@ describe("validateScenario", () => {
       teardown: [{ action: "run_script", command: "echo teardown" }],
     };
     expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("accepts a scenario with artifacts globs", () => {
+    const scenario = { ...validScenario, artifacts: ["*.log", "dist/**"] };
+    expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("rejects a scenario whose artifacts is not an array", () => {
+    const scenario = { ...validScenario, artifacts: "*.log" };
+    expect(() => validateScenario(scenario, "test.json")).toThrow(
+      `"artifacts" must be an array of non-empty glob strings`,
+    );
+  });
+
+  it("rejects a scenario with non-string artifact entries", () => {
+    const scenario = { ...validScenario, artifacts: ["*.log", 123] };
+    expect(() => validateScenario(scenario, "test.json")).toThrow(
+      `"artifacts" must be an array of non-empty glob strings`,
+    );
+  });
+
+  it("rejects empty-string entries in artifacts", () => {
+    const scenario = { ...validScenario, artifacts: ["*.log", ""] };
+    expect(() => validateScenario(scenario, "test.json")).toThrow(
+      `"artifacts" must be an array of non-empty glob strings`,
+    );
   });
 
   it("rejects missing name", () => {

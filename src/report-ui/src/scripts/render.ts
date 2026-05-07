@@ -12,6 +12,7 @@ import type {
   SparseIndex,
   Interaction,
   RubricCriterion,
+  ArtifactEntry,
 } from "./types";
 import { isScoredSummary } from "./types";
 
@@ -386,6 +387,7 @@ function renderDetailRow(entry: ResultEntry, index: number, scenarioKey?: string
         <div class="detail-panel">
           ${entry.error ? `<div class="error-banner">${escapeHtml(entry.error)}</div>` : ""}
           ${entry.score ? renderScoreDetail(entry.score, entry.durationMs) : renderUnscoredDetail(entry)}
+          ${entry.artifacts && entry.artifacts.length > 0 ? renderArtifactsSection(entry.artifacts, index) : ""}
         </div>
       </td>
     </tr>`;
@@ -1104,4 +1106,146 @@ function friendlyError(error: string): string {
     if (pattern.test(error)) return friendly;
   }
   return error.length > 80 ? error.slice(0, 77) + "..." : error;
+}
+
+// --- Artifacts ---
+
+function fmtArtifactSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+interface ArtTreeFile {
+  type: "file";
+  name: string;
+  size: number;
+  mimeType: string;
+  artifactIndex: number;
+}
+
+interface ArtTreeDir {
+  type: "dir";
+  name: string;
+  children: ArtTreeNode[];
+}
+
+type ArtTreeNode = ArtTreeFile | ArtTreeDir;
+
+function buildArtifactTree(artifacts: ArtifactEntry[]): ArtTreeDir {
+  const root: ArtTreeDir = { type: "dir", name: "", children: [] };
+
+  for (let i = 0; i < artifacts.length; i++) {
+    const segments = artifacts[i].path.split("/").filter(Boolean);
+    let node = root;
+    for (let j = 0; j < segments.length - 1; j++) {
+      const seg = segments[j];
+      let child = node.children.find((c): c is ArtTreeDir => c.type === "dir" && c.name === seg);
+      if (!child) {
+        child = { type: "dir", name: seg, children: [] };
+        node.children.push(child);
+      }
+      node = child;
+    }
+    node.children.push({
+      type: "file",
+      name: segments[segments.length - 1],
+      size: artifacts[i].size,
+      mimeType: artifacts[i].mimeType,
+      artifactIndex: i,
+    });
+  }
+
+  // Sort: directories first, then files; alphabetical within each group.
+  const sortNode = (n: ArtTreeDir) => {
+    n.children.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    for (const c of n.children) {
+      if (c.type === "dir") sortNode(c);
+    }
+  };
+  sortNode(root);
+
+  return root;
+}
+
+const EYE_SVG =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+const DOWNLOAD_SVG =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg>';
+
+function renderArtifactTreeNode(node: ArtTreeNode, depth: number): string {
+  const indent = `padding-left:${8 + depth * 16}px;`;
+
+  if (node.type === "file") {
+    const safeName = escapeHtml(node.name);
+    return `
+      <li class="art-tree-file">
+        <div class="art-tree-row" style="${indent}">
+          <span class="art-tree-name" title="${safeName}">${safeName}</span>
+          <span class="art-tree-size">${fmtArtifactSize(node.size)}</span>
+          <button class="art-tree-eye" data-artifact-index="${node.artifactIndex}" type="button" aria-label="Preview ${safeName}" title="Preview">${EYE_SVG}</button>
+          <button class="art-tree-download" data-artifact-index="${node.artifactIndex}" type="button" aria-label="Download ${safeName}" title="Download">${DOWNLOAD_SVG}</button>
+        </div>
+      </li>`;
+  }
+
+  const children = node.children.map((c) => renderArtifactTreeNode(c, depth + 1)).join("");
+  return `
+    <li class="art-tree-dir collapsed">
+      <button class="art-tree-folder-toggle" type="button" style="${indent}" aria-expanded="false">
+        <span class="art-tree-chevron" aria-hidden="true">▸</span>
+        <span class="art-tree-icon art-tree-dir-icon" aria-hidden="true">◇</span>
+        <span class="art-tree-name">${escapeHtml(node.name)}</span>
+      </button>
+      <ul class="art-tree-children">${children}</ul>
+    </li>`;
+}
+
+function renderArtifactModalShell(index: number): string {
+  return `
+    <div class="modal-backdrop artifact-modal" data-artifact-modal-key="${index}">
+      <div class="modal artifact-modal-content">
+        <div class="modal-header">
+          <h3>
+            <span class="artifact-modal-title">Artifact</span>
+            <span class="modal-subtitle artifact-modal-meta"></span>
+          </h3>
+          <button class="modal-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="artifact-modal-toolbar">
+            <button class="artifact-modal-download" type="button" data-artifacts-key="${index}">${DOWNLOAD_SVG}<span>Download</span></button>
+          </div>
+          <div class="artifact-modal-preview" data-artifacts-key="${index}"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderArtifactsSection(artifacts: ArtifactEntry[], index: number): string {
+  const tree = buildArtifactTree(artifacts);
+  const treeChildren = tree.children.map((c) => renderArtifactTreeNode(c, 0)).join("");
+
+  // Embed full artifact data (with base64 content) so click handlers can
+  // construct blob URLs without needing fetch() — works on file:// too.
+  const safeJson = JSON.stringify(artifacts).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+
+  return `
+    <div class="detail-section artifacts-section" data-artifacts-key="${index}">
+      <div class="section-header">
+        <h3>Artifacts <span class="artifacts-count">(${artifacts.length})</span></h3>
+        <div class="artifacts-actions">
+          <button class="artifacts-toggle" data-artifacts-key="${index}" type="button" aria-expanded="false">Show artifacts</button>
+          <button class="artifacts-download-all" data-artifacts-key="${index}" type="button">Download all (.zip)</button>
+        </div>
+      </div>
+      <ul class="art-tree-root" data-artifacts-key="${index}" hidden>${treeChildren}</ul>
+      <script type="application/json" class="artifacts-data" data-artifacts-key="${index}">${safeJson}</script>
+      ${renderArtifactModalShell(index)}
+    </div>`;
 }

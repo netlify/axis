@@ -89,6 +89,15 @@ function makeReport(overrides?: Partial<ReportManifest>): ReportManifest {
   };
 }
 
+function extractAxisData(html: string): any {
+  const match = html.match(/<script is:inline id="axis-data"[^>]*>([\s\S]*?)<\/script>/)
+    ?? html.match(/<script id="axis-data"[^>]*>([\s\S]*?)<\/script>/);
+  if (!match) throw new Error("axis-data script tag not found in HTML");
+  // Reverse the < and > escaping done in generateReportHtml
+  const json = match[1].replace(/\\u003c/g, "<").replace(/\\u003e/g, ">");
+  return JSON.parse(json);
+}
+
 describe("generateReportHtml", () => {
   it("returns a valid HTML document", () => {
     const html = generateReportHtml(makeReport());
@@ -351,6 +360,46 @@ describe("generateReportHtml", () => {
     const html = generateReportHtml(report);
     // No modal elements rendered — CSS/JS definitions still exist in the bundle
     expect(html).not.toContain('data-modal-index="0"');
+  });
+
+  it("embeds artifacts in the report manifest data", () => {
+    const report = makeReport();
+    report.results[0].artifacts = [
+      {
+        path: "build.log",
+        size: 5,
+        mimeType: "text/plain",
+        content: Buffer.from("hello").toString("base64"),
+      },
+      {
+        path: "out/result.json",
+        size: 8,
+        mimeType: "application/json",
+        content: Buffer.from('{"ok":1}').toString("base64"),
+      },
+      {
+        path: "shot.png",
+        size: 8,
+        mimeType: "image/png",
+        content: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString("base64"),
+      },
+    ];
+
+    const html = generateReportHtml(report);
+    const data = extractAxisData(html);
+    expect(data.results[0].artifacts).toHaveLength(3);
+    expect(data.results[0].artifacts[0].path).toBe("build.log");
+    expect(data.results[0].artifacts[0].mimeType).toBe("text/plain");
+    expect(data.results[0].artifacts[0].content).toBe(Buffer.from("hello").toString("base64"));
+    expect(data.results[0].artifacts[1].path).toBe("out/result.json");
+    expect(data.results[0].artifacts[2].path).toBe("shot.png");
+  });
+
+  it("omits artifacts from manifest when none are captured", () => {
+    const report = makeReport();
+    const html = generateReportHtml(report);
+    const data = extractAxisData(html);
+    expect(data.results[0].artifacts).toBeUndefined();
   });
 
   it("includes audit rationale data", () => {

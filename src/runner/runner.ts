@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { loadConfig, discoverScenarios } from "../config/loader.js";
 import { getAdapter, registerAdapter } from "../adapters/registry.js";
 import { executeLifecycleActions } from "./lifecycle.js";
+import { captureArtifacts, resolveArtifactPatterns } from "./artifacts.js";
 import type { ResolvedRunConfig, RunOutput, RunResult, Logger, JobState, JobStatus } from "../types/output.js";
 import { silentLogger as defaultLogger, formatError } from "../types/output.js";
 import type { Scenario } from "../types/scenario.js";
@@ -62,12 +63,15 @@ function buildResolvedRunConfig(
   // MCP: merge top-level + scenario; scenario keys override.
   const mcpServers = { ...(axisConfig.mcp_servers ?? {}), ...(scenario.mcp_servers ?? {}) };
 
+  const artifactPatterns = resolveArtifactPatterns(axisConfig, scenario);
+
   return {
     limits,
     skills: skills.length > 0 ? skills : undefined,
     setup: scenario.setup && scenario.setup.length > 0 ? scenario.setup : undefined,
     teardown: scenario.teardown && scenario.teardown.length > 0 ? scenario.teardown : undefined,
     mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+    artifacts: artifactPatterns.length > 0 ? artifactPatterns : undefined,
   };
 }
 
@@ -102,6 +106,12 @@ export interface RunOptions {
   debug?: boolean;
   /** Force re-clone of remote skills from cache. */
   refreshSkills?: boolean;
+  /**
+   * Report directory root. When provided and the scenario configures `artifacts`
+   * patterns, captured files are copied to
+   * `{reportDir}/scenarios/{scenarioKey}/{agentName}/artifacts/...` after teardown.
+   */
+  reportDir?: string;
 }
 
 interface Job {
@@ -338,6 +348,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
         jobAbortController,
         jobLimits,
         checkOverallTokenLimit,
+        options.reportDir,
       );
 
       try {
@@ -381,6 +392,7 @@ async function executeJob(
   jobAbortController?: AbortController,
   jobLimits?: ResolvedJobLimits,
   checkOverallTokenLimit?: () => void,
+  reportDir?: string,
 ): Promise<JobOutput> {
   const { index, agentName, agentConfig, scenario, axisConfig, configDir } = job;
   const label = `${scenario.key} (${agentName})`;
@@ -403,12 +415,30 @@ async function executeJob(
     }
   });
 
+  const artifactPatterns = resolveArtifactPatterns(axisConfig, scenario);
+  // The result reference is needed inside cleanup so we can attach the
+  // captured artifacts before the function returns. It is assigned in the
+  // try block below, before cleanup is invoked.
+  let resultRef: RunResult | undefined;
+
   const cleanup = async () => {
     if (scenario.teardown?.length) {
       logger.verbose?.(`[${label}] Running teardown...`);
       await executeLifecycleActions(scenario.teardown, workspace, jobEnv).catch((teardownErr) => {
         logger.error(`[${label}] Teardown failed: ${formatError(teardownErr)}`);
       });
+    }
+    if (resultRef && reportDir && artifactPatterns.length > 0) {
+      const destDir = path.join(reportDir, "scenarios", scenario.key, agentName, "artifacts");
+      try {
+        const captured = captureArtifacts(workspace, artifactPatterns, destDir, logger);
+        if (captured.length > 0) {
+          resultRef.artifacts = captured;
+          logger.verbose?.(`[${label}] Captured ${captured.length} artifact(s)`);
+        }
+      } catch (err) {
+        logger.error(`[${label}] Artifact capture failed: ${formatError(err)}`);
+      }
     }
     try {
       fs.rmSync(workspace, { recursive: true, force: true });
@@ -498,20 +528,19 @@ async function executeJob(
     const failed = output.metadata.exitCode !== 0 || !!output.metadata.error;
     updateStatus(index, failed ? "failed" : "done", durationMs);
 
-    return {
-      result: {
-        scenarioKey: scenario.key,
-        scenarioName: scenario.name,
-        agentName,
-        prompt: scenario.prompt,
-        rubric: scenario.rubric,
-        agentConfig,
-        output,
-        workingDirectory: workspace,
-        resolvedConfig: buildResolvedRunConfig(scenario, axisConfig, agentConfig),
-      },
-      cleanup,
+    const result: RunResult = {
+      scenarioKey: scenario.key,
+      scenarioName: scenario.name,
+      agentName,
+      prompt: scenario.prompt,
+      rubric: scenario.rubric,
+      agentConfig,
+      output,
+      workingDirectory: workspace,
+      resolvedConfig: buildResolvedRunConfig(scenario, axisConfig, agentConfig),
     };
+    resultRef = result;
+    return { result, cleanup };
   } catch (err) {
     updateStatus(index, "failed", Date.now() - jobStart);
     // On unexpected errors, clean up immediately (nothing to verify)

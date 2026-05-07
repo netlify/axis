@@ -37,6 +37,16 @@ export interface ResultEntry {
   rubric?: string | RubricCriterion[];
   agentConfig?: Record<string, unknown>;
   resolvedConfig?: ResolvedRunConfig;
+  artifacts?: ArtifactEntry[];
+}
+
+export interface ArtifactEntry {
+  /** Path relative to the per-run artifacts directory. Uses forward slashes. */
+  path: string;
+  size: number;
+  mimeType: string;
+  /** File contents, base64-encoded. */
+  content: string;
 }
 
 export interface ResolvedRunConfig {

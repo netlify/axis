@@ -109,6 +109,9 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
     agentConfig: result.agentConfig,
     output: result.output,
     score,
+    ...(result.workingDirectory !== undefined ? { workingDirectory: result.workingDirectory } : {}),
+    ...(result.resolvedConfig !== undefined ? { resolvedConfig: result.resolvedConfig } : {}),
+    ...(result.artifacts !== undefined ? { artifacts: result.artifacts } : {}),
   };
 }
 

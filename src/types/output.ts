@@ -10,6 +10,20 @@ export interface ResolvedRunConfig {
   setup?: LifecycleAction[];
   teardown?: LifecycleAction[];
   mcpServers?: Record<string, McpServerConfig>;
+  /** Effective artifact glob patterns applied to this run (merged from config + scenario). */
+  artifacts?: string[];
+}
+
+/** A file captured from a scenario workspace after teardown. */
+export interface ArtifactEntry {
+  /** Path relative to the per-run artifacts directory (and to the workspace root). Uses forward slashes. */
+  path: string;
+  /** File size in bytes. */
+  size: number;
+  /** Best-effort MIME type derived from the file extension. */
+  mimeType: string;
+  /** File contents, base64-encoded. Embedded in the report manifest so previews and downloads work even when the HTML report is opened from disk (file://). */
+  content: string;
 }
 
 export interface RunOutput {
@@ -33,6 +47,8 @@ export interface BaseRunResult {
   workingDirectory?: string;
   /** Materialized scenario settings (limits, skills, lifecycle, MCP) actually applied to this run. */
   resolvedConfig?: ResolvedRunConfig;
+  /** Files captured from the workspace after teardown, when artifact patterns are configured. */
+  artifacts?: ArtifactEntry[];
 }
 
 export interface RunResult extends BaseRunResult {}

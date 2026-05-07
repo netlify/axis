@@ -1,7 +1,7 @@
 import type { TokenUsage } from "./agent.js";
 import type { AgentConfig } from "./config.js";
 import type { ScoreResult } from "./scoring.js";
-import type { ResolvedRunConfig, RunSummary } from "./output.js";
+import type { ArtifactEntry, ResolvedRunConfig, RunSummary } from "./output.js";
 import type { ScoredSummary } from "./scoring.js";
 import type { RubricCriterion } from "./scenario.js";
 
@@ -39,4 +39,6 @@ export interface ReportResultEntry {
   agentConfig?: AgentConfig;
   /** Materialized scenario configuration (limits, skills, lifecycle, MCP) actually used for this run. */
   resolvedConfig?: ResolvedRunConfig;
+  /** Files captured from the workspace after teardown. Empty/omitted when no artifacts were captured. */
+  artifacts?: ArtifactEntry[];
 }
