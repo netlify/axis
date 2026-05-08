@@ -30,7 +30,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"
 
 const program = new Command();
 
-program.name("axis").description("AXIS — Agent eXperience Index Score").version(pkg.version);
+program.name("axis").description("AXIS — Agent Experience Index Score").version(pkg.version);
 
 // --- Signal handling: kill child processes and clean up on Ctrl-C ---
 

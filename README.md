@@ -1,4 +1,4 @@
-# AXIS - Agent eXperience Index Score
+# AXIS - Agent Experience Index Score
 
 Full documentation lives at **https://axis.run**:
 

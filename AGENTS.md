@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-AXIS (Agent eXperience Index Score) is a synthetic testing framework for AI agents. It runs agents against scenarios, captures transcripts, and produces graded scores across four dimensions: goal achievement, environment quality, service quality, and agent quality.
+AXIS (Agent Experience Index Score) is a synthetic testing framework for AI agents. It runs agents against scenarios, captures transcripts, and produces graded scores across four dimensions: goal achievement, environment quality, service quality, and agent quality.
 
 - ESM TypeScript, built with `tsc`, tested with `vitest`, CLI via `commander`
 - Live terminal display uses `ink` (React for CLIs), rendered to stderr
@@ -10,7 +10,7 @@ AXIS (Agent eXperience Index Score) is a synthetic testing framework for AI agen
 
 ## Terminology
 
-- **AXIS Result** (not "AXIS Score") -the composite 0–100 number. "AXIS Score" reads as "score score" since AXIS already stands for "Agent eXperience Index **Score**".
+- **AXIS Result** (not "AXIS Score") -the composite 0–100 number. "AXIS Score" reads as "score score" since AXIS already stands for "Agent Experience Index **Score**".
 - Use "AXIS Result" in all user-facing text, display output, and documentation.
 - The internal property names (`axisScore`, `averageAxisScore`) are fine as code identifiers.
 
