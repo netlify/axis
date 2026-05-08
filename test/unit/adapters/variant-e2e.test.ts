@@ -121,7 +121,7 @@ describe("renderSummaryTable variant display", () => {
           agentName: "claude-code",
           prompt: "deploy",
           rubric: "check",
-          agentConfig: { adapter: "claude-code" },
+          agentConfig: { agent: "claude-code" },
           output: {
             transcript: [],
             result: null,
@@ -134,7 +134,7 @@ describe("renderSummaryTable variant display", () => {
           agentName: "claude-code",
           prompt: "deploy",
           rubric: "check",
-          agentConfig: { adapter: "claude-code" },
+          agentConfig: { agent: "claude-code" },
           output: {
             transcript: [],
             result: null,
@@ -147,7 +147,7 @@ describe("renderSummaryTable variant display", () => {
           agentName: "claude-code",
           prompt: "hello",
           rubric: "check",
-          agentConfig: { adapter: "claude-code" },
+          agentConfig: { agent: "claude-code" },
           output: {
             transcript: [],
             result: null,

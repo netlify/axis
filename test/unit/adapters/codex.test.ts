@@ -37,7 +37,7 @@ function createMockProcess(lines: string[], exitCode = 0) {
 function makeInput(prompt = "test prompt"): AgentInput {
   return {
     prompt,
-    config: { adapter: "codex" },
+    config: { agent: "codex" },
     scenario: {
       key: "test",
       name: "Test",

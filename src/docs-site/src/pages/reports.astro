@@ -72,6 +72,11 @@ npx @netlify/axis reports latest --agent claude-code`}</code></pre>
       <a href="/scenarios#artifacts"><code>artifacts</code></a> &mdash; preview text/images in a
       modal, download individual files, or grab everything as a <code>.zip</code>.
     </li>
+    <li>
+      Markdown "Setup notes" and "Teardown notes" panels per run when lifecycle scripts write to
+      <a href="/scenarios#lifecycle-notes"><code>$AXIS_OUTPUT</code></a> &mdash; useful for
+      capturing workspace state, external probes, or diagnostic context alongside each scored run.
+    </li>
   </ul>
 
   <h3>JSON output</h3>

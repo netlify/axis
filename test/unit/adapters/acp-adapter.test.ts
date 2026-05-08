@@ -79,7 +79,7 @@ function createMockProcess(exitCode = 0, delay = 10) {
 function makeInput(prompt = "test prompt"): AgentInput {
   return {
     prompt,
-    config: { adapter: "goose" },
+    config: { agent: "goose" },
     scenario: {
       key: "test",
       name: "Test",

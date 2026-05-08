@@ -22,8 +22,8 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
       throw new Error(`Invalid config at ${filePath}: agents[${i}] must be a string or object`);
     }
     const agentObj = entry as Record<string, unknown>;
-    if (typeof agentObj.adapter !== "string") {
-      throw new Error(`Invalid config at ${filePath}: agents[${i}] must have an "adapter" string`);
+    if (typeof agentObj.agent !== "string") {
+      throw new Error(`Invalid config at ${filePath}: agents[${i}] must have an "agent" string`);
     }
     if (agentObj.scenarios !== undefined && !Array.isArray(agentObj.scenarios)) {
       throw new Error(`Invalid config at ${filePath}: agents[${i}].scenarios must be an array`);

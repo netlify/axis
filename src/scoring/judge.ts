@@ -24,7 +24,7 @@ export async function callJudge(
   prompt: string,
   options: JudgeCallOptions,
 ): Promise<string> {
-  const adapter = getAdapter(runResult.agentConfig.adapter);
+  const adapter = getAdapter(runResult.agentConfig.agent);
   const originalWorkspace = runResult.workingDirectory;
 
   const workspace = originalWorkspace ?? fs.mkdtempSync(path.join(os.tmpdir(), `axis-${options.scenarioKey}-`));

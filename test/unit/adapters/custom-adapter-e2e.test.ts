@@ -59,6 +59,6 @@ describe("Custom adapter e2e", () => {
     expect(output.version).toBe("0.1.0");
     expect(output.timestamp).toBeDefined();
     expect(output.durationMs).toBeGreaterThanOrEqual(0);
-    expect(output.results[0].agentConfig.adapter).toBe("echo");
+    expect(output.results[0].agentConfig.agent).toBe("echo");
   });
 });

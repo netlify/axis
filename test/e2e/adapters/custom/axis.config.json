@@ -1,5 +1,5 @@
 {
   "adapters": { "echo": "./echo-adapter.ts" },
   "scenarios": "./scenarios",
-  "agents": [{ "adapter": "echo" }]
+  "agents": [{ "agent": "echo" }]
 }

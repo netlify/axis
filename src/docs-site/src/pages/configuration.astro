@@ -36,7 +36,7 @@ const mcpExample = `{
   "agents": [
     "claude-code",
     {
-      "adapter": "gemini",
+      "agent": "gemini",
       "model": "gemini-2.5-pro",
       "scenarios": ["cms/*"],
       "flags": { "yolo": true }
@@ -240,7 +240,7 @@ export default async () => {
     </thead>
     <tbody>
       <tr>
-        <td><code>adapter</code></td>
+        <td><code>agent</code></td>
         <td><code>string</code></td>
         <td><span class="req-yes">Yes</span></td>
         <td>Agent name: <code>claude-code</code>, <code>codex</code>, <code>gemini</code>, <code>goose</code>, etc.</td>

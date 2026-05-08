@@ -36,7 +36,7 @@ function createMockProcess(lines: string[], exitCode = 0) {
 function makeInput(prompt = "test prompt"): AgentInput {
   return {
     prompt,
-    config: { adapter: "gemini" },
+    config: { agent: "gemini" },
     scenario: {
       key: "test",
       name: "Test",

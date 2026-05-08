@@ -26,7 +26,7 @@
         { "check": "Summary covers what the product does", "weight": 0.25 },
         { "check": "Summary includes setup steps and key concepts", "weight": 0.25 }
       ],
-      "agentConfig": { "adapter": "claude-code", "model": "claude-sonnet-4-5-20250929" },
+      "agentConfig": { "agent": "claude-code", "model": "claude-sonnet-4-5-20250929" },
       "score": {
         "axisScore": 88,
         "goalAchievement": {
@@ -105,7 +105,7 @@
         { "check": "Summary covers what the product does", "weight": 0.25 },
         { "check": "Summary includes setup steps and key concepts", "weight": 0.25 }
       ],
-      "agentConfig": { "adapter": "gemini" },
+      "agentConfig": { "agent": "gemini" },
       "score": {
         "axisScore": 72,
         "goalAchievement": {
@@ -160,7 +160,7 @@
         { "check": "Summary covers what the product does", "weight": 0.25 },
         { "check": "Summary includes setup steps and key concepts", "weight": 0.25 }
       ],
-      "agentConfig": { "adapter": "codex" },
+      "agentConfig": { "agent": "codex" },
       "error": "API quota exceeded"
     },
     {
@@ -178,7 +178,7 @@
         { "check": "Agent applied the correct fix", "weight": 0.4 },
         { "check": "Agent ran tests and they pass", "weight": 0.3 }
       ],
-      "agentConfig": { "adapter": "claude-code", "model": "claude-sonnet-4-5-20250929" },
+      "agentConfig": { "agent": "claude-code", "model": "claude-sonnet-4-5-20250929" },
       "score": {
         "axisScore": 92,
         "goalAchievement": {
@@ -231,7 +231,7 @@
         { "check": "Agent applied the correct fix", "weight": 0.4 },
         { "check": "Agent ran tests and they pass", "weight": 0.3 }
       ],
-      "agentConfig": { "adapter": "gemini" },
+      "agentConfig": { "agent": "gemini" },
       "score": {
         "axisScore": 79,
         "goalAchievement": {
@@ -287,7 +287,7 @@
         { "check": "Agent applied the correct fix", "weight": 0.4 },
         { "check": "Agent ran tests and they pass", "weight": 0.3 }
       ],
-      "agentConfig": { "adapter": "codex" },
+      "agentConfig": { "agent": "codex" },
       "score": {
         "axisScore": 68,
         "goalAchievement": {

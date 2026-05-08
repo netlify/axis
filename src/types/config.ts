@@ -39,7 +39,8 @@ export interface ResolvedSkill {
 }
 
 export interface AgentConfig {
-  adapter: string;
+  /** Name of the agent (registered adapter) to invoke. */
+  agent: string;
   /** Executable command for custom adapters (e.g. "codex", "aider", "./my-agent.sh"). */
   command?: string;
   scenarios?: string[];

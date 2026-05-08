@@ -9,6 +9,7 @@ vi.mock("../../../src/adapters/registry.js", () => ({
 }));
 vi.mock("../../../src/runner/lifecycle.js", () => ({
   executeLifecycleActions: vi.fn().mockResolvedValue([]),
+  runLifecyclePhase: vi.fn().mockResolvedValue({ results: [] }),
 }));
 
 import { run } from "../../../src/runner/runner.js";
@@ -62,17 +63,17 @@ describe("kitchen-sink (all adapters)", () => {
     }
   });
 
-  it("runs active scenarios across both adapters (skipped excluded)", async () => {
+  it("runs active scenarios across all agent instances (skipped excluded)", async () => {
     const output = await run({
       configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
       logger: silentLogger,
     });
 
-    // 1 active scenario (echo-test) × 2 agents = 2 results.
+    // 1 active scenario (echo-test) × 3 agent instances = 3 results.
     // summarize-docs has skip:true, which propagates to its 2 variants — so 2 skipped keys.
-    expect(output.results).toHaveLength(2);
-    expect(output.summary.total).toBe(2);
-    expect(output.summary.completed).toBe(2);
+    expect(output.results).toHaveLength(3);
+    expect(output.summary.total).toBe(3);
+    expect(output.summary.completed).toBe(3);
     expect(output.summary.failed).toBe(0);
     expect(output.summary.skipped).toBe(2);
   });
@@ -84,7 +85,7 @@ describe("kitchen-sink (all adapters)", () => {
     });
 
     const agentNames = [...new Set(output.results.map((r) => r.agentName))].sort();
-    expect(agentNames).toEqual(["claude-code", "codex"]);
+    expect(agentNames).toEqual(["claude-code|claude-opus-4-6", "claude-code|claude-sonnet-4-6", "codex"]);
   });
 
   it("includes only active scenario keys", async () => {
@@ -104,7 +105,7 @@ describe("kitchen-sink (all adapters)", () => {
     });
 
     const echoResults = output.results.filter((r) => r.scenarioKey === "echo-test");
-    expect(echoResults).toHaveLength(2);
+    expect(echoResults).toHaveLength(3);
     for (const result of echoResults) {
       expect(result.scenarioName).toBe("Largest English word");
       expect(result.prompt).toContain("largest word in the English language");
@@ -113,15 +114,18 @@ describe("kitchen-sink (all adapters)", () => {
     }
   });
 
-  it("preserves adapter type in agentConfig", async () => {
+  it("preserves agent type in agentConfig", async () => {
     const output = await run({
       configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
       logger: silentLogger,
     });
 
     const byAgent = Object.fromEntries(output.results.map((r) => [r.agentName, r]));
-    expect(byAgent["claude-code"].agentConfig.adapter).toBe("claude-code");
-    expect(byAgent["codex"].agentConfig.adapter).toBe("codex");
+    expect(byAgent["claude-code|claude-sonnet-4-6"].agentConfig.agent).toBe("claude-code");
+    expect(byAgent["claude-code|claude-sonnet-4-6"].agentConfig.model).toBe("claude-sonnet-4-6");
+    expect(byAgent["claude-code|claude-opus-4-6"].agentConfig.agent).toBe("claude-code");
+    expect(byAgent["claude-code|claude-opus-4-6"].agentConfig.model).toBe("claude-opus-4-6");
+    expect(byAgent["codex"].agentConfig.agent).toBe("codex");
   });
 
   it("filters to single agent from mixed config", async () => {
@@ -144,8 +148,8 @@ describe("kitchen-sink (all adapters)", () => {
       logger: silentLogger,
     });
 
-    // Each adapter runs 1 active scenario (echo-test)
-    expect(adapters["claude-code"].run).toHaveBeenCalledTimes(1);
+    // claude-code is registered twice (sonnet + opus instances), codex once.
+    expect(adapters["claude-code"].run).toHaveBeenCalledTimes(2);
     expect(adapters["codex"].run).toHaveBeenCalledTimes(1);
   });
 });

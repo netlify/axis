@@ -291,7 +291,7 @@ describe("Claude SDK adapter e2e", () => {
       expect(output.summary.total).toBe(1);
       expect(output.summary.completed).toBe(1);
       expect(output.summary.failed).toBe(0);
-      expect(output.results[0].agentConfig.adapter).toBe("claude-sdk");
+      expect(output.results[0].agentConfig.agent).toBe("claude-sdk");
     });
   });
 

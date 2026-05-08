@@ -38,6 +38,8 @@ export interface ResultEntry {
   agentConfig?: Record<string, unknown>;
   resolvedConfig?: ResolvedRunConfig;
   artifacts?: ArtifactEntry[];
+  setupOutput?: string;
+  teardownOutput?: string;
 }
 
 export interface ArtifactEntry {

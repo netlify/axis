@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { loadConfig, discoverScenarios } from "../config/loader.js";
 import { getAdapter, registerAdapter } from "../adapters/registry.js";
-import { executeLifecycleActions } from "./lifecycle.js";
+import { runLifecyclePhase } from "./lifecycle.js";
 import { captureArtifacts, resolveArtifactPatterns } from "./artifacts.js";
 import type { ResolvedRunConfig, RunOutput, RunResult, Logger, JobState, JobStatus } from "../types/output.js";
 import { silentLogger as defaultLogger, formatError } from "../types/output.js";
@@ -179,8 +179,10 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
       : scenarios;
 
     for (const scenario of filteredScenarios) {
-      // Scenario-level agent override: if set, only listed agents run this scenario
-      if (scenario.agents && !scenario.agents.includes(agentName)) {
+      // Scenario-level agent override: if set, only listed agents run this scenario.
+      // Match either the full generated name or the base agent (so users can list
+      // `claude-code` to target every claude-code|<model> instance).
+      if (scenario.agents && !scenarioAgentFilterMatches(scenario.agents, agentName, agentConfig.agent)) {
         continue;
       }
       jobs.push({ index: jobs.length, agentName, agentConfig, scenario, configDir, axisConfig: config });
@@ -240,15 +242,15 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   // ink's cursor tracking when it starts rendering the live display.
   const checkedAdapters = new Set<string>();
   for (const job of jobs) {
-    if (checkedAdapters.has(job.agentConfig.adapter)) continue;
-    checkedAdapters.add(job.agentConfig.adapter);
+    if (checkedAdapters.has(job.agentConfig.agent)) continue;
+    checkedAdapters.add(job.agentConfig.agent);
 
-    const adapter = getAdapter(job.agentConfig.adapter);
+    const adapter = getAdapter(job.agentConfig.agent);
     const required = adapter.requiredEnv?.() ?? [];
     const missing = required.filter((key) => !jobEnv[key]);
     if (missing.length > 0) {
       throw new Error(
-        `The "${job.agentConfig.adapter}" agent requires environment variable${missing.length > 1 ? "s" : ""} ${missing.join(", ")} ` +
+        `The "${job.agentConfig.agent}" agent requires environment variable${missing.length > 1 ? "s" : ""} ${missing.join(", ")} ` +
           `but ${missing.length > 1 ? "they are" : "it is"} not set. ` +
           `Add ${missing.length > 1 ? "them" : "it"} to your shell environment or to the "env" array in axis.config.json.`,
       );
@@ -401,7 +403,7 @@ async function executeJob(
   // Create isolated workspace and point HOME there so agents
   // don't pick up the user's global settings (e.g. ~/.claude/).
   const workspace = createWorkspace();
-  const adapter = getAdapter(agentConfig.adapter);
+  const adapter = getAdapter(agentConfig.agent);
   const adapterIsolation = adapter.isolationEnv?.(workspace) ?? {};
   const jobEnv = { ...adapterIsolation, ...env, HOME: workspace, AXIS_CONFIG_DIR: configDir };
   logger.verbose?.(`[${label}] Workspace: ${workspace}`);
@@ -424,9 +426,13 @@ async function executeJob(
   const cleanup = async () => {
     if (scenario.teardown?.length) {
       logger.verbose?.(`[${label}] Running teardown...`);
-      await executeLifecycleActions(scenario.teardown, workspace, jobEnv).catch((teardownErr) => {
-        logger.error(`[${label}] Teardown failed: ${formatError(teardownErr)}`);
-      });
+      const outcome = await runLifecyclePhase(scenario.teardown, workspace, jobEnv, "teardown");
+      if (outcome.error) {
+        logger.error(`[${label}] Teardown failed: ${formatError(outcome.error)}`);
+      }
+      if (resultRef && outcome.output) {
+        resultRef.teardownOutput = outcome.output;
+      }
     }
     if (resultRef && reportDir && artifactPatterns.length > 0) {
       const destDir = path.join(reportDir, "scenarios", scenario.key, agentName, "artifacts");
@@ -449,10 +455,13 @@ async function executeJob(
   };
 
   // Setup
+  let setupOutput: string | undefined;
   if (scenario.setup?.length) {
     updateStatus(index, "setup");
     logger.verbose?.(`[${label}] Running setup...`);
-    await executeLifecycleActions(scenario.setup, workspace, jobEnv);
+    const outcome = await runLifecyclePhase(scenario.setup, workspace, jobEnv, "setup");
+    setupOutput = outcome.output;
+    if (outcome.error) throw outcome.error;
   }
 
   try {
@@ -538,6 +547,7 @@ async function executeJob(
       output,
       workingDirectory: workspace,
       resolvedConfig: buildResolvedRunConfig(scenario, axisConfig, agentConfig),
+      ...(setupOutput ? { setupOutput } : {}),
     };
     resultRef = result;
     return { result, cleanup };
@@ -590,14 +600,21 @@ function buildJobEnv(config: AxisConfig): Record<string, string> {
   return env;
 }
 
+/**
+ * Build the display name for each agent entry. Naming rules:
+ *   - `{agent}|{model}` whenever a model is specified
+ *   - `{agent}` otherwise
+ *   - `-N` numeric suffix appended only as a tie-breaker if the rules above
+ *     still produce duplicates (e.g. two entries with the same agent and no model)
+ */
 function normalizeAgents(agents: (string | AgentConfig)[]): Array<{ name: string; config: AgentConfig }> {
-  const nameCounts = new Map<string, number>();
   const result: Array<{ name: string; config: AgentConfig }> = [];
+  const nameCounts = new Map<string, number>();
 
   for (const entry of agents) {
-    const config: AgentConfig = typeof entry === "string" ? { adapter: entry } : entry;
+    const config: AgentConfig = typeof entry === "string" ? { agent: entry } : entry;
 
-    const baseName = config.adapter;
+    const baseName = config.model ? `${config.agent}|${config.model}` : config.agent;
     const count = (nameCounts.get(baseName) ?? 0) + 1;
     nameCounts.set(baseName, count);
 
@@ -606,6 +623,16 @@ function normalizeAgents(agents: (string | AgentConfig)[]): Array<{ name: string
   }
 
   return result;
+}
+
+/**
+ * Per-scenario `agents: [...]` filter: an entry matches if it equals the
+ * generated agent name OR its base agent (the part before `|model`).
+ * This lets `agents: ["claude-code"]` apply to `claude-code|opus`,
+ * `claude-code|sonnet`, etc. without enumerating every model.
+ */
+function scenarioAgentFilterMatches(filter: string[], generatedName: string, baseAgent: string): boolean {
+  return filter.includes(generatedName) || filter.includes(baseAgent);
 }
 
 function buildFailedResult(job: Job, error: string): RunResult {

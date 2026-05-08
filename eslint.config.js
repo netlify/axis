@@ -6,7 +6,7 @@ import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    ignores: ["dist/", "node_modules/", ".axis/", "coverage/", "**/.astro/"],
+    ignores: ["dist/", "node_modules/", "**/.axis/", "coverage/", "**/.astro/"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

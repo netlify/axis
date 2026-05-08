@@ -376,6 +376,21 @@ export default {
         <td>Referencing fixtures, helper scripts, or other files versioned alongside your project.</td>
       </tr>
       <tr>
+        <td><code>AXIS_OUTPUT</code></td>
+        <td>Path to a per-phase markdown file. Anything written here surfaces in the report.</td>
+        <td>Capturing setup or teardown observations &mdash; see <a href="#lifecycle-notes">Capturing notes for the report</a> below.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_WORKSPACE</code></td>
+        <td>Absolute path to the per-job workspace (same as <code>pwd</code>).</td>
+        <td>Inspecting files when the script's <code>cwd</code> may have changed.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_PHASE</code></td>
+        <td>Either <code>setup</code> or <code>teardown</code>.</td>
+        <td>Sharing one script between phases that branches on the current phase.</td>
+      </tr>
+      <tr>
         <td><code>HOME</code></td>
         <td>Set to the workspace temp directory (same as <code>pwd</code>).</td>
         <td>Workspace isolation &mdash; tools that read <code>$HOME</code> stay scoped to the run.</td>
@@ -405,6 +420,38 @@ export default {
 
 scenarios/
   my-scenario.json              # setup: cp -R "$AXIS_CONFIG_DIR/scenario-fixtures/my-project/." .`}</code></pre>
+
+  <h3 id="lifecycle-notes">Capturing notes for the report</h3>
+  <p>
+    Setup and teardown each receive their own <code>$AXIS_OUTPUT</code> file path. Anything written
+    to that file is captured as <strong>GitHub-flavored markdown</strong> and surfaced as a
+    "Setup notes" or "Teardown notes" panel in the agent's expanded detail row in the HTML report.
+    Multiple actions in the same phase share one output file, so each script can append.
+  </p>
+  <pre><code>{`"teardown": [
+  {
+    "action": "run_script",
+    "command": "{ echo '## Teardown'; echo; if [ -f summary.md ]; then echo \\"- **summary.md**: $(wc -c < summary.md | tr -d ' ') bytes\\"; else echo '_no summary.md was written_'; fi; } >> \\"$AXIS_OUTPUT\\""
+  }
+]`}</code></pre>
+  <p>
+    The notes panel for that run renders the markdown &mdash; bullet list with bold filenames
+    and the captured byte count. Useful patterns:
+  </p>
+  <ul>
+    <li>Snapshot the workspace after the agent finishes (file list, sizes, line counts).</li>
+    <li>Probe an external resource the agent created (HTTP status, DB row counts).</li>
+    <li>Record diagnostic context (commit SHAs, env versions) that scoring should not see but a human reviewer will want.</li>
+  </ul>
+  <div class="callout callout-warn">
+    <div class="callout-title">Capture limits</div>
+    <p>
+      Output is capped at 256 KB per phase &mdash; longer notes are truncated with a marker line.
+      Output is captured even if a script fails, so partial notes still reach the report.
+      Setup output is recorded before the agent runs and is <em>not</em> visible to the agent or
+      the LLM judge.
+    </p>
+  </div>
 
   <h3>Common patterns</h3>
   <ul>
@@ -505,7 +552,7 @@ scenarios/
     groups using glob patterns in the <a href="/configuration">agent configuration</a>:
   </p>
   <pre><code>{`{
-  "adapter": "claude-code",
+  "agent": "claude-code",
   "scenarios": ["cms/*", "api/*"]
 }`}</code></pre>
 

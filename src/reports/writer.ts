@@ -179,6 +179,12 @@ function buildResultEntry(result: RunResult | ScoredRunResult, relPath: string):
   if (result.artifacts && result.artifacts.length > 0) {
     entry.artifacts = result.artifacts;
   }
+  if (result.setupOutput) {
+    entry.setupOutput = result.setupOutput;
+  }
+  if (result.teardownOutput) {
+    entry.teardownOutput = result.teardownOutput;
+  }
 
   return entry;
 }

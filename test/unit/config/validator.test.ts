@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   validateConfig,
   validateScenario,
-  validateMcpServers,
   resolveRubricWeights,
 } from "../../../src/config/validator.js";
 
@@ -18,7 +17,7 @@ describe("validateConfig", () => {
   it("accepts a valid config with object agents", () => {
     const config = {
       scenarios: "./scenarios",
-      agents: [{ adapter: "claude-code", scenarios: ["*"] }],
+      agents: [{ agent: "claude-code", scenarios: ["*"] }],
     };
     expect(() => validateConfig(config, "test.json")).not.toThrow();
   });
@@ -26,7 +25,7 @@ describe("validateConfig", () => {
   it("accepts mixed string and object agents", () => {
     const config = {
       scenarios: "./scenarios",
-      agents: ["claude-code", { adapter: "claude-code", model: "sonnet" }],
+      agents: ["claude-code", { agent: "claude-code", model: "sonnet" }],
     };
     expect(() => validateConfig(config, "test.json")).not.toThrow();
   });
@@ -48,9 +47,9 @@ describe("validateConfig", () => {
     expect(() => validateConfig({ scenarios: "./s", agents: {} }, "test.json")).toThrow('"agents" must be an array');
   });
 
-  it("rejects agent object without adapter", () => {
+  it("rejects agent object without agent field", () => {
     const config = { scenarios: "./s", agents: [{}] };
-    expect(() => validateConfig(config, "test.json")).toThrow('must have an "adapter" string');
+    expect(() => validateConfig(config, "test.json")).toThrow('must have an "agent" string');
   });
 
   it("accepts scenarios as an array of strings", () => {
@@ -96,7 +95,7 @@ describe("validateConfig", () => {
   it("rejects agent with non-array scenarios", () => {
     const config = {
       scenarios: "./s",
-      agents: [{ adapter: "x", scenarios: "bad" }],
+      agents: [{ agent: "x", scenarios: "bad" }],
     };
     expect(() => validateConfig(config, "test.json")).toThrow("must be an array");
   });
@@ -104,7 +103,7 @@ describe("validateConfig", () => {
   it("allows extra fields on agent objects", () => {
     const config = {
       scenarios: "./s",
-      agents: [{ adapter: "x", model: "sonnet", custom_field: true }],
+      agents: [{ agent: "x", model: "sonnet", custom_field: true }],
     };
     expect(() => validateConfig(config, "test.json")).not.toThrow();
   });
@@ -377,7 +376,7 @@ describe("validateConfig", () => {
   it("accepts valid per-agent skills", () => {
     const config = {
       scenarios: "./s",
-      agents: [{ adapter: "claude-code", skills: ["./skills/custom"] }],
+      agents: [{ agent: "claude-code", skills: ["./skills/custom"] }],
     };
     expect(() => validateConfig(config, "test.json")).not.toThrow();
   });
@@ -395,7 +394,7 @@ describe("validateConfig", () => {
   it("rejects non-array per-agent skills", () => {
     const config = {
       scenarios: "./s",
-      agents: [{ adapter: "x", skills: "bad" }],
+      agents: [{ agent: "x", skills: "bad" }],
     };
     expect(() => validateConfig(config, "test.json")).toThrow('"agents[0].skills" must be an array of strings');
   });
@@ -403,7 +402,7 @@ describe("validateConfig", () => {
   it("rejects per-agent skills with non-string elements", () => {
     const config = {
       scenarios: "./s",
-      agents: [{ adapter: "x", skills: [true] }],
+      agents: [{ agent: "x", skills: [true] }],
     };
     expect(() => validateConfig(config, "test.json")).toThrow('"agents[0].skills" must be an array of strings');
   });

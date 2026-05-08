@@ -41,4 +41,8 @@ export interface ReportResultEntry {
   resolvedConfig?: ResolvedRunConfig;
   /** Files captured from the workspace after teardown. Empty/omitted when no artifacts were captured. */
   artifacts?: ArtifactEntry[];
+  /** Markdown notes the scenario's setup scripts wrote to `$AXIS_OUTPUT`. */
+  setupOutput?: string;
+  /** Markdown notes the scenario's teardown scripts wrote to `$AXIS_OUTPUT`. */
+  teardownOutput?: string;
 }

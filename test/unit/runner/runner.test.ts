@@ -10,13 +10,14 @@ vi.mock("../../../src/adapters/registry.js", () => ({
 }));
 vi.mock("../../../src/runner/lifecycle.js", () => ({
   executeLifecycleActions: vi.fn().mockResolvedValue([]),
+  runLifecyclePhase: vi.fn().mockResolvedValue({ results: [] }),
 }));
 
 import { run } from "../../../src/runner/runner.js";
 import { getAdapter } from "../../../src/adapters/registry.js";
-import { executeLifecycleActions } from "../../../src/runner/lifecycle.js";
+import { runLifecyclePhase } from "../../../src/runner/lifecycle.js";
 
-const mockExecuteLifecycle = vi.mocked(executeLifecycleActions);
+const mockExecuteLifecycle = vi.mocked(runLifecyclePhase);
 
 const mockGetAdapter = vi.mocked(getAdapter);
 const E2E_DIR = path.resolve(import.meta.dirname, "../../e2e/fixtures/basic");
@@ -76,7 +77,7 @@ describe("run", () => {
     expect(output.results[0].prompt).toBeDefined();
     expect(output.results[0].rubric).toBeDefined();
     expect(output.results[0].agentConfig).toBeDefined();
-    expect(output.results[0].agentConfig.adapter).toBe("mock-agent");
+    expect(output.results[0].agentConfig.agent).toBe("mock-agent");
     expect(mockAdapter.run).toHaveBeenCalled();
   });
 
@@ -115,7 +116,7 @@ describe("run", () => {
     const call = mockAdapter.run.mock.calls[0][0];
     expect(call.prompt).toBeDefined();
     expect(call.config).toBeDefined();
-    expect(call.config.adapter).toBe("mock-agent");
+    expect(call.config.agent).toBe("mock-agent");
     expect(call.scenario).toBeDefined();
     expect(call.workingDirectory).toMatch(/axis-/);
     expect(call.env).toBeDefined();
@@ -198,7 +199,7 @@ describe("run", () => {
       if (cmd.includes("rm") || cmd.includes("cleanup") || cmd.includes("teardown")) {
         order.push("teardown");
       }
-      return [];
+      return { results: [] };
     });
 
     const multiStepDir = path.resolve(import.meta.dirname, "../../e2e/multi-step");
@@ -321,6 +322,78 @@ describe("run", () => {
 
     const allAgentResults = output.results.filter((r) => r.scenarioKey === "all-agents");
     expect(allAgentResults).toHaveLength(2);
+  });
+
+  describe("agent name generation", () => {
+    let tmp: string;
+
+    beforeEach(() => {
+      tmp = fs.mkdtempSync(path.join(os.tmpdir(), "axis-naming-"));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    });
+
+    function writeConfig(agents: unknown): string {
+      const cfg = {
+        scenarios: [{ key: "s", name: "S", prompt: "p", rubric: "r" }],
+        agents,
+      };
+      const p = path.join(tmp, "axis.config.json");
+      fs.writeFileSync(p, JSON.stringify(cfg));
+      return p;
+    }
+
+    it("uses {agent}|{model} when model is set", async () => {
+      const mockAdapter = createMockAdapter();
+      mockGetAdapter.mockReturnValue(mockAdapter);
+
+      const output = await run({
+        configPath: writeConfig([
+          { agent: "mock-agent", model: "opus" },
+          { agent: "mock-agent", model: "sonnet" },
+        ]),
+        logger: silentLogger,
+      });
+
+      const names = output.results.map((r) => r.agentName).sort();
+      expect(names).toEqual(["mock-agent|opus", "mock-agent|sonnet"]);
+    });
+
+    it("falls back to -N suffix only when names collide", async () => {
+      const mockAdapter = createMockAdapter();
+      mockGetAdapter.mockReturnValue(mockAdapter);
+
+      const output = await run({
+        configPath: writeConfig([{ agent: "mock-agent" }, { agent: "mock-agent" }]),
+        logger: silentLogger,
+      });
+
+      const names = output.results.map((r) => r.agentName).sort();
+      expect(names).toEqual(["mock-agent", "mock-agent-2"]);
+    });
+
+    it("scenario.agents prefix-matches the base agent name across models", async () => {
+      const mockAdapter = createMockAdapter();
+      mockGetAdapter.mockReturnValue(mockAdapter);
+
+      const cfg = {
+        scenarios: [
+          { key: "s", name: "S", prompt: "p", rubric: "r", agents: ["mock-agent"] },
+        ],
+        agents: [
+          { agent: "mock-agent", model: "opus" },
+          { agent: "mock-agent", model: "sonnet" },
+        ],
+      };
+      const p = path.join(tmp, "axis.config.json");
+      fs.writeFileSync(p, JSON.stringify(cfg));
+
+      const output = await run({ configPath: p, logger: silentLogger });
+      const names = output.results.map((r) => r.agentName).sort();
+      expect(names).toEqual(["mock-agent|opus", "mock-agent|sonnet"]);
+    });
   });
 
   it("fails early when adapter requiredEnv vars are missing", async () => {

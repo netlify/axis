@@ -1,3 +1,4 @@
+import { marked } from "marked";
 import type {
   ReportData,
   ResultEntry,
@@ -15,6 +16,28 @@ import type {
   ArtifactEntry,
 } from "./types";
 import { isScoredSummary } from "./types";
+
+marked.setOptions({ gfm: true, breaks: false });
+
+function renderMarkdown(source: string): string {
+  try {
+    const html = marked.parse(source, { async: false }) as string;
+    return stripUnsafeHtml(html);
+  } catch {
+    return `<pre>${escapeHtml(source)}</pre>`;
+  }
+}
+
+// Strip <script>, <style>, <iframe>, on*= handlers, and javascript: URLs.
+// Notes are produced by the user's own scripts on their own machine, but
+// keeping this conservative protects against accidental code execution
+// when a report is shared.
+function stripUnsafeHtml(html: string): string {
+  return html
+    .replace(/<\s*\/?\s*(script|style|iframe|object|embed)[^>]*>/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*("\s*javascript:[^"]*"|'\s*javascript:[^']*'|\s*javascript:[^\s>]+)/gi, "$1=\"#\"");
+}
 
 // --- Utilities ---
 
@@ -387,10 +410,26 @@ function renderDetailRow(entry: ResultEntry, index: number, scenarioKey?: string
         <div class="detail-panel">
           ${entry.error ? `<div class="error-banner">${escapeHtml(entry.error)}</div>` : ""}
           ${entry.score ? renderScoreDetail(entry.score, entry.durationMs) : renderUnscoredDetail(entry)}
+          ${renderLifecycleNotes(entry)}
           ${entry.artifacts && entry.artifacts.length > 0 ? renderArtifactsSection(entry.artifacts, index) : ""}
         </div>
       </td>
     </tr>`;
+}
+
+function renderLifecycleNotes(entry: ResultEntry): string {
+  const blocks: string[] = [];
+  if (entry.setupOutput) blocks.push(renderNotePanel("Setup notes", entry.setupOutput));
+  if (entry.teardownOutput) blocks.push(renderNotePanel("Teardown notes", entry.teardownOutput));
+  return blocks.join("");
+}
+
+function renderNotePanel(title: string, markdownSource: string): string {
+  return `
+    <div class="detail-section lifecycle-notes">
+      <div class="section-header"><h3>${escapeHtml(title)}</h3></div>
+      <div class="notes-body markdown-body">${renderMarkdown(markdownSource)}</div>
+    </div>`;
 }
 
 function renderUnscoredDetail(entry: ResultEntry): string {
@@ -928,11 +967,11 @@ function renderModal(entry: ResultEntry, index: number): string {
           ${entry.agentConfig ? renderModalAgentConfig(entry.agentConfig, entry.agentName) : ""}
           ${resolved ? renderModalLimits(resolved.limits) : ""}
           ${resolved?.skills?.length ? renderModalSkills(resolved.skills) : ""}
-          ${resolved?.setup?.length ? renderModalLifecycle("Setup", resolved.setup) : ""}
-          ${resolved?.teardown?.length ? renderModalLifecycle("Teardown", resolved.teardown) : ""}
           ${resolved?.mcpServers && Object.keys(resolved.mcpServers).length ? renderModalMcp(resolved.mcpServers) : ""}
           ${entry.prompt ? renderModalPrompt(entry.prompt) : ""}
           ${entry.rubric ? renderModalRubric(entry.rubric) : ""}
+          ${resolved?.setup?.length ? renderModalLifecycle("Setup", resolved.setup) : ""}
+          ${resolved?.teardown?.length ? renderModalLifecycle("Teardown", resolved.teardown) : ""}
         </div>
       </div>
     </div>`;

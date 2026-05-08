@@ -34,7 +34,7 @@ function makeRunResult(rubric: RunResult["rubric"]): RunResult {
     agentName: "claude-code",
     prompt: "Visit the target URL and verify the page content",
     rubric,
-    agentConfig: { adapter: "claude-code" },
+    agentConfig: { agent: "claude-code" },
     output: {
       transcript: [{ type: "assistant", timestamp: new Date().toISOString(), content: { text: "I did the task" } }],
       result: "Task completed",

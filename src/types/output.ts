@@ -49,6 +49,10 @@ export interface BaseRunResult {
   resolvedConfig?: ResolvedRunConfig;
   /** Files captured from the workspace after teardown, when artifact patterns are configured. */
   artifacts?: ArtifactEntry[];
+  /** Markdown notes the scenario's setup scripts wrote to `$AXIS_OUTPUT`. */
+  setupOutput?: string;
+  /** Markdown notes the scenario's teardown scripts wrote to `$AXIS_OUTPUT`. */
+  teardownOutput?: string;
 }
 
 export interface RunResult extends BaseRunResult {}

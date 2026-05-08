@@ -7,6 +7,19 @@
     { "check": "Summary covers what async workloads are and their key features", "weight": 0.25 },
     { "check": "Summary includes setup steps", "weight": 0.25 }
   ],
+  "skip": true,
+  "setup": [
+    {
+      "action": "run_script",
+      "command": "{ echo '## Setup'; echo; echo \"- Phase: **${AXIS_PHASE}**\"; echo \"- Workspace: \\`${AXIS_WORKSPACE}\\`\"; echo \"- Started: $(date -u +%FT%TZ)\"; echo; echo '### Pre-existing files'; echo; if [ -z \"$(ls -A \"$AXIS_WORKSPACE\")\" ]; then echo '_workspace is empty_'; else ls -la \"$AXIS_WORKSPACE\" | sed 's/^/    /'; fi; } >> \"$AXIS_OUTPUT\""
+    }
+  ],
+  "teardown": [
+    {
+      "action": "run_script",
+      "command": "{ echo '## Teardown'; echo; echo \"- Finished: $(date -u +%FT%TZ)\"; echo; echo '### Files left in workspace'; echo; if [ -f \"$AXIS_WORKSPACE/summary.md\" ]; then bytes=$(wc -c < \"$AXIS_WORKSPACE/summary.md\" | tr -d ' '); lines=$(wc -l < \"$AXIS_WORKSPACE/summary.md\" | tr -d ' '); echo '| file | bytes | lines |'; echo '| --- | ---: | ---: |'; echo \"| \\`summary.md\\` | $bytes | $lines |\"; echo; echo '### First line preview'; echo; echo \"> $(head -n 1 \"$AXIS_WORKSPACE/summary.md\")\"; else echo '_no summary.md was written_'; fi; } >> \"$AXIS_OUTPUT\""
+    }
+  ],
   "variants": [
     {
       "name": "baseline"

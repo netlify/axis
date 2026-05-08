@@ -127,7 +127,7 @@ function normalizeConfigAgents(config: AxisConfig): void {
     if (typeof entry === "string") {
       config.agents[i] = entry.toLowerCase();
     } else {
-      entry.adapter = entry.adapter.toLowerCase();
+      entry.agent = entry.agent.toLowerCase();
     }
   }
 }

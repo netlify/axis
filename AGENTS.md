@@ -19,7 +19,7 @@ AXIS (Agent eXperience Index Score) is a synthetic testing framework for AI agen
 | Layer    | Key Files                                                  | Purpose                                                              |
 | -------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
 | CLI      | `src/cli.ts`                                               | Entry point, ink display, signal handling                            |
-| Runner   | `src/runner/runner.ts`                                     | Job orchestration, concurrency, isolation                            |
+| Runner   | `src/runner/runner.ts`, `lifecycle.ts`                     | Job orchestration, concurrency, isolation; `runLifecyclePhase` captures `$AXIS_OUTPUT` markdown |
 | Adapters | `src/adapters/*.ts`                                        | Spawn agent CLIs, parse NDJSON streams                               |
 | Scoring  | `src/scoring/`                                             | LLM judge + interaction-based evaluation pipeline                    |
 | Reports  | `src/reports/writer.ts`, `reader.ts`                       | Persistent `.axis/reports/` store                                    |
@@ -112,3 +112,4 @@ npm test                       # vitest, all unit tests
 - Runner emits initial `onJobUpdate` AFTER pre-flight to avoid ink cursor corruption
 - The `close` event listener must be registered BEFORE readline to avoid missing it
 - Live token counter uses `chars / 5` (intentionally conservative) so the UI never has to reverse; runner enforces monotonicity in `updateTokens`
+- `setupOutput` / `teardownOutput` (captured from `$AXIS_OUTPUT`) live on `RunResult` but `scoreRunResult` returns a fresh `ScoredRunResult` -`cli.ts` re-propagates them onto the scored copy alongside `artifacts`, otherwise they vanish from the manifest

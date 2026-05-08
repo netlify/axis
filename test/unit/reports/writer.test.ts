@@ -40,7 +40,7 @@ function makeRunOutput(): RunOutput {
         agentName: "claude-code",
         prompt: "Visit the target",
         rubric: [{ check: "Page loaded", weight: 1.0 }],
-        agentConfig: { adapter: "claude-code" },
+        agentConfig: { agent: "claude-code" },
         output: {
           transcript: [{ type: "assistant", timestamp: "2025-04-13T18:30:43.000Z", content: { text: "Done" } }],
           result: "Completed",
@@ -71,7 +71,7 @@ function makeScoredOutput(): ScoredOutput {
         agentName: "claude-code",
         prompt: "Create a blog post",
         rubric: [{ check: "Post exists", weight: 1.0 }],
-        agentConfig: { adapter: "claude-code" },
+        agentConfig: { agent: "claude-code" },
         output: {
           transcript: [],
           result: "Done",
@@ -291,7 +291,7 @@ describe("writeReportToStore", () => {
 
     expect(manifest.results[0].prompt).toBe("Visit the target");
     expect(manifest.results[0].rubric).toEqual([{ check: "Page loaded", weight: 1.0 }]);
-    expect(manifest.results[0].agentConfig).toEqual({ adapter: "claude-code" });
+    expect(manifest.results[0].agentConfig).toEqual({ agent: "claude-code" });
   });
 
   it("strips sparseIndex from scenario JSON", () => {

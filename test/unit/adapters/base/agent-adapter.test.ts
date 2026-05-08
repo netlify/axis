@@ -41,7 +41,7 @@ function createMockProcess(opts: {
 function makeInput(overrides: Partial<AgentInput> = {}): AgentInput {
   return {
     prompt: "hi",
-    config: { adapter: "test" },
+    config: { agent: "test" },
     scenario: {
       key: "t",
       name: "T",

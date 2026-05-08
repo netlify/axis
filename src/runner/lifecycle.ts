@@ -1,8 +1,14 @@
 import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { LifecycleAction } from "../types/scenario.js";
 
 /** Default timeout for lifecycle scripts (30 seconds). */
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** Max bytes captured from $AXIS_OUTPUT to keep reports small. */
+const MAX_OUTPUT_BYTES = 256 * 1024;
 
 export interface LifecycleResult {
   action: LifecycleAction;
@@ -31,6 +37,70 @@ export async function executeLifecycleActions(
   }
 
   return results;
+}
+
+export interface LifecyclePhaseOutcome {
+  results: LifecycleResult[];
+  /** Markdown content the scripts wrote to $AXIS_OUTPUT. Undefined when nothing was written. */
+  output?: string;
+  /** Error thrown by `executeLifecycleActions`, if any. Output is still captured. */
+  error?: Error;
+}
+
+/**
+ * Run one lifecycle phase (setup or teardown), exposing an `$AXIS_OUTPUT`
+ * file scripts can write markdown notes to. The file is shared across all
+ * actions in the phase so multiple scripts can append. Output is captured
+ * even when an action fails — partial notes still surface in the report.
+ */
+export async function runLifecyclePhase(
+  actions: LifecycleAction[],
+  cwd: string,
+  baseEnv: Record<string, string> | undefined,
+  phase: "setup" | "teardown",
+): Promise<LifecyclePhaseOutcome> {
+  const outputFile = path.join(os.tmpdir(), `axis-${phase}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.md`);
+  // Pre-create empty file so scripts can append even with redirections like `>>`.
+  fs.writeFileSync(outputFile, "");
+
+  const env = {
+    ...(baseEnv ?? {}),
+    AXIS_OUTPUT: outputFile,
+    AXIS_WORKSPACE: cwd,
+    AXIS_PHASE: phase,
+  };
+
+  let error: Error | undefined;
+  let results: LifecycleResult[] = [];
+  try {
+    results = await executeLifecycleActions(actions, cwd, env);
+  } catch (err) {
+    error = err instanceof Error ? err : new Error(String(err));
+  }
+
+  let output: string | undefined;
+  try {
+    const stat = fs.statSync(outputFile);
+    if (stat.size > 0) {
+      const buf =
+        stat.size > MAX_OUTPUT_BYTES
+          ? fs.readFileSync(outputFile, { encoding: "utf8" }).slice(0, MAX_OUTPUT_BYTES) +
+            `\n\n_…truncated at ${MAX_OUTPUT_BYTES} bytes_\n`
+          : fs.readFileSync(outputFile, "utf8");
+      const trimmed = buf.replace(/\s+$/u, "");
+      if (trimmed.length > 0) output = trimmed;
+    }
+  } catch {
+    /* file was deleted by script or never created — no output captured */
+  } finally {
+    try {
+      fs.unlinkSync(outputFile);
+    } catch {
+      /* best-effort cleanup */
+    }
+  }
+
+  return { results, ...(output !== undefined ? { output } : {}), ...(error ? { error } : {}) };
 }
 
 function runScript(action: LifecycleAction, cwd: string, env?: Record<string, string>): Promise<LifecycleResult> {

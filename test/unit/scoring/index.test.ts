@@ -104,7 +104,7 @@ function makeRunOutput(overrides: Partial<RunOutput> = {}): RunOutput {
         agentName: "claude-code",
         prompt: "Visit the target and verify content",
         rubric: [{ check: "Did it", weight: 1.0 }],
-        agentConfig: { adapter: "claude-code" },
+        agentConfig: { agent: "claude-code" },
         output: {
           transcript: [
             { type: "assistant", timestamp: new Date().toISOString(), content: { text: "Done" } },

@@ -40,7 +40,7 @@ function makeScoredOutput(timestamp: string, scenarioKey = "hello-world"): Score
         target: "https://example.com",
         prompt: "Visit the target",
         rubric: "Check the page loads",
-        agentConfig: { adapter: "claude-code" },
+        agentConfig: { agent: "claude-code" },
         output: {
           transcript: [{ type: "assistant", timestamp, content: { text: "Done" } }],
           result: "Completed",
@@ -162,7 +162,7 @@ function makeMultiAgentOutput(timestamp: string): ScoredOutput {
   const codexResult = {
     ...base.results[0],
     agentName: "codex",
-    agentConfig: { adapter: "codex" },
+    agentConfig: { agent: "codex" },
     score: {
       ...base.results[0].score,
       axisScore: 65,

@@ -82,7 +82,7 @@ function makeResult(overrides: Partial<{ error: string; exitCode: number }>): Ru
     agentName: "test-agent",
     prompt: "do something",
     rubric: "verify it works",
-    agentConfig: { adapter: "test-adapter" },
+    agentConfig: { agent: "test-adapter" },
     output,
   };
 }

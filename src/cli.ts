@@ -245,14 +245,21 @@ async function executeRunPipeline(
 
   if (opts.score && runOutput.results.length > 0) {
     const scoredResults = await Promise.all(scoringPromises);
-    // Artifacts are captured during cleanup (after scoring) — propagate them
-    // onto the scored results so they appear in the final manifest.
+    // Artifacts and teardown notes are captured during cleanup (after scoring) —
+    // propagate them onto the scored results so they appear in the final manifest.
     for (const scored of scoredResults) {
       const match = runOutput.results.find(
         (r) => r.scenarioKey === scored.scenarioKey && r.agentName === scored.agentName,
       );
-      if (match?.artifacts && match.artifacts.length > 0) {
+      if (!match) continue;
+      if (match.artifacts && match.artifacts.length > 0) {
         scored.artifacts = match.artifacts;
+      }
+      if (match.setupOutput) {
+        scored.setupOutput = match.setupOutput;
+      }
+      if (match.teardownOutput) {
+        scored.teardownOutput = match.teardownOutput;
       }
     }
     output = buildScoredOutput(runOutput, scoredResults);
