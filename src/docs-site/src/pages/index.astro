@@ -2,115 +2,245 @@
 import DocsLayout from "../layouts/DocsLayout.astro";
 ---
 
-<DocsLayout title="What is AXIS" active="overview">
-  <div class="hero">
-    <h1>AXIS - Agent Experience Index Score</h1>
-    <p class="lead">
-      AXIS is both an open scoring framework for measuring <strong>agent experience (AX)</strong>
-      and a CLI tool that implements it. Think
-      <a href="https://developer.chrome.com/docs/lighthouse">Lighthouse</a>, but instead of scoring
-      user experience, AXIS scores <strong>agent experience</strong>.
-    </p>
+<DocsLayout title="AXIS - Agent Experience Index Score" active="overview" landing={true}>
+  <div class="home">
+    <section class="home-hero">
+      <div class="home-tag">
+        <span class="home-tag-pulse" aria-hidden="true"></span>
+        <span class="home-tag-label">Open Source</span>
+        <span class="home-tag-sep" aria-hidden="true">·</span>
+        <span class="home-tag-text">Built by Netlify, for the agent web</span>
+      </div>
+
+      <h1 class="home-headline">
+        Stop guessing if agents<br />
+        can use your service.
+      </h1>
+
+      <p class="home-lead">
+        AXIS is an open scoring framework <em>and</em> CLI that measures how well your project,
+        APIs, and tooling actually work when an AI agent tries to use them. Run real agents
+        against real scenarios, capture every tool call, and get a comparable
+        <strong>0&ndash;100 score</strong> back.
+      </p>
+
+      <div class="home-cta">
+        <a href="/quickstart" class="btn btn-primary">
+          Get started
+          <span aria-hidden="true">&rarr;</span>
+        </a>
+        <a href="https://github.com/netlify/axis" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+          </svg>
+          View on GitHub
+        </a>
+      </div>
+
+      <div class="home-steps" role="region" aria-label="Three step quick start">
+        <div class="home-step">
+          <span class="home-step-num">1</span>
+          <span class="home-step-label">Install</span>
+          <code class="home-step-cmd"><span class="home-step-prompt">$</span>npm i -g @netlify/axis</code>
+          <button class="home-step-copy" type="button" data-copy="npm i -g @netlify/axis" aria-label="Copy install command">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h7A1.5 1.5 0 0 1 14 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10v-1h2.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5V4H4V1.5Z"/>
+              <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h7A1.5 1.5 0 0 1 12 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 14.5v-9Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7Z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="home-step">
+          <span class="home-step-num">2</span>
+          <span class="home-step-label">Set up</span>
+          <code class="home-step-cmd"><span class="home-step-prompt">$</span>axis init</code>
+          <button class="home-step-copy" type="button" data-copy="axis init" aria-label="Copy setup command">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h7A1.5 1.5 0 0 1 14 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10v-1h2.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5V4H4V1.5Z"/>
+              <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h7A1.5 1.5 0 0 1 12 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 14.5v-9Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7Z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="home-step">
+          <span class="home-step-num">3</span>
+          <span class="home-step-label">Run</span>
+          <code class="home-step-cmd"><span class="home-step-prompt">$</span>axis run</code>
+          <button class="home-step-copy" type="button" data-copy="axis run" aria-label="Copy run command">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h7A1.5 1.5 0 0 1 14 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10v-1h2.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5V4H4V1.5Z"/>
+              <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h7A1.5 1.5 0 0 1 12 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 14.5v-9Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7Z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Highlights: the four scoring dimensions -->
+    <section class="home-highlights">
+      <div class="home-section-eyebrow">The framework</div>
+      <h2 class="home-section-title">Four dimensions, one score.</h2>
+      <p class="home-section-blurb">
+        A single pass/fail tells you nothing about <em>why</em> an agent struggled. AXIS scores
+        four independent dimensions so you can focus on what matters: a slow API, a confusing
+        layout, a noisy tool, or the agent's own decisions.
+      </p>
+
+      <div class="home-dim-grid">
+        <a href="/scoring#goal-achievement" class="home-dim home-dim-goal">
+          <div class="home-dim-head">
+            <span class="home-dim-weight">40%</span>
+            <span class="home-dim-name">Goal Achievement</span>
+          </div>
+          <p class="home-dim-desc">
+            Did the agent actually finish the task? Scored against your rubric checks by an
+            LLM judge.
+          </p>
+        </a>
+        <a href="/scoring#environment" class="home-dim home-dim-env">
+          <div class="home-dim-head">
+            <span class="home-dim-weight">20%</span>
+            <span class="home-dim-name">Environment</span>
+          </div>
+          <p class="home-dim-desc">
+            Shell, filesystem, build tools. Measures whether your project structure and dev
+            workflow trip agents up.
+          </p>
+        </a>
+        <a href="/scoring#service" class="home-dim home-dim-svc">
+          <div class="home-dim-head">
+            <span class="home-dim-weight">20%</span>
+            <span class="home-dim-name">Service</span>
+          </div>
+          <p class="home-dim-desc">
+            APIs, MCP tools, third-party services. Tells you whether your endpoints are
+            actually usable by an agent.
+          </p>
+        </a>
+        <a href="/scoring#agent" class="home-dim home-dim-agent">
+          <div class="home-dim-head">
+            <span class="home-dim-weight">20%</span>
+            <span class="home-dim-name">Agent</span>
+          </div>
+          <p class="home-dim-desc">
+            Planning, tool selection, self-organization. Captures the quality of the agent's
+            own decisions.
+          </p>
+        </a>
+      </div>
+    </section>
+
+    <!-- Featured: live sample report iframe -->
+    <section class="home-report home-full">
+      <div class="home-report-text">
+        <div class="home-section-eyebrow">The report</div>
+        <h2 class="home-section-title">Every run, fully inspectable.</h2>
+        <p class="home-section-blurb">
+          AXIS doesn't just hand you a number. Each run produces a self-contained HTML report
+          with the full transcript, every tool call, the LLM judge's per-criterion grading,
+          and a sparse-index view that's optimized for skimming. Try the live sample
+          below. Click around, expand interactions, read the rubric grades.
+        </p>
+      </div>
+
+      <div class="home-report-frame">
+        <div class="home-report-bar">
+          <span class="home-report-dot home-report-dot-r" aria-hidden="true"></span>
+          <span class="home-report-dot home-report-dot-y" aria-hidden="true"></span>
+          <span class="home-report-dot home-report-dot-g" aria-hidden="true"></span>
+          <div class="home-report-url">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M11 6V4.5a3 3 0 0 0-6 0V6H3.5A1.5 1.5 0 0 0 2 7.5v6A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 12.5 6H11Zm-5-1.5a2 2 0 1 1 4 0V6H6V4.5Z"/>
+            </svg>
+            .axis/reports/sample/report.html
+          </div>
+          <a class="home-report-open" href="/sample-report.html" target="_blank" rel="noopener">
+            Open full
+            <span aria-hidden="true">&UpperRightArrow;</span>
+          </a>
+        </div>
+        <iframe
+          src="/sample-report.html"
+          title="Sample AXIS report"
+          loading="lazy"
+          class="home-report-iframe"
+        ></iframe>
+        <div class="home-report-caption">
+          Sample data: 6 scenarios, 3 agents, generated at docs build time. Interactive.
+        </div>
+      </div>
+    </section>
+
+    <!-- Workflow -->
+    <section class="home-workflow">
+      <div class="home-section-eyebrow">The workflow</div>
+      <h2 class="home-section-title">Score it. Baseline it. Gate CI on it.</h2>
+      <p class="home-section-blurb">
+        AXIS is built to slot into the same place as your unit tests, just for agent
+        experience. Run it locally to iterate, then turn on baselines and let your CI catch
+        regressions automatically.
+      </p>
+
+      <div class="home-flow-grid">
+        <div class="home-flow">
+          <div class="home-flow-num">1</div>
+          <div class="home-flow-title">Define a scenario</div>
+          <p class="home-flow-desc">
+            A JSON file with a prompt, a rubric, and optional setup steps. Five lines of YAML
+            is enough to start.
+          </p>
+        </div>
+        <div class="home-flow">
+          <div class="home-flow-num">2</div>
+          <div class="home-flow-title">Run any agent</div>
+          <p class="home-flow-desc">
+            40+ built-in agents including Claude Code, Codex, Gemini, plus any ACP-compliant
+            agent. Bring your own with a small adapter.
+          </p>
+        </div>
+        <div class="home-flow">
+          <div class="home-flow-num">3</div>
+          <div class="home-flow-title">Set a baseline</div>
+          <p class="home-flow-desc">
+            Snapshot a passing run, commit the baseline, and any future regression beyond
+            noise tolerance fails the build.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom CTA -->
+    <section class="home-bottom">
+      <h2 class="home-bottom-title">Ship for humans <em>and</em> the agents they use.</h2>
+      <p class="home-bottom-blurb">
+        AXIS is open source and free.<br />
+        You can wire it into your project in a couple of minutes.
+      </p>
+      <div class="home-cta">
+        <a href="/quickstart" class="btn btn-primary">
+          Read the quickstart
+          <span aria-hidden="true">&rarr;</span>
+        </a>
+        <a href="/scoring" class="btn btn-secondary">
+          How scoring works
+        </a>
+      </div>
+    </section>
   </div>
 
-  <h2>Why AX Matters</h2>
-  <p>
-    The web has Lighthouse. APIs have contract testing. Performance has k6. But there is no
-    standardized way to answer: <em>"How well does my system work when an AI agent tries to use it?"</em>
-  </p>
-  <p>
-    Without measurement, you are guessing. Maybe agents struggle with your project because the
-    directory structure is confusing. Maybe they waste tokens calling an API that returns unhelpful
-    errors. Maybe they succeed at the task but take three times longer than they should. You
-    cannot fix what you cannot see. AX gives you the same visibility into agent interactions that
-    UX metrics give you for human users.
-  </p>
-
-  <h2>Our Approach</h2>
-  <p>
-    AXIS is built on two core beliefs.
-  </p>
-  <p>
-    <strong>Measure each dimension independently.</strong> Agent experience is not a single number.
-    When a score drops, you need to know <em>why</em>. Is your API slow? Is the agent making
-    unnecessary calls? Is the project structure confusing? AXIS scores four independent dimensions
-    so you can pinpoint the problem. A low Service score tells you your APIs are the bottleneck.
-    A low Environment score tells you your filesystem or tooling is tripping agents up. Generic
-    pass/fail testing cannot surface these signals.
-  </p>
-  <p>
-    <strong>Test against real agent behavior.</strong> It is not enough to validate that your system
-    publishes the right config files or follows a protocol spec. What matters is whether agents
-    actually discover and use what you provide. AXIS runs real agents against real scenarios and
-    observes what happens: which tools they call, which files they read, which APIs they hit. This
-    tells you what agents <em>do</em>, not what they <em>could</em> do in theory.
-  </p>
-
-  <h2>The Scoring Framework</h2>
-  <p>
-    At its core, AXIS defines a standard way to measure agent experience across four independent
-    dimensions. Any tool, platform, or CI system can implement this framework to produce
-    comparable AX measurements.
-  </p>
-  <div class="card-grid">
-    <div class="card card-accent">
-      <span class="card-weight">40%</span>
-      <div class="card-title">Goal Achievement</div>
-      <div class="card-desc">
-        Did the agent complete the task? Evaluated against rubric criteria you define for each
-        scenario.
-      </div>
-    </div>
-    <div class="card card-env">
-      <span class="card-weight">20%</span>
-      <div class="card-title">Environment</div>
-      <div class="card-desc">
-        How well did the agent use the OS, filesystem, and dev tools? Measures quality of shell
-        commands, file operations, git usage, and build tools.
-      </div>
-    </div>
-    <div class="card card-svc">
-      <span class="card-weight">20%</span>
-      <div class="card-title">Service</div>
-      <div class="card-desc">
-        How effectively did the agent use external services? Evaluates API calls, MCP tools,
-        network requests, and third-party integrations.
-      </div>
-    </div>
-    <div class="card card-agent">
-      <span class="card-weight">20%</span>
-      <div class="card-title">Agent</div>
-      <div class="card-desc">
-        How well did the agent reason and self-organize? Covers planning, task management, tool
-        discovery, and metacognitive behavior.
-      </div>
-    </div>
-  </div>
-  <p>
-    These four dimensions combine into a single 0 to 100 <strong>AXIS Result</strong>. The
-    framework specifies what signals feed each dimension, how interactions are categorized, and
-    how the composite score is calculated. See <a href="/scoring">Scoring Framework</a> for full
-    details on the signals and scoring logic.
-  </p>
-
-  <h2>The CLI Tool</h2>
-  <p>
-    The <code>@netlify/axis</code> package is an easy to use implementation of the scoring framework that will 
-    help you get started quickly and maintain a good AX. Because the scoring framework is open and modular, you can also implement your own tooling on top of it.
-    With the AXIS CLI, you can run agent scenarios, capture transcripts, score the results, and
-    produce reports.
-  </p>
-  <ul>
-    <li><strong>Define scenarios</strong> as JSON files with a prompt, rubric, and optional setup/teardown steps.</li>
-    <li><strong>Run them</strong> against any supported agent (or your own) in isolated workspaces.</li>
-    <li><strong>Score automatically</strong> using a multi-pass LLM evaluation pipeline that produces per-dimension and composite scores.</li>
-    <li><strong>Track over time</strong> with persistent reports, baseline snapshots, and regression detection for CI gating.</li>
-  </ul>
-
-  <h3>Agent Support</h3>
-  <p>
-    AXIS ships with built-in support for Claude Code, Codex, Gemini, Goose, and more. You can also
-    bring your own agent using the custom agent API. See
-    <a href="/running">Execution & Agents</a> for the full list and details.
-  </p>
+  <script is:inline>
+    document.querySelectorAll(".home-step-copy").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var text = btn.getAttribute("data-copy") || "";
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(text).then(function () {
+          var prev = btn.getAttribute("aria-label");
+          btn.setAttribute("aria-label", "Copied!");
+          btn.classList.add("copied");
+          setTimeout(function () {
+            btn.setAttribute("aria-label", prev || "Copy command");
+            btn.classList.remove("copied");
+          }, 1400);
+        });
+      });
+    });
+  </script>
 </DocsLayout>

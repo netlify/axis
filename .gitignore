@@ -3,3 +3,4 @@ dist/
 .axis
 .astro
 .claude/worktrees
+src/docs-site/public/sample-report.html
