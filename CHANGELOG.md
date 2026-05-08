@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0](https://github.com/netlify/axis/compare/v1.4.0...v1.5.0) (2026-05-08)
+
+
+### Features
+
+* ensure agent|model keys are used ([9d0ef6e](https://github.com/netlify/axis/commit/9d0ef6e3e5c983b5c412b1a5b15bbe514493c4c9))
+* fix up the landing page ([b56ccaa](https://github.com/netlify/axis/commit/b56ccaaa6752bc8e7f2f68bf8f063a9fcaa14abd))
+
 ## [1.4.0](https://github.com/netlify/axis/compare/v1.3.1...v1.4.0) (2026-05-07)
 
 
