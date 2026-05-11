@@ -90,6 +90,7 @@ import { scoreResults } from "../../../src/scoring/index.js";
 import { buildSparseIndex } from "../../../src/scoring/sparse-index.js";
 import { runDeepEval } from "../../../src/scoring/deep-eval.js";
 import { computeCategoryScore } from "../../../src/scoring/category-score.js";
+import { scoreGoalAchievement } from "../../../src/scoring/goal-achievement.js";
 import type { RunOutput } from "../../../src/types/output.js";
 
 function makeRunOutput(overrides: Partial<RunOutput> = {}): RunOutput {
@@ -210,5 +211,65 @@ describe("scoreResults", () => {
   it("includes sparseIndex in score result", async () => {
     const scored = await scoreResults(makeRunOutput());
     expect(scored.results[0].score.sparseIndex).toBe(mockSparseIndex);
+  });
+
+  describe("failed-run short-circuit", () => {
+    it("returns zero scores for non-zero exit code without invoking judges", async () => {
+      const output = makeRunOutput();
+      output.results[0].output.metadata.exitCode = 1;
+      output.results[0].output.metadata.error = "Authentication required";
+
+      const scored = await scoreResults(output);
+      const score = scored.results[0].score;
+
+      expect(score.axisScore).toBe(0);
+      expect(score.goalAchievement.score).toBe(0);
+      expect(score.environment.score).toBe(0);
+      expect(score.service.score).toBe(0);
+      expect(score.agent.score).toBe(0);
+
+      // No LLM judges were called
+      expect(scoreGoalAchievement).not.toHaveBeenCalled();
+      expect(runDeepEval).not.toHaveBeenCalled();
+      expect(computeCategoryScore).not.toHaveBeenCalled();
+    });
+
+    it("treats metadata.error as failure even when exit code is 0", async () => {
+      const output = makeRunOutput();
+      output.results[0].output.metadata.exitCode = 0;
+      output.results[0].output.metadata.error = "Stream closed unexpectedly";
+
+      const scored = await scoreResults(output);
+
+      expect(scored.results[0].score.axisScore).toBe(0);
+      expect(runDeepEval).not.toHaveBeenCalled();
+    });
+
+    it("populates rubric criteria with the failure reason on zero score", async () => {
+      const output = makeRunOutput();
+      output.results[0].rubric = [{ check: "Did the thing", weight: 1.0 }];
+      output.results[0].output.metadata.exitCode = 1;
+      output.results[0].output.metadata.error = "Authentication required";
+
+      const scored = await scoreResults(output);
+      const criteria = scored.results[0].score.goalAchievement.criteria;
+
+      expect(criteria).toHaveLength(1);
+      expect(criteria[0].score).toBe(0);
+      expect(criteria[0].rationale).toContain("Authentication required");
+    });
+
+    it("handles a string rubric on failed runs", async () => {
+      const output = makeRunOutput();
+      output.results[0].rubric = "Agent should echo prompt";
+      output.results[0].output.metadata.exitCode = 1;
+
+      const scored = await scoreResults(output);
+      const criteria = scored.results[0].score.goalAchievement.criteria;
+
+      expect(criteria).toHaveLength(1);
+      expect(criteria[0].check).toBe("Agent should echo prompt");
+      expect(criteria[0].score).toBe(0);
+    });
   });
 });

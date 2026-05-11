@@ -4,10 +4,10 @@
   "timestamp": "2026-04-23T22:22:13.210Z",
   "durationMs": 210340,
   "summary": {
-    "total": 6,
+    "total": 5,
     "completed": 5,
-    "failed": 1,
-    "averageAxisScore": 78
+    "failed": 0,
+    "averageAxisScore": 80
   },
   "results": [
     {
@@ -143,25 +143,6 @@
         },
         "weights": { "goal_achievement": 0.4, "environment": 0.2, "service": 0.2, "agent": 0.2 }
       }
-    },
-    {
-      "scenarioKey": "explain-docs",
-      "scenarioName": "Fetch and summarize documentation",
-      "agentName": "codex",
-      "durationMs": 42100,
-      "exitCode": 1,
-      "file": "scenarios/explain-docs/codex.json",
-      "tokenUsage": { "input": 200, "output": 50, "cacheReadInput": 0 },
-      "totalCostUsd": 0.0012,
-      "prompt": "Fetch the documentation page at https://docs.netlify.com/build/async-workloads/overview/ and write a detailed summary to summary.md.",
-      "rubric": [
-        { "check": "Agent fetched the documentation URL", "weight": 0.25 },
-        { "check": "Agent wrote summary.md with substantive content", "weight": 0.25 },
-        { "check": "Summary covers what the product does", "weight": 0.25 },
-        { "check": "Summary includes setup steps and key concepts", "weight": 0.25 }
-      ],
-      "agentConfig": { "agent": "codex" },
-      "error": "API quota exceeded"
     },
     {
       "scenarioKey": "fix-bug",

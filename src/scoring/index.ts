@@ -1,6 +1,15 @@
 import type { RunOutput, RunResult } from "../types/output.js";
 import type { ScoringWeights } from "../types/config.js";
-import type { ScoredOutput, ScoredRunResult, ScoreResult, ScoringOptions } from "../types/scoring.js";
+import type { RubricCriterion } from "../types/scenario.js";
+import type {
+  CategoryScore,
+  GoalAchievementScore,
+  InteractionCategory,
+  ScoredOutput,
+  ScoredRunResult,
+  ScoreResult,
+  ScoringOptions,
+} from "../types/scoring.js";
 import { normalizeTranscript, toTranscriptAnalysis } from "../transcript/normalize.js";
 import { writeScenarioRawData } from "../reports/writer.js";
 import { scoreGoalAchievement } from "./goal-achievement.js";
@@ -41,6 +50,28 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   // Step 3: Write raw data to report dir so LLM judges can read it
   if (options?.reportDir) {
     writeScenarioRawData(options.reportDir, result, sparseIndex);
+  }
+
+  // Short-circuit: runs that failed entirely shouldn't be graded on process
+  // quality — there's no process to grade. Without this, empty-transcript runs
+  // get perfect-score defaults in env/service/agent because nothing was audited.
+  if (isFailedRun(result)) {
+    const score = buildZeroScore(result, weights, sparseIndex.lines.length > 0 ? sparseIndex : undefined);
+    options?.onProgress?.(result.scenarioKey, result.agentName, "done");
+    result.output.transcriptAnalysis = toTranscriptAnalysis(normalized);
+    return {
+      scenarioKey: result.scenarioKey,
+      scenarioName: result.scenarioName,
+      agentName: result.agentName,
+      prompt: result.prompt,
+      rubric: result.rubric,
+      agentConfig: result.agentConfig,
+      output: result.output,
+      score,
+      ...(result.workingDirectory !== undefined ? { workingDirectory: result.workingDirectory } : {}),
+      ...(result.resolvedConfig !== undefined ? { resolvedConfig: result.resolvedConfig } : {}),
+      ...(result.artifacts !== undefined ? { artifacts: result.artifacts } : {}),
+    };
   }
 
   // Step 4: Deep eval + goal achievement in parallel
@@ -147,4 +178,61 @@ export async function scoreResults(runOutput: RunOutput, options?: ScoringOption
   const scoredResults = await Promise.all(runOutput.results.map((r) => scoreRunResult(r, options)));
 
   return buildScoredOutput(runOutput, scoredResults);
+}
+
+function isFailedRun(result: RunResult): boolean {
+  const { exitCode, error } = result.output.metadata;
+  return exitCode !== 0 || Boolean(error);
+}
+
+function buildZeroScore(
+  result: RunResult,
+  weights: ScoringWeights,
+  sparseIndex?: ScoreResult["sparseIndex"],
+): ScoreResult {
+  const reason = result.output.metadata.error
+    ? `Run failed: ${result.output.metadata.error}`
+    : `Run failed with exit code ${result.output.metadata.exitCode}`;
+
+  return {
+    axisScore: 0,
+    goalAchievement: buildZeroGoalAchievement(result.rubric, reason),
+    environment: buildZeroCategoryScore("environment"),
+    service: buildZeroCategoryScore("service"),
+    agent: buildZeroCategoryScore("agent"),
+    weights,
+    ...(sparseIndex ? { sparseIndex } : {}),
+  };
+}
+
+function buildZeroGoalAchievement(rubric: RunResult["rubric"], reason: string): GoalAchievementScore {
+  if (typeof rubric === "string") {
+    return {
+      score: 0,
+      criteria: [{ check: rubric, weight: 1, score: 0, rationale: reason }],
+    };
+  }
+  if (Array.isArray(rubric) && rubric.length > 0) {
+    return {
+      score: 0,
+      criteria: rubric.map((c: RubricCriterion) => ({
+        check: c.check,
+        weight: c.weight ?? 1,
+        score: 0,
+        rationale: reason,
+      })),
+    };
+  }
+  return { score: 0, criteria: [] };
+}
+
+function buildZeroCategoryScore(category: InteractionCategory): CategoryScore {
+  return {
+    score: 0,
+    interactionCount: 0,
+    auditedCount: 0,
+    dimensions: { success: 0, speed: 0, weight: 0, relevance: 0, necessity: 0 },
+    audits: [],
+    necessity: { category, score: 0, unnecessaryIds: [], rationale: "Run failed before any interactions occurred" },
+  };
 }
