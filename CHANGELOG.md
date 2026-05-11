@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/netlify/axis/compare/v1.6.0...v1.6.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* type on config ([c6df111](https://github.com/netlify/axis/commit/c6df111c401b31118dc6257088299aa79d608dc8))
+
 ## [1.6.0](https://github.com/netlify/axis/compare/v1.5.0...v1.6.0) (2026-05-11)
 
 
