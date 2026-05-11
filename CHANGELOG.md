@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0](https://github.com/netlify/axis/compare/v1.5.0...v1.6.0) (2026-05-11)
+
+
+### Features
+
+* add docs for expanded agent support ([19d0799](https://github.com/netlify/axis/commit/19d07990c3fa4ae5ec1198e500a22a293cb02aab))
+
+
+### Bug Fixes
+
+* capitalization ([6627825](https://github.com/netlify/axis/commit/6627825c49327c5776015b1a7f0b7037fa67ec14))
+* gemini trust mode ([f9b2a3d](https://github.com/netlify/axis/commit/f9b2a3d3ece914b54500056835952489490aa894))
+* homepage report ([63fe35e](https://github.com/netlify/axis/commit/63fe35e405b3dda575d57715ea3d415ae795dccc))
+
 ## [1.5.0](https://github.com/netlify/axis/compare/v1.4.0...v1.5.0) (2026-05-08)
 
 
