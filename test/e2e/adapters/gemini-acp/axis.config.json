@@ -1,4 +1,0 @@
-{
-  "scenarios": "./scenarios",
-  "agents": ["gemini-acp"]
-}

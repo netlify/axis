@@ -1,0 +1,168 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+---
+
+<DocsLayout title="Built-in Agents" active="agents">
+  <h1>Built-in Agents</h1>
+  <p class="lead">
+    AXIS ships with built-in support for every major AI coding agent that speaks the Agent Client
+    Protocol (ACP), plus the native Claude Code and Codex CLIs.
+  </p>
+
+  <p>
+    Reference an agent by name in your <code>axis.config.json</code>:
+  </p>
+  <pre><code>{`{
+  "agents": ["claude-code", "codex"]
+}`}</code></pre>
+
+  <p>
+    Many agents are bring-your-own-key (BYOK) and accept several provider environment variables;
+    those rows link to the agent's own provider docs.
+  </p>
+
+  <p>
+    Agents with <strong>Auto Install: yes</strong> are distributed as npm packages and AXIS will
+    run them via <code>npx --yes</code> if the CLI is not already on your <code>PATH</code>.
+    Agents with <strong>no</strong> ship through brew, cargo, uv, pip, or vendor installers, and
+    must be installed manually before AXIS can run them.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Agent</th>
+        <th>Auto Install</th>
+        <th>Required Env Vars</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>claude-code</code></td>
+        <td>yes</td>
+        <td><code>ANTHROPIC_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>codex</code></td>
+        <td>yes</td>
+        <td><code>CODEX_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>claude-sdk</code></td>
+        <td>yes</td>
+        <td><code>ANTHROPIC_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>codex-sdk</code></td>
+        <td>yes</td>
+        <td><code>OPENAI_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>gemini</code></td>
+        <td>yes</td>
+        <td><code>GEMINI_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>goose</code></td>
+        <td>no</td>
+        <td><a href="https://block.github.io/goose/docs/getting-started/providers" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>opencode</code></td>
+        <td>yes</td>
+        <td><a href="https://opencode.ai/docs/providers/" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>fast-agent</code></td>
+        <td>no</td>
+        <td><a href="https://fast-agent.ai/ref/config_file/" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>openhands</code></td>
+        <td>no</td>
+        <td><a href="https://docs.all-hands.dev/usage/llms" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>qwen-code</code></td>
+        <td>yes</td>
+        <td><a href="https://qwenlm.github.io/qwen-code-docs/en/users/configuration/auth/" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>kimi</code></td>
+        <td>no</td>
+        <td><a href="https://moonshotai.github.io/kimi-cli/en/configuration/providers.html" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>mistral-vibe</code></td>
+        <td>no</td>
+        <td><code>MISTRAL_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>blackbox</code></td>
+        <td>no</td>
+        <td><code>BLACKBOX_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>stakpak</code></td>
+        <td>no</td>
+        <td><a href="https://github.com/stakpak/agent" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>poolside</code></td>
+        <td>no</td>
+        <td><code>POOLSIDE_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>vtcode</code></td>
+        <td>no</td>
+        <td><a href="https://github.com/vinhnx/VTCode" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>cursor-agent</code></td>
+        <td>no</td>
+        <td><code>CURSOR_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>auggie</code></td>
+        <td>yes</td>
+        <td><code>AUGMENT_SESSION_AUTH</code></td>
+      </tr>
+      <tr>
+        <td><code>factory-droid</code></td>
+        <td>yes</td>
+        <td><code>FACTORY_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>qoder</code></td>
+        <td>no</td>
+        <td><code>QODER_PERSONAL_ACCESS_TOKEN</code></td>
+      </tr>
+      <tr>
+        <td><code>cline</code></td>
+        <td>yes</td>
+        <td><a href="https://docs.cline.bot/api/authentication#bring-your-own-key-byok" target="_blank" rel="noopener">Supported provider keys</a></td>
+      </tr>
+      <tr>
+        <td><code>kilo</code></td>
+        <td>no</td>
+        <td><code>KILO_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>kiro-cli</code></td>
+        <td>no</td>
+        <td><code>KIRO_API_KEY</code></td>
+      </tr>
+      <tr>
+        <td><code>copilot</code></td>
+        <td>yes</td>
+        <td><code>COPILOT_GITHUB_TOKEN</code>, <code>GH_TOKEN</code>, or <code>GITHUB_TOKEN</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Custom Agents</h2>
+  <p>
+    Not listed here? You can register any agent via the
+    <a href="/running#custom-agents">custom agent API</a>.
+  </p>
+</DocsLayout>

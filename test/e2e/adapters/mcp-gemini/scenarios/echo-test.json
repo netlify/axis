@@ -1,5 +1,0 @@
-{
-  "name": "MCP echo test",
-  "prompt": "Echo hello with MCP servers configured",
-  "rubric": "The agent should produce a result."
-}

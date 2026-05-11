@@ -1,4 +1,4 @@
 {
   "scenarios": "./scenarios",
-  "agents": ["goose"]
+  "agents": ["copilot"]
 }

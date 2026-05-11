@@ -12,8 +12,14 @@ const NPX_PACKAGES: Record<string, string> = {
   "claude-sdk": "@agentclientprotocol/claude-agent-acp",
   "claude-code": "@anthropic-ai/claude-code",
   codex: "@openai/codex",
+  "codex-sdk": "@zed-industries/codex-acp",
   gemini: "@google/gemini-cli",
-  "gemini-acp": "@google/gemini-cli",
+  opencode: "opencode-ai",
+  "qwen-code": "@qwen-code/qwen-code",
+  auggie: "@augmentcode/auggie",
+  cline: "cline",
+  "factory-droid": "@yaonyan/droid-acp",
+  copilot: "@github/copilot",
 };
 
 /**

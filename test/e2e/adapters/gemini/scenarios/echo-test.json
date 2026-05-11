@@ -1,5 +1,5 @@
 {
-  "name": "Gemini echo test",
-  "prompt": "Hello from AXIS Gemini adapter",
+  "name": "Gemini ACP echo test",
+  "prompt": "Hello from AXIS Gemini ACP adapter",
   "rubric": "The agent should echo back the prompt text."
 }

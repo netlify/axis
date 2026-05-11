@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { writeClaudeMcpConfig, writeCodexMcpConfig, writeGeminiSettings } from "../../../../src/adapters/utils/mcp.js";
+import { writeClaudeMcpConfig, writeCodexMcpConfig } from "../../../../src/adapters/utils/mcp.js";
 import type { McpServerConfig } from "../../../../src/types/config.js";
 
 let tmpDir: string;
@@ -134,53 +134,3 @@ describe("writeCodexMcpConfig", () => {
   });
 });
 
-describe("writeGeminiSettings", () => {
-  it("always writes context discovery settings", () => {
-    writeGeminiSettings(tmpDir);
-
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
-    expect(content.context).toEqual({
-      discoveryMaxDirs: 0,
-      memoryBoundaryMarkers: [],
-    });
-    expect(content.mcpServers).toBeUndefined();
-  });
-
-  it("writes settings.json with a stdio server", () => {
-    writeGeminiSettings(tmpDir, { myServer: stdioServer });
-
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
-    expect(content.context.discoveryMaxDirs).toBe(0);
-    expect(content.mcpServers.myServer).toEqual({
-      command: "npx",
-      args: ["-y", "@example/mcp-server"],
-      env: { API_KEY: "test-key" },
-    });
-  });
-
-  it("writes settings.json with an http server", () => {
-    writeGeminiSettings(tmpDir, { remote: httpServer });
-
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
-    expect(content.mcpServers.remote).toEqual({
-      type: "http",
-      url: "https://mcp.example.com/tools",
-      headers: { Authorization: "Bearer tok123" },
-    });
-  });
-
-  it("writes settings.json with mixed servers", () => {
-    writeGeminiSettings(tmpDir, { local: minimalStdio, remote: minimalHttp });
-
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
-    expect(Object.keys(content.mcpServers)).toEqual(["local", "remote"]);
-  });
-
-  it("omits empty optional fields", () => {
-    writeGeminiSettings(tmpDir, { min: minimalHttp });
-
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
-    expect(content.mcpServers.min).toEqual({ type: "http", url: "https://mcp.example.com" });
-    expect(content.mcpServers.min.headers).toBeUndefined();
-  });
-});

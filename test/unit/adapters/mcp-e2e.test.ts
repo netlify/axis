@@ -47,12 +47,7 @@ const CODEX_EVENTS = [
   JSON.stringify({ type: "turn.completed", usage: { input_tokens: 10, output_tokens: 5 } }),
 ];
 
-const GEMINI_EVENTS = [
-  JSON.stringify({ type: "message", role: "assistant", content: "Done", delta: true }),
-  JSON.stringify({ type: "result", status: "success", stats: { input_tokens: 10, output_tokens: 5 } }),
-];
-
-// Expected MCP config content (JSON format — used by Claude Code and Gemini)
+// Expected MCP config content (JSON format — used by Claude Code)
 const EXPECTED_JSON_MCP = {
   mcpServers: {
     netlify: {
@@ -166,52 +161,4 @@ describe("MCP e2e — Codex", () => {
   });
 });
 
-// ─── Gemini ────────────────────────────────────────────────────────────────────
-
-describe("MCP e2e — Gemini", () => {
-  const E2E_DIR = path.resolve(import.meta.dirname, "../../e2e/adapters/mcp-gemini");
-  const origKey = process.env.GEMINI_API_KEY;
-  let capturedMcpConfig: Record<string, unknown> | null = null;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    process.env.GEMINI_API_KEY = "test-key";
-    capturedMcpConfig = null;
-
-    mockSpawn.mockImplementation(((_cmd: string, _args: string[], opts: any) => {
-      // At spawn time, settings.json should already be written to GEMINI_CLI_HOME
-      const geminiHome = opts.env?.GEMINI_CLI_HOME;
-      if (geminiHome) {
-        const settingsPath = path.join(geminiHome, "settings.json");
-        if (fs.existsSync(settingsPath)) {
-          capturedMcpConfig = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-        }
-      }
-      return createMockProcess(GEMINI_EVENTS);
-    }) as any);
-  });
-
-  afterEach(() => {
-    if (origKey !== undefined) process.env.GEMINI_API_KEY = origKey;
-    else delete process.env.GEMINI_API_KEY;
-  });
-
-  it("writes settings.json with correct MCP config and context settings before spawning agent", async () => {
-    await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
-
-    expect(capturedMcpConfig).not.toBeNull();
-    // Gemini settings.json includes context discovery settings alongside MCP config
-    expect(capturedMcpConfig).toEqual({
-      context: { discoveryMaxDirs: 0, memoryBoundaryMarkers: [] },
-      ...EXPECTED_JSON_MCP,
-    });
-  });
-
-  it("produces correct results with MCP servers configured", async () => {
-    const output = await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
-
-    expect(output.results).toHaveLength(1);
-    expect(output.results[0].output.result).toBe("Done");
-    expect(output.summary.completed).toBe(1);
-  });
-});
+// Note: Gemini's MCP wiring moved to ACP `session/new` — covered by the ACP adapter test.

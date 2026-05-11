@@ -472,7 +472,9 @@ export default async () => {
   </table>
   <pre><code>{mcpExample}</code></pre>
   <p>
-    Each agent writes MCP configuration in its native format before spawning:
+    Each NDJSON-style agent writes MCP configuration in its native format before spawning. ACP-based
+    adapters (<code>claude-sdk</code>, <code>codex-sdk</code>, <code>gemini</code>, and every other
+    ACP agent) pass MCP servers through the ACP <code>session/new</code> call instead.
   </p>
   <table class="table-fields">
     <thead>
@@ -492,11 +494,6 @@ export default async () => {
         <td><code>codex</code></td>
         <td><code>config.toml</code></td>
         <td><code>CODEX_HOME</code></td>
-      </tr>
-      <tr>
-        <td><code>gemini</code></td>
-        <td><code>settings.json</code></td>
-        <td><code>GEMINI_CLI_HOME</code></td>
       </tr>
     </tbody>
   </table>

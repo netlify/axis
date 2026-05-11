@@ -28,7 +28,7 @@ AXIS (Agent Experience Index Score) is a synthetic testing framework for AI agen
 
 ### Adapter Pattern
 
-All three built-in adapters are created via `createAgentAdapter(spec)` from `src/adapters/base/agent-adapter.ts`. Each adapter is a plain factory function (e.g. `createGeminiAdapter()`) that returns an `AgentAdapter` -no classes, no inheritance. The factory owns the shared plumbing:
+Built-in adapters split into two factories. NDJSON-style adapters (`claude-code`, `codex`) are created via `createAgentAdapter(spec)` from `src/adapters/base/agent-adapter.ts`. ACP-based adapters (`claude-sdk`, `codex-sdk`, `gemini`, `goose`, `opencode`, `qwen-code`, `stakpak`, `blackbox`, `fast-agent`, `mistral-vibe`, `factory-droid`, `poolside`, `vtcode`, `cursor-agent`, `auggie`, `kimi`, `openhands`, `cline`, `kiro-cli`, `kilo`, `qoder`) are created via `createAcpBasedAdapter(spec)` from `src/adapters/base/acp-adapter.ts`. Each adapter is a plain factory function (e.g. `createGeminiAdapter()`) that returns an `AgentAdapter` -no classes, no inheritance. The factory owns the shared plumbing:
 
 - Spawn + stdin.end + cleanup registration (SIGTERM on Ctrl-C)
 - 10-minute timeout → SIGTERM → SIGKILL after 5s grace (timer cleared on clean exit)
@@ -39,7 +39,7 @@ All three built-in adapters are created via `createAgentAdapter(spec)` from `src
 - CLI resolution (direct command → `npx --yes <pkg>` fallback)
 - Error precedence: `extracted.metadata.error` → `stderr` → `"Agent process exited with non-zero code"`
 
-The three built-in adapters (`claude-code`, `codex`, `gemini`) use `lines` mode for NDJSON parsing. Custom adapters can use either `lines` or `aggregate` mode (raw stdout capture).
+The NDJSON-style adapters (`claude-code`, `codex`) use `lines` mode for NDJSON parsing. Custom adapters can use either `lines` or `aggregate` mode (raw stdout capture). ACP-based adapters bypass `streamConfig` entirely - the ACP SDK handles framing.
 
 ### Adding a new agent adapter
 

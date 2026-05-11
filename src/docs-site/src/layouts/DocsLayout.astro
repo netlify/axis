@@ -3,7 +3,7 @@ import "../styles/docs.css";
 
 interface Props {
   title: string;
-  active: "overview" | "quickstart" | "scoring" | "scenarios" | "running" | "reports" | "cli" | "configuration";
+  active: "overview" | "quickstart" | "scoring" | "scenarios" | "running" | "agents" | "reports" | "cli" | "configuration";
   landing?: boolean;
 }
 
@@ -54,6 +54,7 @@ const { title, active, landing = false } = Astro.props;
             <a href="/scenarios" class:list={["sidebar-link", { active: active === "scenarios" }]}>Writing Scenarios</a>
             <div class="sidebar-section-label">Running Tests</div>
             <a href="/running" class:list={["sidebar-link", { active: active === "running" }]}>Execution & Agents</a>
+            <a href="/agents" class:list={["sidebar-link", { active: active === "agents" }]}>Built-in Agents</a>
             <a href="/reports" class:list={["sidebar-link", { active: active === "reports" }]}>Reports & Baselines</a>
             <div class="sidebar-section-label">Reference</div>
             <a href="/cli" class:list={["sidebar-link", { active: active === "cli" }]}>CLI</a>

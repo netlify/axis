@@ -33,61 +33,9 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 
   <h2>Supported Agents</h2>
   <p>
-    AXIS ships with built-in support for popular AI coding agents. Each agent integration handles
-    CLI resolution, process spawning, transcript capture, and output normalization.
-  </p>
-  <table>
-    <thead>
-      <tr>
-        <th>Agent</th>
-        <th>CLI Binary</th>
-        <th>Required Env</th>
-        <th>Default Flags</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>claude-code</code></td>
-        <td><code>claude</code></td>
-        <td><code>ANTHROPIC_API_KEY</code></td>
-        <td><code>dangerously-skip-permissions</code></td>
-      </tr>
-      <tr>
-        <td><code>codex</code></td>
-        <td><code>codex</code></td>
-        <td><code>CODEX_API_KEY</code></td>
-        <td><code>full-auto</code>, <code>skip-git-repo-check</code></td>
-      </tr>
-      <tr>
-        <td><code>gemini</code></td>
-        <td><code>gemini</code></td>
-        <td><code>GEMINI_API_KEY</code></td>
-        <td><code>yolo</code></td>
-      </tr>
-      <tr>
-        <td><code>goose</code></td>
-        <td><code>goose</code></td>
-        <td>None</td>
-        <td>None</td>
-      </tr>
-      <tr>
-        <td><code>claude-sdk</code></td>
-        <td>SDK</td>
-        <td><code>ANTHROPIC_API_KEY</code></td>
-        <td>None</td>
-      </tr>
-      <tr>
-        <td><code>gemini-acp</code></td>
-        <td>ACP</td>
-        <td><code>GEMINI_API_KEY</code></td>
-        <td>None</td>
-      </tr>
-    </tbody>
-  </table>
-  <p>
-    CLI binaries are resolved automatically. If not found locally, AXIS falls back to
-    <code>npx --yes &lt;package&gt;</code> silently. Default flags are applied unless you
-    override them in your <a href="/configuration">agent configuration</a>.
+    AXIS supports Claude Code and Codex as default agents, plus every major AI coding agent that
+    speaks the Agent Client Protocol (ACP). See <a href="/agents">Built-in Agents</a> for the full
+    list with required environment variables.
   </p>
 
   <h2>Custom Agents</h2>
@@ -131,7 +79,8 @@ export default createAgentAdapter<{ stdout: string }>({
     <li>
       <strong>Lines mode</strong> -For agents that emit NDJSON (one JSON object per line). AXIS
       parses each line and passes the parsed object to your <code>onLine</code> handler. The
-      built-in Claude Code, Codex, and Gemini agents all use this mode.
+      native <code>claude-code</code> and <code>codex</code> adapters use this mode. ACP-based
+      adapters bypass <code>streamConfig</code> entirely; the ACP SDK handles framing.
     </li>
     <li>
       <strong>Aggregate mode</strong> -For agents that emit plain text or non-JSON output. Raw
