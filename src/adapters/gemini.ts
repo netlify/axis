@@ -27,7 +27,7 @@ export function createGeminiAdapter(): AgentAdapter {
     }),
 
     buildArgs: (input) => {
-      const args = ["--acp"];
+      const args = ["--acp", "--skip-trust"];
       if (input.config.model) args.push("--model", input.config.model);
 
       const flags = input.config.flags ?? {};
