@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.3](https://github.com/netlify/axis/compare/v1.6.2...v1.6.3) (2026-05-12)
+
+
+### Bug Fixes
+
+* env vars should merge ([9ef3967](https://github.com/netlify/axis/commit/9ef3967d971f5dce120b3abd342bcb80ab3d6d54))
+* show inline speed tiers ([3f3c307](https://github.com/netlify/axis/commit/3f3c307f37919138530ef2dffd6082e1542b646f))
+
 ## [1.6.2](https://github.com/netlify/axis/compare/v1.6.1...v1.6.2) (2026-05-12)
 
 
