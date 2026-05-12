@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.4](https://github.com/netlify/axis/compare/v1.6.3...v1.6.4) (2026-05-12)
+
+
+### Bug Fixes
+
+* improve acp end detection ([0b559cc](https://github.com/netlify/axis/commit/0b559cc67f6b59f5e71725426bb5452c797f89de))
+
 ## [1.6.3](https://github.com/netlify/axis/compare/v1.6.2...v1.6.3) (2026-05-12)
 
 
