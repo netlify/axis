@@ -17,7 +17,12 @@ export interface AxisConfig {
   settings?: SettingsConfig;
   /** Custom adapter modules. Keys are adapter names, values are paths (relative to config) to JS/TS modules that export an AgentAdapter. */
   adapters?: Record<string, string>;
-  /** Environment variables to pass through to agent processes. System vars (PATH, HOME, etc.) are always included. */
+  /**
+   * Additional environment variables to pass through to agent processes.
+   * System vars (PATH, HOME, etc.) and default agent API keys
+   * (`ANTHROPIC_API_KEY`, `CODEX_API_KEY`, `GEMINI_API_KEY`) are always
+   * included — entries here are merged on top, not a replacement.
+   */
   env?: string[];
   /** MCP servers available to all agents during execution. */
   mcp_servers?: Record<string, McpServerConfig>;

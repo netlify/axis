@@ -126,7 +126,11 @@ interface Job {
 /** System vars always passed through to isolated environments. */
 const SYSTEM_VARS = ["PATH", "USER", "SHELL", "LANG", "TERM", "TMPDIR"];
 
-/** Default env when not specified in config. */
+/**
+ * Default agent API keys always passed through, merged with any user-supplied
+ * `config.env`. Without this, declaring `env: [...]` for lifecycle scripts
+ * would silently strip the keys adapters need to authenticate.
+ */
 const DEFAULT_PASS_ENV = ["ANTHROPIC_API_KEY", "CODEX_API_KEY", "GEMINI_API_KEY"];
 
 export async function run(options: RunOptions = {}): Promise<RunOutput> {
@@ -617,8 +621,7 @@ function createWorkspace(): string {
 }
 
 function buildJobEnv(config: AxisConfig): Record<string, string> {
-  const passthrough = config.env ?? DEFAULT_PASS_ENV;
-  const allowedKeys = [...SYSTEM_VARS, ...passthrough];
+  const allowedKeys = new Set<string>([...SYSTEM_VARS, ...DEFAULT_PASS_ENV, ...(config.env ?? [])]);
 
   const env: Record<string, string> = {};
   for (const key of allowedKeys) {
