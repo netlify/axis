@@ -44,6 +44,13 @@ export interface NormalizedEntry {
   toolId: string | null;
 
   /**
+   * ACP semantic tool category (`read`, `edit`, `execute`, `search`, `think`,
+   * etc.), populated by ACP-based adapters. Null for adapters whose tool names
+   * are themselves stable identifiers (Claude Code, Codex).
+   */
+  kind: string | null;
+
+  /**
    * Index of the paired entry in the normalized array.
    * For tool_use: points to the matching tool_result.
    * For tool_result: points to the matching tool_use.
@@ -105,6 +112,7 @@ export interface EntryAnalysis {
   toolResultText: string | null;
   errorMessage: string | null;
   toolId: string | null;
+  kind: string | null;
   pairedIndex: number | null;
   urls: ExtractedUrl[];
   isNetworkCall: boolean;

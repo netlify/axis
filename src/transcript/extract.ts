@@ -8,6 +8,14 @@ export interface ExtractedFields {
   toolResultText: string | null;
   errorMessage: string | null;
   toolId: string | null;
+  /**
+   * ACP `kind` field — semantic tool category populated by ACP-based adapters
+   * (Gemini, etc.). Values include `read`, `edit`, `delete`, `move`, `search`,
+   * `execute`, `think`, `fetch`, `switch_mode`, `other`. Used to classify
+   * interactions whose `toolName` is a human-readable title rather than a
+   * stable tool identifier.
+   */
+  kind: string | null;
 }
 
 /**
@@ -32,6 +40,7 @@ export function extractFields(entry: TranscriptEntry): ExtractedFields {
           toolResultText: null,
           errorMessage: null,
           toolId: extractToolId(content),
+          kind: extractKind(content),
         };
       }
       return {
@@ -42,6 +51,7 @@ export function extractFields(entry: TranscriptEntry): ExtractedFields {
         toolResultText: null,
         errorMessage: null,
         toolId: null,
+        kind: null,
       };
     }
 
@@ -54,6 +64,7 @@ export function extractFields(entry: TranscriptEntry): ExtractedFields {
         toolResultText: null,
         errorMessage: null,
         toolId: extractToolId(content),
+        kind: extractKind(content),
       };
 
     case "tool_result": {
@@ -69,6 +80,7 @@ export function extractFields(entry: TranscriptEntry): ExtractedFields {
         toolResultText: extractToolResultText(content),
         errorMessage: null,
         toolId: extractToolId(content),
+        kind: extractKind(content),
       };
     }
 
@@ -81,6 +93,7 @@ export function extractFields(entry: TranscriptEntry): ExtractedFields {
         toolResultText: null,
         errorMessage: extractErrorMessage(content),
         toolId: null,
+        kind: extractKind(content),
       };
 
     default:
@@ -92,8 +105,18 @@ export function extractFields(entry: TranscriptEntry): ExtractedFields {
         toolResultText: null,
         errorMessage: null,
         toolId: null,
+        kind: null,
       };
   }
+}
+
+/**
+ * Extract the ACP `kind` field if present.
+ * Set by the ACP adapter on tool_use, tool_result, and error entries to
+ * carry the semantic tool category (`read`, `edit`, `execute`, etc.).
+ */
+function extractKind(content: Record<string, unknown>): string | null {
+  return typeof content.kind === "string" ? content.kind : null;
 }
 
 // ---------------------------------------------------------------------------

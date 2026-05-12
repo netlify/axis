@@ -134,12 +134,40 @@ const AGENT_TOOL_NAMES = new Set([
  */
 const AGENT_INTERNAL_PATH_PATTERNS = [".claude/", ".codex/", ".gemini/", "CLAUDE.md", "AGENTS.md"];
 
+/**
+ * ACP `kind` values that semantically map to environment interactions
+ * (filesystem, shell, process). ACP-based adapters set `kind` on tool calls
+ * because their `toolName` is a human-readable title, not a stable identifier.
+ */
+const ENVIRONMENT_KINDS = new Set([
+  "read",
+  "search",
+  "edit",
+  "modify",
+  "add",
+  "delete",
+  "move",
+  "execute",
+]);
+
+/** ACP kinds that represent agent-internal operations (metacognition, mode). */
+const AGENT_KINDS = new Set(["think", "switch_mode"]);
+
+/** ACP kinds that represent external service / network calls. */
+const SERVICE_KINDS = new Set(["fetch"]);
+
 /** Optional context for richer classification of tool_use entries. */
 export interface CategorizationContext {
   /** Summarized tool input (e.g. "file_path: src/index.ts"). */
   toolInputSummary?: string | null;
   /** Whether this entry was detected as a network call during normalization. */
   isNetworkCall?: boolean;
+  /**
+   * ACP semantic tool kind, when available. Used as a fallback when the
+   * tool name is a human-readable title (e.g. "Writing to README.md") rather
+   * than a stable identifier matched by ENVIRONMENT_TOOL_NAMES / AGENT_TOOL_NAMES.
+   */
+  kind?: string | null;
 }
 
 /**
@@ -184,18 +212,53 @@ export function categorizeInteraction(
       }
       return ["environment"];
     }
+    // Fall through to ACP `kind` if available — for ACP-based adapters
+    // (Gemini), the toolName is a human-readable title, not a stable identifier.
+    const byKind = categorizeByKind(context?.kind, context);
+    if (byKind) return byKind;
     // Everything else is a service interaction
     return ["service"];
   }
 
   // tool_result without a tool name — follow the pair's category
   // (will be resolved during sparse index building via the paired tool_use)
-  // Default to service as the safest assumption for unknown tools
+  // Use ACP `kind` if present, otherwise default to service for unknown tools.
   if (entryType === "tool_result") {
+    const byKind = categorizeByKind(context?.kind, context);
+    if (byKind) return byKind;
     return ["service"];
   }
 
   return ["agent"];
+}
+
+/**
+ * Map an ACP `kind` value to interaction categories.
+ * Returns null when the kind is missing or maps to a fall-through category
+ * (`other`, unknown values) so the caller can apply its default.
+ */
+function categorizeByKind(
+  kind: string | null | undefined,
+  context: CategorizationContext | undefined,
+): InteractionCategory[] | null {
+  if (!kind) return null;
+  const lower = kind.toLowerCase();
+  if (AGENT_KINDS.has(lower)) {
+    return ["agent"];
+  }
+  if (ENVIRONMENT_KINDS.has(lower)) {
+    if (context?.toolInputSummary && isAgentInternalPath(context.toolInputSummary)) {
+      return ["agent"];
+    }
+    if (context?.isNetworkCall) {
+      return ["environment", "service"];
+    }
+    return ["environment"];
+  }
+  if (SERVICE_KINDS.has(lower)) {
+    return ["service"];
+  }
+  return null;
 }
 
 /**

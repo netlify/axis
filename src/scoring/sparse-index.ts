@@ -162,6 +162,7 @@ function buildToolInteraction(
   const categories = categorizeInteraction(entry.type, entry.toolName, {
     toolInputSummary: entry.toolInputSummary,
     isNetworkCall: entry.isNetworkCall,
+    kind: entry.kind,
   });
 
   let resultText: string | null = null;
@@ -267,7 +268,9 @@ function buildStandaloneInteraction(
 ): Interaction {
   visited.add(entry.index);
 
-  const categories = categorizeInteraction(entry.type, entry.toolName);
+  const categories = categorizeInteraction(entry.type, entry.toolName, {
+    kind: entry.kind,
+  });
   const text = entry.text ?? entry.toolResultText ?? "(no content)";
   const summary = truncate(text, MAX_DETAIL_CHARS);
   const contextBytes = textSize(text);

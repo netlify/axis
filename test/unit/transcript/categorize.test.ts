@@ -220,4 +220,97 @@ describe("categorizeInteraction", () => {
   it("classifies orphaned tool_result without toolName as service", () => {
     expect(categorizeInteraction("tool_result", null)).toEqual(["service"]);
   });
+
+  // --- ACP kind-based classification ---
+  // ACP-based adapters (Gemini) set toolName to a human-readable title
+  // ("Writing to README.md") and the semantic kind ("edit") on a separate
+  // field. Classification must fall through to kind when the title doesn't
+  // match a known tool name.
+
+  it("classifies ACP kind=read as environment", () => {
+    expect(categorizeInteraction("tool_use", "package.json", { kind: "read" })).toEqual(["environment"]);
+  });
+
+  it("classifies ACP kind=edit as environment", () => {
+    expect(
+      categorizeInteraction("tool_use", "Writing to src/data/products.ts", { kind: "edit" }),
+    ).toEqual(["environment"]);
+  });
+
+  it("classifies ACP kind=search as environment", () => {
+    expect(categorizeInteraction("tool_use", "src/routes", { kind: "search" })).toEqual(["environment"]);
+  });
+
+  it("classifies ACP kind=execute as environment", () => {
+    expect(categorizeInteraction("tool_use", "Running build script", { kind: "execute" })).toEqual([
+      "environment",
+    ]);
+  });
+
+  it("classifies ACP kind=modify/add/delete/move as environment", () => {
+    expect(categorizeInteraction("tool_use", "x", { kind: "modify" })).toEqual(["environment"]);
+    expect(categorizeInteraction("tool_use", "x", { kind: "add" })).toEqual(["environment"]);
+    expect(categorizeInteraction("tool_use", "x", { kind: "delete" })).toEqual(["environment"]);
+    expect(categorizeInteraction("tool_use", "x", { kind: "move" })).toEqual(["environment"]);
+  });
+
+  it("classifies ACP kind=think as agent", () => {
+    expect(
+      categorizeInteraction("tool_use", 'Update topic to: "Implementing Product Data"', { kind: "think" }),
+    ).toEqual(["agent"]);
+  });
+
+  it("classifies ACP kind=switch_mode as agent", () => {
+    expect(categorizeInteraction("tool_use", "Switch to plan mode", { kind: "switch_mode" })).toEqual([
+      "agent",
+    ]);
+  });
+
+  it("classifies ACP kind=fetch as service", () => {
+    expect(categorizeInteraction("tool_use", "Fetching https://api.example.com", { kind: "fetch" })).toEqual([
+      "service",
+    ]);
+  });
+
+  it("classifies ACP kind=other as service (default fallback)", () => {
+    expect(categorizeInteraction("tool_use", "Plan approval", { kind: "other" })).toEqual(["service"]);
+  });
+
+  it("classifies ACP kind=edit on agent-internal path as agent", () => {
+    expect(
+      categorizeInteraction("tool_use", "Writing to .gemini/settings.json", {
+        kind: "edit",
+        toolInputSummary: "path: .gemini/settings.json",
+      }),
+    ).toEqual(["agent"]);
+  });
+
+  it("classifies ACP kind=execute with network call as environment + service", () => {
+    expect(categorizeInteraction("tool_use", "curl call", { kind: "execute", isNetworkCall: true })).toEqual([
+      "environment",
+      "service",
+    ]);
+  });
+
+  it("classifies ACP tool_result with kind=read as environment", () => {
+    expect(categorizeInteraction("tool_result", null, { kind: "read" })).toEqual(["environment"]);
+  });
+
+  it("classifies ACP tool_result with kind=think as agent", () => {
+    expect(categorizeInteraction("tool_result", null, { kind: "think" })).toEqual(["agent"]);
+  });
+
+  it("ignores ACP kind when toolName already matches an environment tool", () => {
+    // Stable tool names always win over kind — kind is a fallback signal
+    expect(categorizeInteraction("tool_use", "Bash", { kind: "think" })).toEqual(["environment"]);
+  });
+
+  it("ignores ACP kind when toolName already matches an agent tool", () => {
+    expect(categorizeInteraction("tool_use", "TaskCreate", { kind: "execute" })).toEqual(["agent"]);
+  });
+
+  it("is case-insensitive for ACP kind", () => {
+    expect(categorizeInteraction("tool_use", "x", { kind: "READ" })).toEqual(["environment"]);
+    expect(categorizeInteraction("tool_use", "x", { kind: "Think" })).toEqual(["agent"]);
+  });
 });
