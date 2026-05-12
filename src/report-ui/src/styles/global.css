@@ -824,6 +824,89 @@ a.wf-id.interaction-link {
   color: var(--text-secondary);
 }
 
+.speed-tag {
+  position: relative;
+  cursor: help;
+}
+
+.speed-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--bg-card);
+  padding: 8px 10px;
+  border-radius: 6px;
+  width: max-content;
+  max-width: 260px;
+  z-index: 30;
+  pointer-events: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-sans, inherit);
+  text-transform: none;
+  letter-spacing: normal;
+  text-align: left;
+  font-weight: 400;
+}
+
+.speed-tag:hover .speed-tooltip,
+.speed-tag:focus-within .speed-tooltip {
+  display: block;
+}
+
+.speed-tooltip-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+  color: var(--bg-card);
+}
+
+.speed-tooltip-header strong {
+  font-weight: 600;
+}
+
+.speed-tooltip-actual {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--bg-alt);
+}
+
+.speed-tooltip-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+
+.speed-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--bg-alt);
+}
+
+.speed-tooltip-row-active {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--bg-card);
+  font-weight: 600;
+}
+
+.speed-tooltip-range {
+  white-space: nowrap;
+}
+
+.speed-tooltip-score {
+  font-variant-numeric: tabular-nums;
+}
+
 .cat-deduction-rationale {
   display: block;
   font-size: 0.75rem;

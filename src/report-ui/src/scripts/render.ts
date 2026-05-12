@@ -16,6 +16,13 @@ import type {
   ArtifactEntry,
 } from "./types";
 import { isScoredSummary } from "./types";
+import {
+  getLandedTierIndex,
+  getSpeedTierKind,
+  getSpeedTiers,
+  tierKindLabel,
+  tierLabel,
+} from "./speed-tiers";
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -471,9 +478,9 @@ function renderScoreDetail(score: ScoreResult, totalDurationMs: number): string 
     <div class="detail-sections">
       ${score.sparseIndex ? renderWaterfall(score.sparseIndex, totalDurationMs) : ""}
       ${renderGoalAchievement(score.goalAchievement)}
-      ${renderCategoryCard("Environment", score.environment)}
-      ${renderCategoryCard("Service", score.service)}
-      ${renderCategoryCard("Agent", score.agent)}
+      ${renderCategoryCard("Environment", score.environment, score.sparseIndex)}
+      ${renderCategoryCard("Service", score.service, score.sparseIndex)}
+      ${renderCategoryCard("Agent", score.agent, score.sparseIndex)}
       ${score.sparseIndex ? renderSparseIndex(score.sparseIndex) : ""}
     </div>`;
 }
@@ -526,7 +533,7 @@ function renderCriterion(c: CriterionGrade): string {
 
 // --- Category Card ---
 
-function renderCategoryCard(label: string, cat: CategoryScore): string {
+function renderCategoryCard(label: string, cat: CategoryScore, sparseIndex?: SparseIndex): string {
   const headerTitle = `<h3>${escapeHtml(label)}${categoryInfoButton(label)}</h3>`;
 
   // Zero-state: no interactions of this category occurred in the run
@@ -560,7 +567,7 @@ function renderCategoryCard(label: string, cat: CategoryScore): string {
 
   const necessityForBreakdown = includeNecessity && cat.necessity.rationale !== "default" ? cat.necessity : null;
   const breakdownBlock = hasRealAudits
-    ? renderCategoryBreakdown(dimEntries, imperfectDims, nonDefaultAudits, includeRelevance, isPerfect, necessityForBreakdown)
+    ? renderCategoryBreakdown(dimEntries, imperfectDims, nonDefaultAudits, includeRelevance, isPerfect, necessityForBreakdown, sparseIndex)
     : "";
 
   return `
@@ -616,6 +623,7 @@ function renderCategoryBreakdown(
   showRelevance: boolean,
   isPerfect: boolean,
   necessity: { score: number; unnecessaryIds: number[]; rationale: string } | null,
+  sparseIndex?: SparseIndex,
 ): string {
   // Audits with at least one sub-perfect dim that contributes to the score
   const isImperfectAudit = (a: InteractionAudit): boolean =>
@@ -629,10 +637,14 @@ function renderCategoryBreakdown(
       <div class="dimensions-grid">${allDims.map((e) => dimensionItem(e.label, e.value)).join("")}</div>`;
   }
 
+  const interactionsById = new Map<number, Interaction>();
+  if (sparseIndex) {
+    for (const ix of sparseIndex.interactions) interactionsById.set(ix.id, ix);
+  }
   const renderRow = (a: InteractionAudit) => `
     <div class="cat-deduction-item">
       <a class="cat-deduction-id interaction-link" data-interaction-id="${a.id}" title="Jump to this interaction in the transcript">Interaction #${a.id}</a>
-      <span class="cat-deduction-scores">${renderAuditDimScores(a, showRelevance)}</span>
+      <span class="cat-deduction-scores">${renderAuditDimScores(a, showRelevance, interactionsById.get(a.id))}</span>
       <span class="cat-deduction-rationale">${escapeHtml(a.rationale)}</span>
     </div>`;
 
@@ -675,7 +687,7 @@ function renderCategoryBreakdown(
       : ""}`;
 }
 
-function renderAuditDimScores(a: InteractionAudit, showRelevance: boolean): string {
+function renderAuditDimScores(a: InteractionAudit, showRelevance: boolean, interaction?: Interaction): string {
   const dims: Array<{ label: string; value: number }> = [
     { label: "Success", value: a.success },
     { label: "Speed", value: a.speed },
@@ -683,8 +695,47 @@ function renderAuditDimScores(a: InteractionAudit, showRelevance: boolean): stri
   ];
   return dims
     .filter((d) => d.value < 1)
-    .map((d) => `<span class="dim-score-tag">${d.label}: ${fmt01(d.value)}</span>`)
+    .map((d) => {
+      if (d.label === "Speed") {
+        return renderSpeedTag(d.value, interaction);
+      }
+      return `<span class="dim-score-tag">${d.label}: ${fmt01(d.value)}</span>`;
+    })
     .join("");
+}
+
+function renderSpeedTag(speed: number, interaction?: Interaction): string {
+  const tooltip = interaction ? renderSpeedTooltip(interaction) : "";
+  const cls = tooltip ? "dim-score-tag speed-tag" : "dim-score-tag";
+  return `<span class="${cls}">Speed: ${fmt01(speed)}${tooltip}</span>`;
+}
+
+function renderSpeedTooltip(interaction: Interaction): string {
+  const kind = getSpeedTierKind(interaction.categories);
+  const tiers = getSpeedTiers(kind);
+  const landed = getLandedTierIndex(interaction.durationMs, kind);
+  const durationText = interaction.durationMs !== null && interaction.durationMs > 0
+    ? fmtDuration(interaction.durationMs)
+    : "no timing data";
+
+  const rows = tiers
+    .map((t, i) => {
+      const isActive = i === landed;
+      const label = tierLabel(t, i > 0 ? tiers[i - 1] : undefined);
+      return `<span class="speed-tooltip-row${isActive ? " speed-tooltip-row-active" : ""}">
+        <span class="speed-tooltip-range">${escapeHtml(label)}</span>
+        <span class="speed-tooltip-score">${t.score}</span>
+      </span>`;
+    })
+    .join("");
+
+  return `<span class="speed-tooltip" role="tooltip">
+    <span class="speed-tooltip-header">
+      <strong>${escapeHtml(tierKindLabel(kind))} speed</strong>
+      <span class="speed-tooltip-actual">${escapeHtml(durationText)}</span>
+    </span>
+    <span class="speed-tooltip-tiers">${rows}</span>
+  </span>`;
 }
 
 function fmt01(v: number): string {
