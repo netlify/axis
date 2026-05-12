@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.5](https://github.com/netlify/axis/compare/v1.6.4...v1.6.5) (2026-05-12)
+
+
+### Bug Fixes
+
+* make the default timout for lifecycle methods to be larger ([fed03a1](https://github.com/netlify/axis/commit/fed03a19260b8d5c8c17fd1cef2208350c7d67bb))
+
 ## [1.6.4](https://github.com/netlify/axis/compare/v1.6.3...v1.6.4) (2026-05-12)
 
 
