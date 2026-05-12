@@ -243,12 +243,14 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
         child.on("close", (code) => resolve(code ?? 1));
       });
 
-      // 8. Buffer stderr with a size cap
+      // 8. Buffer stderr with a size cap (and mirror to debug callback if any)
       let stderr = "";
       child.stderr?.on("data", (data: Buffer) => {
+        const chunk = data.toString();
         if (stderr.length < maxStderrBytes) {
-          stderr += data.toString();
+          stderr += chunk;
         }
+        input.onStderr?.(chunk);
       });
 
       // 9. Timeout → SIGTERM → SIGKILL, with proper timer cleanup
@@ -300,6 +302,7 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
               for await (const line of rl) {
                 if (!line.trim()) continue;
                 rawOutput?.push(line);
+                input.onRawLine?.(line);
                 streamSpec.onLine(line, streamCtx);
               }
             } catch {
@@ -310,6 +313,7 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
           child.stdout?.on("data", (data: Buffer) => {
             const chunk = data.toString();
             rawOutput?.push(chunk);
+            input.onRawLine?.(chunk);
             estimator.addText(chunk);
             streamSpec.onChunk(chunk, streamCtx);
           });

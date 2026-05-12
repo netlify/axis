@@ -185,12 +185,14 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         child.on("close", (code) => resolve(code ?? 1));
       });
 
-      // 7. Buffer stderr with a size cap
+      // 7. Buffer stderr with a size cap (and mirror to debug callback if any)
       let stderr = "";
       child.stderr?.on("data", (data: Buffer) => {
+        const chunk = data.toString();
         if (stderr.length < MAX_STDERR_BYTES) {
-          stderr += data.toString();
+          stderr += chunk;
         }
+        input.onStderr?.(chunk);
       });
 
       // 8. Timeout → SIGTERM → SIGKILL
@@ -226,7 +228,11 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
             version: "0.1.0",
           },
         });
-        rawOutput?.push(JSON.stringify({ type: "initialize_result", ...initResult }));
+        {
+          const line = JSON.stringify({ type: "initialize_result", ...initResult });
+          rawOutput?.push(line);
+          input.onRawLine?.(line);
+        }
 
         // 12. Create session
         const mcpServers = convertMcpServers(input.mcpServers);
@@ -235,7 +241,11 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
           mcpServers,
         });
         state.sessionId = sessionResult.sessionId;
-        rawOutput?.push(JSON.stringify({ type: "session_result", ...sessionResult }));
+        {
+          const line = JSON.stringify({ type: "session_result", ...sessionResult });
+          rawOutput?.push(line);
+          input.onRawLine?.(line);
+        }
 
         // 13. Add the initial prompt to the transcript and raw output
         transcript.push({
@@ -243,13 +253,15 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
           timestamp: new Date().toISOString(),
           content: { content: input.prompt },
         });
-        rawOutput?.push(
-          JSON.stringify({
+        {
+          const line = JSON.stringify({
             type: "prompt",
             sessionId: sessionResult.sessionId,
             prompt: [{ type: "text", text: input.prompt }],
-          }),
-        );
+          });
+          rawOutput?.push(line);
+          input.onRawLine?.(line);
+        }
 
         // 14. Send prompt and wait for completion — time just the agent work
         const promptStart = Date.now();
@@ -258,7 +270,11 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
           prompt: [{ type: "text", text: input.prompt }],
         });
         state.promptDurationMs = Date.now() - promptStart;
-        rawOutput?.push(JSON.stringify({ type: "prompt_result", ...promptResult }));
+        {
+          const line = JSON.stringify({ type: "prompt_result", ...promptResult });
+          rawOutput?.push(line);
+          input.onRawLine?.(line);
+        }
 
         // 15. Extract token usage from PromptResponse if available
         if (promptResult.usage) {
@@ -372,7 +388,9 @@ function buildClient(
     // Handle streaming session updates — the core event mapper
     async sessionUpdate(params: SessionNotification) {
       const update = params.update;
-      rawOutput?.push(JSON.stringify(update));
+      const line = JSON.stringify(update);
+      rawOutput?.push(line);
+      input.onRawLine?.(line);
 
       switch (update.sessionUpdate) {
         case "agent_message_chunk":

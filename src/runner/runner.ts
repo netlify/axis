@@ -346,7 +346,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
         updateTokens,
         resolvedSkillMap,
         options.registerCleanup,
-        options.debug,
+        options.debug ?? false,
         jobAbortController,
         jobLimits,
         checkOverallTokenLimit,
@@ -390,7 +390,7 @@ async function executeJob(
   updateTokens: (index: number, tokens: number, final?: boolean) => void,
   resolvedSkillMap: Map<string, ResolvedSkill>,
   registerCleanup?: (fn: () => void) => void,
-  _debug?: boolean,
+  debug?: boolean,
   jobAbortController?: AbortController,
   jobLimits?: ResolvedJobLimits,
   checkOverallTokenLimit?: () => void,
@@ -464,6 +464,31 @@ async function executeJob(
     if (outcome.error) throw outcome.error;
   }
 
+  // Debug-mode tail files: when --debug is set and we have a report directory,
+  // stream each captured raw stdout line and stderr chunk to disk while the
+  // agent works, adjacent to where `writeScenarioRawData` will eventually emit
+  // `{agent}.raw.ndjson`.
+  let debugStream: fs.WriteStream | undefined;
+  let debugStderrStream: fs.WriteStream | undefined;
+  let onRawLine: ((line: string) => void) | undefined;
+  let onStderr: ((chunk: string) => void) | undefined;
+  if (debug && reportDir) {
+    const scenarioDir = path.join(reportDir, "scenarios", scenario.key);
+    fs.mkdirSync(scenarioDir, { recursive: true });
+    const debugPath = path.join(scenarioDir, `${agentName}.debug.ndjson`);
+    const debugStderrPath = path.join(scenarioDir, `${agentName}.debug.stderr.log`);
+    debugStream = fs.createWriteStream(debugPath);
+    debugStderrStream = fs.createWriteStream(debugStderrPath);
+    onRawLine = (line) => {
+      debugStream!.write(line + "\n");
+    };
+    onStderr = (chunk) => {
+      debugStderrStream!.write(chunk);
+    };
+    logger.verbose?.(`[${label}] Debug stream: ${debugPath}`);
+    logger.verbose?.(`[${label}] Debug stderr: ${debugStderrPath}`);
+  }
+
   try {
     updateStatus(index, "running");
     logger.verbose?.(`[${label}] Executing agent...`);
@@ -487,6 +512,8 @@ async function executeJob(
       env: jobEnv,
       registerCleanup,
       captureRawOutput: true,
+      ...(onRawLine ? { onRawLine } : {}),
+      ...(onStderr ? { onStderr } : {}),
       mcpServers: scenario.mcp_servers
         ? { ...axisConfig.mcp_servers, ...scenario.mcp_servers }
         : axisConfig.mcp_servers,
@@ -556,6 +583,9 @@ async function executeJob(
     // On unexpected errors, clean up immediately (nothing to verify)
     await cleanup();
     throw err;
+  } finally {
+    debugStream?.end();
+    debugStderrStream?.end();
   }
 }
 

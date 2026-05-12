@@ -37,6 +37,18 @@ export interface AgentInput {
   registerCleanup?: (fn: () => void) => void;
   /** When true, adapters capture raw stdout lines in AgentOutput.rawOutput. */
   captureRawOutput?: boolean;
+  /**
+   * Invoked for each raw stdout line/chunk as the agent streams output.
+   * Adapters call this in parallel with pushing to `rawOutput`, so the runner
+   * can tail-write a debug file while the agent is still running.
+   */
+  onRawLine?: (line: string) => void;
+  /**
+   * Invoked for each stderr chunk as the agent streams it. Adapters call this
+   * in parallel with the (capped) in-memory stderr buffer, so the runner can
+   * tail-write a debug stderr log while the agent is still running.
+   */
+  onStderr?: (chunk: string) => void;
   /** MCP servers to configure for this agent run (from top-level config). */
   mcpServers?: Record<string, McpServerConfig>;
   /** Resolved skills to install for this agent run. */
