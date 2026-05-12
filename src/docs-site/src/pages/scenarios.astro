@@ -391,6 +391,26 @@ export default {
         <td>Sharing one script between phases that branches on the current phase.</td>
       </tr>
       <tr>
+        <td><code>AXIS_AGENT</code></td>
+        <td>Name of the agent being run (e.g. <code>claude-code</code>, <code>codex</code>, <code>gemini</code>).</td>
+        <td>Branching setup or fixtures per agent &mdash; e.g. installing an agent-specific CLI helper.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_MODEL</code></td>
+        <td>Model identifier when the agent is configured with one (e.g. <code>claude-sonnet-4-6</code>). Unset otherwise.</td>
+        <td>Tagging report notes with the model under test, or skipping model-specific steps.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_SCENARIO</code></td>
+        <td>Full scenario key, including any <code>@variant</code> suffix (e.g. <code>build-shop@fast</code>).</td>
+        <td>Logging which scenario is running, or routing fixtures by scenario.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_VARIANT</code></td>
+        <td>Variant name when the scenario key contains <code>@&lt;name&gt;</code>. Unset for non-variant runs.</td>
+        <td>Branching setup per variant &mdash; e.g. seeding different data for <code>@baseline</code> vs <code>@stress</code>.</td>
+      </tr>
+      <tr>
         <td><code>HOME</code></td>
         <td>Set to the workspace temp directory (same as <code>pwd</code>).</td>
         <td>Workspace isolation &mdash; tools that read <code>$HOME</code> stay scoped to the run.</td>
@@ -420,6 +440,21 @@ export default {
 
 scenarios/
   my-scenario.json              # setup: cp -R "$AXIS_CONFIG_DIR/scenario-fixtures/my-project/." .`}</code></pre>
+  <p>
+    The <code>AXIS_AGENT</code>, <code>AXIS_MODEL</code>, <code>AXIS_SCENARIO</code>, and
+    <code>AXIS_VARIANT</code> variables let a single setup or teardown script branch on what
+    is actually running without baking that information into the command string:
+  </p>
+  <pre><code>{`"setup": [
+  {
+    "action": "run_script",
+    "command": "echo \\"Preparing $AXIS_SCENARIO for $AXIS_AGENT\\" >> \\"$AXIS_OUTPUT\\""
+  },
+  {
+    "action": "run_script",
+    "command": "if [ \\"$AXIS_VARIANT\\" = \\"stress\\" ]; then cp -R \\"$AXIS_CONFIG_DIR/fixtures/large/.\\" .; else cp -R \\"$AXIS_CONFIG_DIR/fixtures/small/.\\" .; fi"
+  }
+]`}</code></pre>
 
   <h3 id="lifecycle-notes">Capturing notes for the report</h3>
   <p>

@@ -121,4 +121,59 @@ describe("runLifecyclePhase", () => {
     expect(outcome.output?.split("\n")[0]).toBe("teardown");
     expect(outcome.output?.split("\n")[1]).toMatch(/\/tmp$/);
   });
+
+  it("exposes AXIS_AGENT, AXIS_SCENARIO, AXIS_MODEL, AXIS_VARIANT when context provided", async () => {
+    const outcome = await runLifecyclePhase(
+      [
+        {
+          action: "run_script",
+          command:
+            'printf "%s|%s|%s|%s" "$AXIS_AGENT" "$AXIS_SCENARIO" "$AXIS_MODEL" "$AXIS_VARIANT" > "$AXIS_OUTPUT"',
+        },
+      ],
+      "/tmp",
+      undefined,
+      "setup",
+      {
+        agent: "claude-code",
+        model: "claude-sonnet-4-6",
+        scenario: "build-shop@fast",
+        variant: "fast",
+      },
+    );
+
+    expect(outcome.output).toBe("claude-code|build-shop@fast|claude-sonnet-4-6|fast");
+  });
+
+  it("omits AXIS_MODEL and AXIS_VARIANT when not in context", async () => {
+    const outcome = await runLifecyclePhase(
+      [
+        {
+          action: "run_script",
+          command:
+            'printf "agent=%s scenario=%s model=[%s] variant=[%s]" "$AXIS_AGENT" "$AXIS_SCENARIO" "${AXIS_MODEL-unset}" "${AXIS_VARIANT-unset}" > "$AXIS_OUTPUT"',
+        },
+      ],
+      "/tmp",
+      undefined,
+      "setup",
+      {
+        agent: "codex",
+        scenario: "echo-test",
+      },
+    );
+
+    expect(outcome.output).toBe("agent=codex scenario=echo-test model=[unset] variant=[unset]");
+  });
+
+  it("does not set AXIS_AGENT when no context is provided", async () => {
+    const outcome = await runLifecyclePhase(
+      [{ action: "run_script", command: 'printf "[%s]" "${AXIS_AGENT-unset}" > "$AXIS_OUTPUT"' }],
+      "/tmp",
+      undefined,
+      "setup",
+    );
+
+    expect(outcome.output).toBe("[unset]");
+  });
 });

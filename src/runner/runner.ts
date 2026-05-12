@@ -408,6 +408,17 @@ async function executeJob(
   const adapter = getAdapter(agentConfig.agent);
   const adapterIsolation = adapter.isolationEnv?.(workspace) ?? {};
   const jobEnv = { ...adapterIsolation, ...env, HOME: workspace, AXIS_CONFIG_DIR: configDir };
+
+  // Lifecycle scripts get scenario/agent context as AXIS_* env vars so they
+  // can branch on what's running without encoding it into the command string.
+  // Variant names match /^[a-zA-Z0-9_-]+$/, so splitting on the first `@` is unambiguous.
+  const atIndex = scenario.key.indexOf("@");
+  const lifecycleContext = {
+    agent: agentConfig.agent,
+    scenario: scenario.key,
+    ...(agentConfig.model ? { model: agentConfig.model } : {}),
+    ...(atIndex >= 0 ? { variant: scenario.key.slice(atIndex + 1) } : {}),
+  };
   logger.verbose?.(`[${label}] Workspace: ${workspace}`);
 
   // Register workspace for cleanup on process signal (Ctrl-C)
@@ -428,7 +439,7 @@ async function executeJob(
   const cleanup = async () => {
     if (scenario.teardown?.length) {
       logger.verbose?.(`[${label}] Running teardown...`);
-      const outcome = await runLifecyclePhase(scenario.teardown, workspace, jobEnv, "teardown");
+      const outcome = await runLifecyclePhase(scenario.teardown, workspace, jobEnv, "teardown", lifecycleContext);
       if (outcome.error) {
         logger.error(`[${label}] Teardown failed: ${formatError(outcome.error)}`);
       }
@@ -461,7 +472,7 @@ async function executeJob(
   if (scenario.setup?.length) {
     updateStatus(index, "setup");
     logger.verbose?.(`[${label}] Running setup...`);
-    const outcome = await runLifecyclePhase(scenario.setup, workspace, jobEnv, "setup");
+    const outcome = await runLifecyclePhase(scenario.setup, workspace, jobEnv, "setup", lifecycleContext);
     setupOutput = outcome.output;
     if (outcome.error) throw outcome.error;
   }

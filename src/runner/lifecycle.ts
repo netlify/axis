@@ -48,6 +48,22 @@ export interface LifecyclePhaseOutcome {
 }
 
 /**
+ * Job-level context exposed to lifecycle scripts as `AXIS_*` env vars.
+ * Scripts use these to branch on the agent, scenario, or variant under test
+ * without needing to encode that information in their command strings.
+ */
+export interface LifecyclePhaseContext {
+  /** Agent name (e.g. "claude-code"). Becomes `AXIS_AGENT`. */
+  agent: string;
+  /** Model identifier, if the agent was configured with one. Becomes `AXIS_MODEL`. */
+  model?: string;
+  /** Full scenario key including variant suffix (e.g. "my-scenario@fast"). Becomes `AXIS_SCENARIO`. */
+  scenario: string;
+  /** Variant name, when the scenario key contains an `@variant` suffix. Becomes `AXIS_VARIANT`. */
+  variant?: string;
+}
+
+/**
  * Run one lifecycle phase (setup or teardown), exposing an `$AXIS_OUTPUT`
  * file scripts can write markdown notes to. The file is shared across all
  * actions in the phase so multiple scripts can append. Output is captured
@@ -58,17 +74,24 @@ export async function runLifecyclePhase(
   cwd: string,
   baseEnv: Record<string, string> | undefined,
   phase: "setup" | "teardown",
+  context?: LifecyclePhaseContext,
 ): Promise<LifecyclePhaseOutcome> {
   const outputFile = path.join(os.tmpdir(), `axis-${phase}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.md`);
   // Pre-create empty file so scripts can append even with redirections like `>>`.
   fs.writeFileSync(outputFile, "");
 
-  const env = {
+  const env: Record<string, string> = {
     ...(baseEnv ?? {}),
     AXIS_OUTPUT: outputFile,
     AXIS_WORKSPACE: cwd,
     AXIS_PHASE: phase,
   };
+  if (context) {
+    env.AXIS_AGENT = context.agent;
+    env.AXIS_SCENARIO = context.scenario;
+    if (context.model) env.AXIS_MODEL = context.model;
+    if (context.variant) env.AXIS_VARIANT = context.variant;
+  }
 
   let error: Error | undefined;
   let results: LifecycleResult[] = [];
