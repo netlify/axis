@@ -4,8 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { LifecycleAction } from "../types/scenario.js";
 
-/** Default timeout for lifecycle scripts (30 seconds). */
-const DEFAULT_TIMEOUT_MS = 30_000;
+/** Default timeout for lifecycle scripts (3 minutes). */
+const DEFAULT_TIMEOUT_MS = 3 * 60_000;
 
 /** Max bytes captured from $AXIS_OUTPUT to keep reports small. */
 const MAX_OUTPUT_BYTES = 256 * 1024;
