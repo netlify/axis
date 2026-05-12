@@ -305,11 +305,30 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         clearTimeout(outerTimer);
         // Flush any pending message chunks
         flushPendingChunks(state, transcript);
-        // Kill the child process if still running
+        // Gracefully signal EOF so the agent can exit on its own. ACP agents
+        // (e.g. gemini --acp) keep the JSON-RPC channel alive after prompt_result
+        // waiting for more prompts; closing stdin tells them no more are coming.
         try {
-          child.kill("SIGTERM");
+          child.stdin?.end();
         } catch {
-          // already dead
+          // already closed
+        }
+        // SIGTERM with SIGKILL fallback — some agents catch SIGTERM and never exit.
+        // Without the fallback, `await exitPromise` would hang until outerTimer.
+        if (!timedOut && child.exitCode === null && child.signalCode === null) {
+          try {
+            child.kill("SIGTERM");
+          } catch {
+            // already dead
+          }
+          const cleanupKillTimer = setTimeout(() => {
+            try {
+              child.kill("SIGKILL");
+            } catch {
+              // already dead
+            }
+          }, SIGTERM_TO_SIGKILL_MS);
+          child.on("close", () => clearTimeout(cleanupKillTimer));
         }
       }
 

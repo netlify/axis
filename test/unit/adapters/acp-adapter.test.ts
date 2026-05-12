@@ -65,11 +65,14 @@ function createMockProcess(exitCode = 0, delay = 10) {
     stdin: stdinStream,
     kill: vi.fn(),
     pid: 12345,
+    exitCode: null as number | null,
+    signalCode: null as NodeJS.Signals | null,
   });
 
   setTimeout(() => {
     stdout.push(null);
     stderr.push(null);
+    proc.exitCode = exitCode;
     proc.emit("close", exitCode);
   }, delay);
 
@@ -777,6 +780,74 @@ describe("createAcpBasedAdapter", () => {
 
     // Last cumulative cost wins
     expect(output.metadata.totalCostUsd).toBe(0.035);
+  });
+
+  it("ends stdin and sends SIGTERM after the prompt completes", async () => {
+    const endSpy = vi.fn();
+    let killSpy: ReturnType<typeof vi.fn> = vi.fn();
+
+    mockSpawn.mockImplementation((() => {
+      const proc = createMockProcess();
+      proc.stdin.end = endSpy as any;
+      killSpy = proc.kill as ReturnType<typeof vi.fn>;
+      return proc;
+    }) as any);
+
+    mockPrompt.mockResolvedValue({ stopReason: "end_turn" });
+    await adapter.run(makeInput());
+
+    expect(endSpy).toHaveBeenCalled();
+    expect(killSpy).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("schedules SIGKILL fallback when the agent ignores SIGTERM", async () => {
+    vi.useFakeTimers();
+
+    const killCalls: NodeJS.Signals[] = [];
+    let proc: ReturnType<typeof createMockProcess>;
+
+    mockSpawn.mockImplementation((() => {
+      // Build a process that does NOT auto-close — simulates an ACP agent
+      // that keeps the JSON-RPC channel alive after prompt_result.
+      const stdout = new Readable({ read() {} });
+      const stderr = new Readable({ read() {} });
+      const stdinStream = new Writable({
+        write(_chunk, _enc, cb) {
+          cb();
+        },
+      });
+      proc = Object.assign(new EventEmitter(), {
+        stdout,
+        stderr,
+        stdin: stdinStream,
+        kill: vi.fn((signal: NodeJS.Signals) => {
+          killCalls.push(signal);
+          // Only honor SIGKILL — SIGTERM is silently ignored
+          if (signal === "SIGKILL") {
+            queueMicrotask(() => proc.emit("close", 137));
+          }
+        }),
+        pid: 12345,
+        exitCode: null,
+        signalCode: null,
+      }) as any;
+      return proc;
+    }) as any);
+
+    mockPrompt.mockResolvedValue({ stopReason: "end_turn" });
+
+    const runPromise = adapter.run(makeInput());
+
+    // Let the prompt resolve and the finally block run
+    await vi.advanceTimersByTimeAsync(0);
+    expect(killCalls).toEqual(["SIGTERM"]);
+
+    // Advance past the SIGTERM → SIGKILL grace window
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(killCalls).toEqual(["SIGTERM", "SIGKILL"]);
+
+    await runPromise;
+    vi.useRealTimers();
   });
 
   it("measures durationMs from prompt call, not full process lifecycle", async () => {
