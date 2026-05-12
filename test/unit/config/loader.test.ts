@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
-import { loadConfig, discoverScenarios } from "../../../src/config/loader.js";
+import { loadConfig, discoverScenarios, matchesScenarioFilter, matchesAgentFilter } from "../../../src/config/loader.js";
 
 const FIXTURES_DIR = path.resolve(import.meta.dirname, "../../e2e/fixtures/basic");
 
@@ -848,5 +848,67 @@ describe("discoverScenarios", () => {
         "must default-export an object",
       );
     });
+  });
+});
+
+describe("matchesScenarioFilter", () => {
+  it("matches exact full key including @variant", () => {
+    expect(matchesScenarioFilter("cms/create-post@fastify", ["cms/create-post@fastify"])).toBe(true);
+    expect(matchesScenarioFilter("cms/create-post@fastify", ["cms/create-post@express"])).toBe(false);
+  });
+
+  it("matches base key against all its variants", () => {
+    expect(matchesScenarioFilter("cms/create-post@fastify", ["cms/create-post"])).toBe(true);
+    expect(matchesScenarioFilter("cms/create-post", ["cms/create-post"])).toBe(true);
+  });
+
+  it("supports `dir/*` glob", () => {
+    expect(matchesScenarioFilter("cms/create-post", ["cms/*"])).toBe(true);
+    expect(matchesScenarioFilter("cms/create-post@v", ["cms/*"])).toBe(true);
+    expect(matchesScenarioFilter("auth/login", ["cms/*"])).toBe(false);
+  });
+
+  it("supports `dir/**` recursive glob", () => {
+    expect(matchesScenarioFilter("cms/posts/create", ["cms/**"])).toBe(true);
+    expect(matchesScenarioFilter("cms/create-post@v", ["cms/**"])).toBe(true);
+  });
+
+  it("supports embedded glob with `**/` for cross-directory matches", () => {
+    expect(matchesScenarioFilter("cms/create-post", ["**/*post*"])).toBe(true);
+    expect(matchesScenarioFilter("cms/create-post@v", ["**/*post*"])).toBe(true);
+    expect(matchesScenarioFilter("cms/list-users", ["**/*post*"])).toBe(false);
+  });
+
+  it("single-star glob does not cross `/` (standard glob semantics)", () => {
+    // `*post*` matches `create-post` (no slash) but not `cms/create-post`.
+    expect(matchesScenarioFilter("create-post", ["*post*"])).toBe(true);
+    expect(matchesScenarioFilter("cms/create-post", ["*post*"])).toBe(false);
+  });
+
+  it("matches against full key (including @variant) for explicit variant globs", () => {
+    expect(matchesScenarioFilter("cms/create-post@fastify", ["cms/create-post@*"])).toBe(true);
+    expect(matchesScenarioFilter("cms/create-post", ["cms/create-post@*"])).toBe(false);
+  });
+
+  it("returns true if any pattern in the list matches", () => {
+    expect(matchesScenarioFilter("cms/create-post", ["auth/*", "cms/*"])).toBe(true);
+    expect(matchesScenarioFilter("billing/checkout", ["auth/*", "cms/*"])).toBe(false);
+  });
+});
+
+describe("matchesAgentFilter", () => {
+  it("matches exact agent name", () => {
+    expect(matchesAgentFilter("claude-code|opus", ["claude-code|opus"])).toBe(true);
+    expect(matchesAgentFilter("claude-code|opus", ["claude-code|sonnet"])).toBe(false);
+  });
+
+  it("supports glob across model suffix", () => {
+    expect(matchesAgentFilter("claude-code|opus", ["claude-code|*"])).toBe(true);
+    expect(matchesAgentFilter("claude-code|sonnet", ["claude-code|*"])).toBe(true);
+    expect(matchesAgentFilter("codex|gpt", ["claude-code|*"])).toBe(false);
+  });
+
+  it("matches any pattern in the list", () => {
+    expect(matchesAgentFilter("codex|gpt", ["claude-code|*", "codex*"])).toBe(true);
   });
 });

@@ -6,6 +6,7 @@ import type { AxisConfig } from "../types/config.js";
 import type { Scenario, ScenarioInput, ScenarioVariant } from "../types/scenario.js";
 import { validateConfig, validateScenario } from "./validator.js";
 import { formatError } from "../types/output.js";
+import { globToRegExp } from "../runner/artifacts.js";
 
 /** Extensions probed when no explicit config path is given, in priority order. */
 const DEFAULT_CONFIG_EXTENSIONS = [".ts", ".js", ".mjs", ".json"] as const;
@@ -166,7 +167,7 @@ export async function discoverScenarios(
 
   // Filter scenarios if agent specifies a subset
   if (filter && !filter.includes("*")) {
-    return scenarios.filter((s) => matchesFilter(s.key, filter));
+    return scenarios.filter((s) => matchesScenarioFilter(s.key, filter));
   }
 
   return scenarios;
@@ -378,28 +379,44 @@ function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: stri
   return expanded;
 }
 
-function matchesFilter(key: string, filter: string[]): boolean {
+/** True if the pattern contains any glob metacharacter (`*`, `?`, `[`). */
+function isGlobPattern(pattern: string): boolean {
+  return /[*?[]/.test(pattern);
+}
+
+/**
+ * Match a scenario key against a list of filter patterns. A pattern matches if:
+ *   - it equals the full key (e.g. `cms/create-post@variant`)
+ *   - it equals the base key (e.g. `cms/create-post`, matches all variants)
+ *   - it is a glob and matches either the full key or the base key
+ *
+ * Supported glob syntax (via {@link globToRegExp}): `**`, `*`, `?`, `[abc]`.
+ */
+export function matchesScenarioFilter(key: string, filter: string[]): boolean {
   const baseKey = key.includes("@") ? key.split("@")[0] : key;
 
   return filter.some((pattern) => {
-    // Exact match (full key including variant)
     if (pattern === key) return true;
-
-    // Base key match: "cms/create-post" matches all its variants
-    if (pattern === baseKey && pattern !== key) return true;
-
-    // Simple glob: "cms/*" matches "cms/create-post" and "cms/create-post@variant"
-    if (pattern.endsWith("/*")) {
-      const prefix = pattern.slice(0, -2);
-      return baseKey.startsWith(prefix + "/");
+    if (pattern === baseKey) return true;
+    if (isGlobPattern(pattern)) {
+      const re = globToRegExp(pattern);
+      return re.test(key) || re.test(baseKey);
     }
+    return false;
+  });
+}
 
-    // Prefix glob: "cms/**" matches any depth under cms/
-    if (pattern.endsWith("/**")) {
-      const prefix = pattern.slice(0, -3);
-      return baseKey.startsWith(prefix + "/");
+/**
+ * Match an agent name against a list of filter patterns. A pattern matches if:
+ *   - it equals the agent name (e.g. `claude-code|opus`)
+ *   - it is a glob and matches the agent name
+ */
+export function matchesAgentFilter(agentName: string, filter: string[]): boolean {
+  return filter.some((pattern) => {
+    if (pattern === agentName) return true;
+    if (isGlobPattern(pattern)) {
+      return globToRegExp(pattern).test(agentName);
     }
-
     return false;
   });
 }

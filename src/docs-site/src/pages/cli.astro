@@ -45,12 +45,18 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <span class="cli-flag-desc">Config file (default: <code>axis.config.json</code>).</span>
       </div>
       <div class="cli-flag">
-        <span class="cli-flag-name"><code>-s, --scenario &lt;key&gt;</code></span>
-        <span class="cli-flag-desc">Run a specific scenario by key.</span>
+        <span class="cli-flag-name"><code>-s, --scenario &lt;keys&gt;</code></span>
+        <span class="cli-flag-desc">
+          Run specific scenarios. Accepts a comma-separated list and glob patterns, e.g.
+          <code>cms/*</code>, <code>hello-world,cms/create-post@*</code>.
+        </span>
       </div>
       <div class="cli-flag">
-        <span class="cli-flag-name"><code>-a, --agent &lt;name&gt;</code></span>
-        <span class="cli-flag-desc">Run with a specific agent only.</span>
+        <span class="cli-flag-name"><code>-a, --agent &lt;names&gt;</code></span>
+        <span class="cli-flag-desc">
+          Run with specific agents. Accepts a comma-separated list and glob patterns, e.g.
+          <code>claude-code|*</code>, <code>codex|gpt,claude-code|opus</code>.
+        </span>
       </div>
       <div class="cli-flag">
         <span class="cli-flag-name"><code>--json</code></span>

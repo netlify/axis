@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { loadConfig, discoverScenarios } from "../config/loader.js";
+import { loadConfig, discoverScenarios, matchesScenarioFilter, matchesAgentFilter } from "../config/loader.js";
 import { getAdapter, registerAdapter } from "../adapters/registry.js";
 import { runLifecyclePhase } from "./lifecycle.js";
 import { captureArtifacts, resolveArtifactPatterns } from "./artifacts.js";
@@ -160,7 +160,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   const skippedKeys = new Set<string>();
 
   for (const { name: agentName, config: agentConfig } of agents) {
-    if (options.agentFilter?.length && !options.agentFilter.includes(agentName)) {
+    if (options.agentFilter?.length && !matchesAgentFilter(agentName, options.agentFilter)) {
       continue;
     }
 
@@ -177,9 +177,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
     }
 
     const filteredScenarios = options.scenarioFilter?.length
-      ? scenarios.filter((s) =>
-          options.scenarioFilter!.some((f) => f === s.key || (s.key.includes("@") && f === s.key.split("@")[0])),
-        )
+      ? scenarios.filter((s) => matchesScenarioFilter(s.key, options.scenarioFilter!))
       : scenarios;
 
     for (const scenario of filteredScenarios) {

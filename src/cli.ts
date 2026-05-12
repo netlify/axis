@@ -181,8 +181,8 @@ program
 
 interface RunPipelineOptions {
   configPath?: string;
-  scenario?: string;
-  agent?: string;
+  scenarios?: string[];
+  agents?: string[];
   concurrency?: number;
   score: boolean;
   verbose: boolean;
@@ -190,6 +190,19 @@ interface RunPipelineOptions {
   outputDir?: string;
   json: boolean;
   refreshSkills: boolean;
+}
+
+/**
+ * Split a comma-separated CLI value (e.g. `--scenario foo,bar`) into a trimmed
+ * non-empty list. Returns undefined when the input is missing or empty.
+ */
+function splitCsv(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+  const parts = value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return parts.length > 0 ? parts : undefined;
 }
 
 /**
@@ -214,8 +227,8 @@ async function executeRunPipeline(
 
   const runOutput = await run({
     configPath: opts.configPath,
-    scenarioFilter: opts.scenario ? [opts.scenario] : undefined,
-    agentFilter: opts.agent ? [opts.agent] : undefined,
+    scenarioFilter: opts.scenarios,
+    agentFilter: opts.agents,
     concurrency,
     logger,
     registerCleanup,
@@ -284,8 +297,11 @@ program
   .command("run")
   .description("Run scenarios against configured agents")
   .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
-  .option("-s, --scenario <key>", "run a specific scenario by key (e.g. hello-world, cms/create-post)")
-  .option("-a, --agent <name>", "run with a specific agent only")
+  .option(
+    "-s, --scenario <keys>",
+    "run specific scenarios (comma-separated, supports globs e.g. 'cms/*' or 'hello-*,foo')",
+  )
+  .option("-a, --agent <names>", "run with specific agents (comma-separated, supports globs e.g. 'claude-code|*')")
   .option("--json", "output results as JSON to stdout", false)
   .option("-v, --verbose", "show detailed per-step logging", false)
   .option("-o, --output-dir <dir>", "also write axis-report-[timestamp].json to this directory")
@@ -306,10 +322,13 @@ program
       process.stderr.write("\n  Warning: --compare-baseline requires scoring. Ignoring because --no-score is set.\n\n");
     }
 
+    const scenarios = splitCsv(opts.scenario);
+    const agents = splitCsv(opts.agent)?.map((a) => a.toLowerCase());
+
     const pipelineOpts: RunPipelineOptions = {
       configPath: opts.config,
-      scenario: opts.scenario,
-      agent: opts.agent ? opts.agent.toLowerCase() : undefined,
+      scenarios,
+      agents,
       concurrency: opts.concurrency,
       score: opts.score,
       verbose: opts.verbose,

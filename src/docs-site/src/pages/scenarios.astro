@@ -685,7 +685,8 @@ scenarios/
       CLI filters and agent-level <code>scenarios</code> globs work with variant keys. Filtering
       by the base key matches all its variants: <code>--scenario create-post</code> runs all three
       variants above. Use the full key to target a specific variant:
-      <code>--scenario create-post@with-netlify-mcp</code>.
+      <code>--scenario create-post@with-netlify-mcp</code>. You can also pass a comma-separated
+      list or a glob pattern: <code>--scenario "cms/*,create-post@with-netlify-mcp"</code>.
     </p>
   </div>
 
