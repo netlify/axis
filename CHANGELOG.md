@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/netlify/axis/compare/v1.6.5...v1.7.0) (2026-05-12)
+
+
+### Features
+
+* add globs support for scnearios,variants, and agents ([c124bfb](https://github.com/netlify/axis/commit/c124bfba8d1f5c337a7572279481f7c32f0aeada))
+
 ## [1.6.5](https://github.com/netlify/axis/compare/v1.6.4...v1.6.5) (2026-05-12)
 
 
