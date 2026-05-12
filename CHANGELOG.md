@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.1](https://github.com/netlify/axis/compare/v1.7.0...v1.7.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* add axis specific env vars during lifecycle modes ([69ea701](https://github.com/netlify/axis/commit/69ea701de0efc930d3517c48ae0b878f0601ff2f))
+* improve acp extraction ([3101b04](https://github.com/netlify/axis/commit/3101b045d043a60328a4eae4b9b29027b43d0150))
+
 ## [1.7.0](https://github.com/netlify/axis/compare/v1.6.5...v1.7.0) (2026-05-12)
 
 
