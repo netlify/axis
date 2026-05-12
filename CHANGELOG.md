@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.2](https://github.com/netlify/axis/compare/v1.6.1...v1.6.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* support debug streaming ([bd2b0ef](https://github.com/netlify/axis/commit/bd2b0ef624a6f59e821dd2fc46499ee1efb5fb3f))
+
 ## [1.6.1](https://github.com/netlify/axis/compare/v1.6.0...v1.6.1) (2026-05-11)
 
 
