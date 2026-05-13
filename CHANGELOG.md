@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.4](https://github.com/netlify/axis/compare/v1.7.3...v1.7.4) (2026-05-13)
+
+
+### Bug Fixes
+
+* improve fuzzy detection of configs ([5de722c](https://github.com/netlify/axis/commit/5de722c2818264d6b8cf317581ce81c81dae48a1))
+
 ## [1.7.3](https://github.com/netlify/axis/compare/v1.7.2...v1.7.3) (2026-05-13)
 
 
