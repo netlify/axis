@@ -185,6 +185,142 @@ describe("discoverScenarios", () => {
     await expect(discoverScenarios(FIXTURES_DIR, "./nonexistent")).rejects.toThrow("Could not read scenarios path");
   });
 
+  describe("walk filtering", () => {
+    it("silently skips JSON files that do not look like scenarios", async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-walk-"));
+      const scenariosDir = path.join(tmpDir, "scenarios");
+      const fixtureDir = path.join(scenariosDir, "fixture-site");
+      await fs.mkdir(fixtureDir, { recursive: true });
+
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+      );
+      await fs.writeFile(
+        path.join(fixtureDir, "package.json"),
+        JSON.stringify({ name: "fixture-site", version: "1.0.0", dependencies: {} }),
+      );
+      await fs.writeFile(
+        path.join(fixtureDir, "state.json"),
+        JSON.stringify({ siteId: "abc", deployId: "xyz" }),
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("still validates JSON files that have any scenario-marker field", async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-walk-"));
+      const scenariosDir = path.join(tmpDir, "scenarios");
+      await fs.mkdir(scenariosDir, { recursive: true });
+      // Has `prompt` but no `name` — clearly intended as a scenario, must error.
+      await fs.writeFile(
+        path.join(scenariosDir, "broken.json"),
+        JSON.stringify({ prompt: "do thing", rubric: "judged" }),
+      );
+
+      await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(/missing required field "name"/);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("silently skips invalid JSON files when walking", async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-walk-"));
+      const scenariosDir = path.join(tmpDir, "scenarios");
+      await fs.mkdir(scenariosDir, { recursive: true });
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+      );
+      await fs.writeFile(path.join(scenariosDir, "garbage.json"), "this is not json");
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("does not descend into hidden directories or node_modules", async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-walk-"));
+      const scenariosDir = path.join(tmpDir, "scenarios");
+      const hidden = path.join(scenariosDir, ".netlify");
+      const vendored = path.join(scenariosDir, "node_modules", "some-pkg");
+      await fs.mkdir(hidden, { recursive: true });
+      await fs.mkdir(vendored, { recursive: true });
+
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+      );
+      // Files inside these dirs would otherwise be readdir'd and parsed.
+      // Even if they happened to look like scenarios, we should not pick them up.
+      await fs.writeFile(
+        path.join(hidden, "state.json"),
+        JSON.stringify({ name: "Should Not Load", prompt: "p", rubric: "r" }),
+      );
+      await fs.writeFile(
+        path.join(vendored, "package.json"),
+        JSON.stringify({ name: "Should Not Load", prompt: "p", rubric: "r" }),
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("treats explicit single-file JSON entries strictly even if they don't look like scenarios", async () => {
+      // Pointing at a file directly is intent — surface validation errors instead of silently skipping.
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-walk-"));
+      await fs.writeFile(path.join(tmpDir, "not-a-scenario.json"), JSON.stringify({ siteId: "x" }));
+
+      await expect(discoverScenarios(tmpDir, "./not-a-scenario.json")).rejects.toThrow(/missing required field/);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("silently skips ESM module files that default-export non-scenario configs", async () => {
+      // Mimics next.config.mjs / vite.config.mjs living inside a fixture codebase.
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-walk-"));
+      const scenariosDir = path.join(tmpDir, "scenarios");
+      const fixtureDir = path.join(scenariosDir, "nextjs-fixture");
+      await fs.mkdir(fixtureDir, { recursive: true });
+
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+      );
+      await fs.writeFile(
+        path.join(fixtureDir, "next.config.mjs"),
+        `export default { reactStrictMode: true, images: { remotePatterns: [] } };`,
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+
+    it("silently skips module files that fail to import when walking", async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-walk-"));
+      const scenariosDir = path.join(tmpDir, "scenarios");
+      await fs.mkdir(scenariosDir, { recursive: true });
+
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+      );
+      await fs.writeFile(path.join(scenariosDir, "broken.mjs"), `import "./does-not-exist.js";`);
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+
+      await fs.rm(tmpDir, { recursive: true });
+    });
+  });
+
   describe("variants", () => {
     let tmpDir: string;
 

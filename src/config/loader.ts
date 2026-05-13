@@ -203,6 +203,13 @@ async function collectFromPath(absolutePath: string, scenarios: Scenario[]): Pro
   if (loaded) scenarios.push(...loaded);
 }
 
+/**
+ * Directory names skipped when walking the scenarios tree. These commonly
+ * appear inside fixture codebases (e.g. `scenarios/fixtures/site/.netlify/`)
+ * and never contain authored scenarios.
+ */
+const WALK_SKIP_DIRS = new Set(["node_modules"]);
+
 async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Promise<void> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
 
@@ -210,6 +217,10 @@ async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Pro
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
+      // Skip dotfile directories (`.git`, `.netlify`, `.next`, …) and known
+      // non-source dirs so we don't crawl into tool state or vendored code
+      // when a scenario directory contains fixture codebases.
+      if (entry.name.startsWith(".") || WALK_SKIP_DIRS.has(entry.name)) continue;
       await walkDir(fullPath, rootDir, scenarios);
       continue;
     }
@@ -220,8 +231,9 @@ async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Pro
 
     // Derive key from path relative to the walk root: scenarios/cms/create-post.ts → "cms/create-post"
     const baseKey = path.relative(rootDir, fullPath).replace(SCENARIO_EXT_RE, "").split(path.sep).join("/");
-    // Walking a directory: silently skip module files that don't default-export a scenario object,
-    // so user-authored helpers/utilities can live alongside scenarios without special handling.
+    // Walking a directory: silently skip files that don't look like a scenario
+    // (e.g. fixture JSON, helper TS modules) so authors can keep them alongside
+    // real scenarios without special handling.
     const loaded = await loadScenarioFromPath(fullPath, baseKey, true);
     if (loaded) scenarios.push(...loaded);
   }
@@ -230,9 +242,11 @@ async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Pro
 /**
  * Loads a single scenario from disk, dispatching by extension.
  *
- * @param silentSkip  When true, JS/TS modules without a default object export return null
- *                    instead of throwing. Used when walking a directory so non-scenario
- *                    helper modules can coexist with scenario files.
+ * @param silentSkip  When true, files that don't look like a scenario return
+ *                    null instead of throwing — JS/TS modules without a default
+ *                    object export, JSON files with no scenario-identifying
+ *                    fields. Used when walking a directory so fixture data and
+ *                    helper modules can coexist with real scenario files.
  */
 async function loadScenarioFromPath(
   filePath: string,
@@ -242,7 +256,7 @@ async function loadScenarioFromPath(
   const ext = path.extname(filePath).toLowerCase();
 
   if (ext === ".json") {
-    return loadJsonScenario(filePath, baseKey);
+    return loadJsonScenario(filePath, baseKey, silentSkip);
   }
 
   if (JS_EXTENSIONS.has(ext) || TS_EXTENSIONS.has(ext)) {
@@ -253,17 +267,36 @@ async function loadScenarioFromPath(
   throw new Error(`Unsupported scenario file extension "${ext}" at ${filePath}`);
 }
 
-async function loadJsonScenario(filePath: string, baseKey: string): Promise<Scenario[]> {
+/**
+ * Top-level fields that, if present in a JSON file, signal "this is intended to
+ * be a scenario." `prompt` and `rubric` are AXIS-specific enough that no common
+ * non-scenario JSON (package.json, tsconfig.json, lockfiles, framework state)
+ * uses them. When walking a directory and neither appears, the JSON is some
+ * other artifact and we skip it silently instead of treating it as a malformed
+ * scenario. `name` is intentionally excluded — package.json has it.
+ */
+const SCENARIO_MARKER_FIELDS = ["prompt", "rubric"] as const;
+
+async function loadJsonScenario(filePath: string, baseKey: string, silentSkip: boolean): Promise<Scenario[] | null> {
   const raw = await fs.readFile(filePath, "utf-8");
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
+    if (silentSkip) return null;
     throw new Error(`Failed to parse JSON in scenario file ${filePath}`);
   }
 
+  if (silentSkip && !looksLikeScenario(parsed)) return null;
+
   return finalizeScenarioObject(parsed, filePath, baseKey);
+}
+
+function looksLikeScenario(parsed: unknown): boolean {
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return false;
+  const obj = parsed as Record<string, unknown>;
+  return SCENARIO_MARKER_FIELDS.some((field) => field in obj);
 }
 
 async function loadModuleScenario(filePath: string, baseKey: string, silentSkip: boolean): Promise<Scenario[] | null> {
@@ -271,6 +304,7 @@ async function loadModuleScenario(filePath: string, baseKey: string, silentSkip:
   try {
     mod = await importModule(filePath);
   } catch (err) {
+    if (silentSkip) return null;
     throw new Error(`Failed to load scenario module at ${filePath}: ${formatError(err)}`);
   }
 
@@ -283,6 +317,12 @@ async function loadModuleScenario(filePath: string, baseKey: string, silentSkip:
     if (silentSkip) return null;
     throw new Error(`Scenario module at ${filePath} must default-export an object (or function returning one)`);
   }
+
+  // Fixture codebases inside the scenarios tree may include framework configs
+  // (next.config.mjs, vite.config.ts, …) that default-export an object. Skip
+  // anything without scenario-marker fields when walking; surface a real error
+  // only for files explicitly named on the command line / config.
+  if (silentSkip && !looksLikeScenario(def)) return null;
 
   return finalizeScenarioObject(def, filePath, baseKey);
 }
