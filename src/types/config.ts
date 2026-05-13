@@ -1,5 +1,12 @@
 import type { ScenarioInput } from "./scenario.js";
 
+/**
+ * Shape of an inline scenario entry in `AxisConfig.scenarios`. Same as
+ * {@link ScenarioInput} but `key` is required, since inline scenarios have
+ * no file path the loader can derive a key from.
+ */
+export type InlineScenario = ScenarioInput & { key: string };
+
 export interface AxisConfig {
   /** Human-readable project name. Shown in report headers. */
   name?: string;
@@ -7,12 +14,12 @@ export interface AxisConfig {
    * Where scenarios come from. Supports three forms:
    * - A path string — directory walked for `*.json`/`*.{js,ts,...}` scenario files.
    * - An array of strings — each entry is a directory or single scenario file path.
-   * - An array mixing path strings and inline {@link ScenarioInput} objects, useful
+   * - An array mixing path strings and inline {@link InlineScenario} objects, useful
    *   when authoring `axis.config.{js,ts}` and generating scenarios programmatically.
    *
    * When omitted, the loader defaults to `"./scenarios"` (relative to the config file).
    */
-  scenarios?: string | (string | ScenarioInput)[];
+  scenarios?: string | (string | InlineScenario)[];
   agents: (string | AgentConfig)[];
   settings?: SettingsConfig;
   /** Custom adapter modules. Keys are adapter names, values are paths (relative to config) to JS/TS modules that export an AgentAdapter. */

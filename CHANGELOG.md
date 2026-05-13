@@ -2,11 +2,10 @@
 
 ## [1.7.2](https://github.com/netlify/axis/compare/v1.7.1...v1.7.2) (2026-05-13)
 
-
 ### Bug Fixes
 
-* bug improvements and cleanup ([b07154b](https://github.com/netlify/axis/commit/b07154b79ec7e136fd163ce98c922a5c62db5214))
-* formatting/linting ([cdeca07](https://github.com/netlify/axis/commit/cdeca0739cdcf74d6445192cd1adefa796d4de34))
+- bug improvements and cleanup ([b07154b](https://github.com/netlify/axis/commit/b07154b79ec7e136fd163ce98c922a5c62db5214))
+- formatting/linting ([cdeca07](https://github.com/netlify/axis/commit/cdeca0739cdcf74d6445192cd1adefa796d4de34))
 
 ## [1.7.1](https://github.com/netlify/axis/compare/v1.7.0...v1.7.1) (2026-05-12)
 

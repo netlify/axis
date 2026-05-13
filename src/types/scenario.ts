@@ -53,11 +53,15 @@ export interface ScenarioVariant {
 }
 
 /**
- * User-facing shape for inline scenarios declared in `axis.config.{js,ts,json}`.
- * Identical to {@link Scenario} but explicit about the contract: `key` is required
- * (the loader does not derive it from a file path for inline entries).
+ * User-facing authoring shape for scenarios. `key` is optional because the
+ * loader derives it from the file path when the scenario lives as a standalone
+ * file in the scenarios directory.
+ *
+ * When declared inline in the `scenarios` array of `axis.config.{js,ts,json}`,
+ * `key` becomes required — there is no path to derive it from. That stricter
+ * constraint is expressed at the `AxisConfig.scenarios` field type, not here.
  */
-export type ScenarioInput = Scenario;
+export type ScenarioInput = Omit<Scenario, "key"> & { key?: string };
 
 export type LifecycleAction = RunScriptAction | CopyAction;
 

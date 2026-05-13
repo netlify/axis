@@ -405,9 +405,7 @@ function validateLifecycleActions(data: unknown, filePath: string, field: string
         throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}] missing non-empty "destination" string`);
       }
     } else {
-      throw new Error(
-        `Invalid scenario at ${filePath}: ${field}[${i}].action must be "run_script" or "copy"`,
-      );
+      throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}].action must be "run_script" or "copy"`);
     }
   }
 }

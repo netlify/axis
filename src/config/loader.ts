@@ -2,8 +2,8 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
-import type { AxisConfig } from "../types/config.js";
-import type { Scenario, ScenarioInput, ScenarioVariant } from "../types/scenario.js";
+import type { AxisConfig, InlineScenario } from "../types/config.js";
+import type { Scenario, ScenarioVariant } from "../types/scenario.js";
 import { validateConfig, validateScenario } from "./validator.js";
 import { formatError } from "../types/output.js";
 import { globToRegExp } from "../runner/artifacts.js";
@@ -135,7 +135,7 @@ function normalizeConfigAgents(config: AxisConfig): void {
 
 export async function discoverScenarios(
   configDir: string,
-  scenariosInput: string | (string | ScenarioInput)[] | undefined,
+  scenariosInput: string | (string | InlineScenario)[] | undefined,
   filter?: string[],
 ): Promise<Scenario[]> {
   // When omitted, fall back to the default scenarios directory.
@@ -311,7 +311,7 @@ function finalizeScenarioObject(parsed: unknown, filePath: string, baseKey: stri
   return scenario.variants.map((variant) => expandVariant(scenario, variant, baseKey));
 }
 
-function expandInline(input: ScenarioInput): Scenario[] {
+function expandInline(input: InlineScenario): Scenario[] {
   // Shallow clone so we don't mutate the caller's config object.
   const scenario = { ...input } as Scenario & { variants?: ScenarioVariant[] };
   normalizeScenarioAgents(scenario);

@@ -241,12 +241,11 @@ describe("copy lifecycle action", () => {
     const lines: string[] = [];
     const logger = { info: (m: string) => lines.push(m), error: () => {} };
 
-    await executeLifecycleActions(
-      [{ action: "copy", match: "./f/*", destination: "./dst" }],
-      workspace,
-      undefined,
-      { sourceRoot, debug: true, logger },
-    );
+    await executeLifecycleActions([{ action: "copy", match: "./f/*", destination: "./dst" }], workspace, undefined, {
+      sourceRoot,
+      debug: true,
+      logger,
+    });
 
     const joined = lines.join("\n");
     expect(joined).toContain("[copy] pattern=./f/*");
@@ -315,10 +314,7 @@ describe("copy lifecycle action", () => {
     fs.mkdirSync(path.join(workspace, "src"), { recursive: true });
     fs.writeFileSync(path.join(workspace, "src", "x.txt"), "x");
 
-    await executeLifecycleActions(
-      [{ action: "copy", match: "./src/*", destination: "./out" }],
-      workspace,
-    );
+    await executeLifecycleActions([{ action: "copy", match: "./src/*", destination: "./out" }], workspace);
 
     expect(fs.readFileSync(path.join(workspace, "out", "x.txt"), "utf8")).toBe("x");
   });

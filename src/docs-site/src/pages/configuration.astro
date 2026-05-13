@@ -111,11 +111,11 @@ const mcpExample = `{
     directly or a (sync or async) function that returns one:
   </p>
   <pre><code>{`// axis.config.ts
-import type { AxisConfig, ScenarioInput } from "@netlify/axis";
+import type { AxisConfig, InlineScenario } from "@netlify/axis";
 import applyLimits from "./scenarios/apply-limits.js";
 import authorScenario from "./scenarios/author-scenario.js";
 
-const dynamicScenarios: ScenarioInput[] = ["alpha", "beta", "gamma"].map((id) => ({
+const dynamicScenarios: InlineScenario[] = ["alpha", "beta", "gamma"].map((id) => ({
   key: "smoke-" + id,
   name: "Smoke test " + id,
   prompt: "Do thing for " + id,
@@ -171,12 +171,13 @@ export default async () => {
     <tbody>
       <tr>
         <td><code>scenarios</code></td>
-        <td><code>string | (string | ScenarioInput)[]</code></td>
+        <td><code>string | (string | InlineScenario)[]</code></td>
         <td><span class="req-no">No</span></td>
         <td>
           A path to the scenarios directory, or an array of paths and/or inline scenario objects.
-          Defaults to <code>"./scenarios"</code> when omitted. See
-          <a href="/scenarios#authoring">Authoring scenarios</a> for the full schema.
+          Inline entries must include a <code>key</code>; entries loaded from files take their
+          <code>key</code> from the file path. Defaults to <code>"./scenarios"</code> when
+          omitted. See <a href="/scenarios#authoring">Authoring scenarios</a> for the full schema.
         </td>
       </tr>
       <tr>

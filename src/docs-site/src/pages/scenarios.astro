@@ -50,13 +50,19 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <td><code>setup</code></td>
         <td><code>object[]</code></td>
         <td><span class="req-no">No</span></td>
-        <td>Lifecycle actions run before the agent starts.</td>
+        <td>
+          <a href="#lifecycle-action-types">Lifecycle actions</a> run before the agent starts
+          (<a href="#action-run-script"><code>run_script</code></a> or
+          <a href="#action-copy"><code>copy</code></a>).
+        </td>
       </tr>
       <tr>
         <td><code>teardown</code></td>
         <td><code>object[]</code></td>
         <td><span class="req-no">No</span></td>
-        <td>Lifecycle actions run after scoring completes.</td>
+        <td>
+          <a href="#lifecycle-action-types">Lifecycle actions</a> run after scoring completes.
+        </td>
       </tr>
       <tr>
         <td><code>agents</code></td>
@@ -341,7 +347,7 @@ export default {
     persist between runs.
   </p>
   <pre><code>{`"setup": [
-  { "action": "run_script", "command": "cp -R \\"$AXIS_CONFIG_DIR/scenario-fixtures/my-project/.\\" ." }
+  { "action": "copy", "match": "./scenario-fixtures/my-project/**/*", "destination": "." }
 ],
 "teardown": [
   { "action": "run_script", "command": "rm -rf /tmp/my-project-artifacts" }
@@ -350,11 +356,107 @@ export default {
   <div class="callout callout-warn">
     <div class="callout-title">Lifecycle Details</div>
     <p>
-      Each action runs sequentially with a 30-second timeout. Setup failures abort the job and
+      Each action runs sequentially with a 3-minute timeout. Setup failures abort the job and
       mark it as failed. Teardown failures are logged but do not block subsequent jobs or affect
       scores.
     </p>
   </div>
+
+  <h3 id="lifecycle-action-types">Action types</h3>
+  <p>
+    Both <code>setup</code> and <code>teardown</code> take an array of action objects. Each object's
+    <code>action</code> field selects one of two action types:
+  </p>
+
+  <h4 id="action-run-script"><code>run_script</code></h4>
+  <p>
+    Runs <code>command</code> in a shell with the per-job workspace as its working directory.
+    Standard output and exit code feed into the lifecycle result. The available
+    <a href="#lifecycle-environment-variables"><code>AXIS_*</code> environment variables</a> let
+    the command branch on agent, scenario, variant, etc.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>action</code></td>
+        <td><code>"run_script"</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Discriminator.</td>
+      </tr>
+      <tr>
+        <td><code>command</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Shell command to execute. Failure (non-zero exit) aborts setup; teardown failures are logged but non-blocking.</td>
+      </tr>
+    </tbody>
+  </table>
+  <pre><code>{`{
+  "action": "run_script",
+  "command": "npm install --silent"
+}`}</code></pre>
+
+  <h4 id="action-copy"><code>copy</code></h4>
+  <p>
+    Copies files from your config directory into the agent's workspace without spawning a shell.
+    This is the recommended way to stage fixtures &mdash; faster and clearer than the equivalent
+    <code>cp -R</code> command, and portable across operating systems.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>action</code></td>
+        <td><code>"copy"</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>Discriminator.</td>
+      </tr>
+      <tr>
+        <td><code>match</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>
+          Glob pattern resolved relative to <code>AXIS_CONFIG_DIR</code> (the directory containing
+          <code>axis.config.&#123;json,ts,js&#125;</code>). Supports <code>*</code>, <code>**</code>,
+          <code>?</code>, and character classes.
+        </td>
+      </tr>
+      <tr>
+        <td><code>destination</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-yes">Yes</span></td>
+        <td>
+          Directory path resolved relative to the agent workspace. Created if missing.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Each matched file's path is preserved <em>relative to the longest non-glob prefix of</em>
+    <code>match</code>, so directory structure under that prefix carries over to the destination:
+  </p>
+  <pre><code>{`// Flat copy: every file directly inside thing/ lands in this/dir/
+{ "action": "copy", "match": "./fixture/thing/*", "destination": "./this/dir" }
+
+// Preserves subdirectories under fixture/
+{ "action": "copy", "match": "./fixture/**/*.txt", "destination": "./out" }
+
+// Single literal file
+{ "action": "copy", "match": "./fixture/seed.json", "destination": "./data" }`}</code></pre>
+  <p>
+    A literal path that doesn't exist is a hard error. A glob whose base directory is missing &mdash;
+    or whose pattern matches nothing &mdash; succeeds with zero files copied.
+  </p>
+  <p>
+    Running with <code>--debug</code> logs the resolved absolute source base, the resolved
+    destination, and every <code>src&nbsp;-&gt;&nbsp;dst</code> pair, so you can verify a pattern
+    without dry-running the whole scenario.
+  </p>
 
   <h3 id="lifecycle-environment-variables">Lifecycle environment variables</h3>
   <p>
@@ -428,22 +530,22 @@ export default {
     </tbody>
   </table>
   <p>
-    The <code>AXIS_CONFIG_DIR</code> variable enables the recommended pattern of keeping fixture
-    data in a versioned <code>scenario-fixtures/</code> directory next to
-    <code>axis.config.json</code>, then copying just the bits a scenario needs into its workspace:
+    The recommended pattern is to keep fixture data in a versioned
+    <code>scenario-fixtures/</code> directory next to <code>axis.config.json</code>, then stage
+    just what each scenario needs with a <a href="#action-copy"><code>copy</code></a> action:
   </p>
   <pre><code>{`scenario-fixtures/
   my-project/
     package.json
     src/index.js
-    .axis/baselines/main.json   # hidden files copied via the trailing /. on cp -R
+    .axis/baselines/main.json
 
 scenarios/
-  my-scenario.json              # setup: cp -R "$AXIS_CONFIG_DIR/scenario-fixtures/my-project/." .`}</code></pre>
+  my-scenario.json              # setup: copy ./scenario-fixtures/my-project/** -> .`}</code></pre>
   <p>
     The <code>AXIS_AGENT</code>, <code>AXIS_MODEL</code>, <code>AXIS_SCENARIO</code>, and
-    <code>AXIS_VARIANT</code> variables let a single setup or teardown script branch on what
-    is actually running without baking that information into the command string:
+    <code>AXIS_VARIANT</code> variables let a single <code>run_script</code> action branch on
+    what is actually running without baking that information into the command string:
   </p>
   <pre><code>{`"setup": [
   {
