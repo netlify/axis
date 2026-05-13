@@ -1099,13 +1099,17 @@ function renderModalSkills(skills: string[]): string {
 
 function renderModalLifecycle(label: string, actions: LifecycleAction[]): string {
   const items = actions
-    .map(
-      (a) => `
+    .map((a) => {
+      const detail =
+        a.action === "copy"
+          ? `<code>${escapeHtml(a.match)}</code> → <code>${escapeHtml(a.destination)}</code>`
+          : `<code>${escapeHtml(a.command)}</code>`;
+      return `
       <li>
         <span class="modal-config-label-inline">${escapeHtml(a.action)}</span>
-        <code>${escapeHtml(a.command)}</code>
-      </li>`,
-    )
+        ${detail}
+      </li>`;
+    })
     .join("");
   return `
     <div class="modal-section">

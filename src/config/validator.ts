@@ -393,11 +393,21 @@ function validateLifecycleActions(data: unknown, filePath: string, field: string
   }
   for (let i = 0; i < data.length; i++) {
     const entry = data[i] as Record<string, unknown>;
-    if (entry.action !== "run_script") {
-      throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}].action must be "run_script"`);
-    }
-    if (typeof entry.command !== "string") {
-      throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}] missing "command" string`);
+    if (entry.action === "run_script") {
+      if (typeof entry.command !== "string") {
+        throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}] missing "command" string`);
+      }
+    } else if (entry.action === "copy") {
+      if (typeof entry.match !== "string" || entry.match.length === 0) {
+        throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}] missing non-empty "match" string`);
+      }
+      if (typeof entry.destination !== "string" || entry.destination.length === 0) {
+        throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}] missing non-empty "destination" string`);
+      }
+    } else {
+      throw new Error(
+        `Invalid scenario at ${filePath}: ${field}[${i}].action must be "run_script" or "copy"`,
+      );
     }
   }
 }

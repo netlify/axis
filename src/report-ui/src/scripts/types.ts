@@ -59,10 +59,9 @@ export interface ResolvedRunConfig {
   mcpServers?: Record<string, McpServerConfig>;
 }
 
-export interface LifecycleAction {
-  action: string;
-  command: string;
-}
+export type LifecycleAction =
+  | { action: "run_script"; command: string }
+  | { action: "copy"; match: string; destination: string };
 
 export type McpServerConfig =
   | { type?: "stdio"; command: string; args?: string[]; env?: Record<string, string> }

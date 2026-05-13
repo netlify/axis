@@ -439,7 +439,11 @@ async function executeJob(
   const cleanup = async () => {
     if (scenario.teardown?.length) {
       logger.verbose?.(`[${label}] Running teardown...`);
-      const outcome = await runLifecyclePhase(scenario.teardown, workspace, jobEnv, "teardown", lifecycleContext);
+      const outcome = await runLifecyclePhase(scenario.teardown, workspace, jobEnv, "teardown", lifecycleContext, {
+        sourceRoot: configDir,
+        debug,
+        logger,
+      });
       if (outcome.error) {
         logger.error(`[${label}] Teardown failed: ${formatError(outcome.error)}`);
       }
@@ -472,7 +476,11 @@ async function executeJob(
   if (scenario.setup?.length) {
     updateStatus(index, "setup");
     logger.verbose?.(`[${label}] Running setup...`);
-    const outcome = await runLifecyclePhase(scenario.setup, workspace, jobEnv, "setup", lifecycleContext);
+    const outcome = await runLifecyclePhase(scenario.setup, workspace, jobEnv, "setup", lifecycleContext, {
+      sourceRoot: configDir,
+      debug,
+      logger,
+    });
     setupOutput = outcome.output;
     if (outcome.error) throw outcome.error;
   }

@@ -59,9 +59,23 @@ export interface ScenarioVariant {
  */
 export type ScenarioInput = Scenario;
 
-export interface LifecycleAction {
+export type LifecycleAction = RunScriptAction | CopyAction;
+
+export interface RunScriptAction {
   action: "run_script";
   command: string;
+}
+
+/**
+ * Copy files matching `match` (a glob, resolved relative to the config
+ * directory) into `destination` (relative to the agent workspace). Each
+ * matched file's path relative to the longest non-glob prefix of `match`
+ * is preserved under `destination`.
+ */
+export interface CopyAction {
+  action: "copy";
+  match: string;
+  destination: string;
 }
 
 export interface RubricCriterion {

@@ -72,10 +72,10 @@ export function captureArtifacts(
 
 /**
  * Walk a directory recursively, invoking `onFile` with each file's path
- * relative to `root`. Skips symlinks to avoid following loops outside the
- * workspace.
+ * relative to `root` (forward-slash normalized). Skips symlinks to avoid
+ * following loops outside the workspace.
  */
-function walk(root: string, rel: string, onFile: (relPath: string) => void): void {
+export function walk(root: string, rel: string, onFile: (relPath: string) => void): void {
   const abs = path.join(root, rel);
   let dirents: fs.Dirent[];
   try {

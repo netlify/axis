@@ -549,6 +549,38 @@ describe("validateScenario", () => {
     expect(() => validateScenario(scenario, "test.json")).toThrow('"command"');
   });
 
+  it("accepts a copy action with match and destination", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", match: "./fixtures/*", destination: "./workspace" }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("rejects a copy action missing match", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", destination: "./workspace" }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).toThrow('"match"');
+  });
+
+  it("rejects a copy action missing destination", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", match: "./fixtures/*" }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).toThrow('"destination"');
+  });
+
+  it("rejects a copy action with empty match string", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", match: "", destination: "./workspace" }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).toThrow('"match"');
+  });
+
   it("accepts a scenario with skills", () => {
     const scenario = { ...validScenario, skills: ["./local-skill", "owner/repo"] };
     expect(() => validateScenario(scenario, "test.json")).not.toThrow();

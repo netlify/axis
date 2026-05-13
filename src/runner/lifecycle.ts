@@ -2,7 +2,9 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { LifecycleAction } from "../types/scenario.js";
+import { globToRegExp, walk } from "./artifacts.js";
+import type { Logger } from "../types/output.js";
+import type { CopyAction, LifecycleAction, RunScriptAction } from "../types/scenario.js";
 
 /** Default timeout for lifecycle scripts (3 minutes). */
 const DEFAULT_TIMEOUT_MS = 3 * 60_000;
@@ -18,21 +20,30 @@ export interface LifecycleResult {
   durationMs: number;
 }
 
+export interface LifecycleExecOptions {
+  /** Base directory for resolving `copy` action source globs. Defaults to `cwd`. */
+  sourceRoot?: string;
+  /** When true, copy actions log resolved source/destination paths via `logger`. */
+  debug?: boolean;
+  /** Logger used to emit debug output. Debug messages are dropped when omitted. */
+  logger?: Logger;
+}
+
 export async function executeLifecycleActions(
   actions: LifecycleAction[],
   cwd: string,
   env?: Record<string, string>,
+  options?: LifecycleExecOptions,
 ): Promise<LifecycleResult[]> {
   const results: LifecycleResult[] = [];
 
   for (const action of actions) {
-    const result = await runScript(action, cwd, env);
+    const result = action.action === "copy" ? runCopy(action, cwd, options) : await runScript(action, cwd, env);
     results.push(result);
 
     if (result.exitCode !== 0) {
-      throw new Error(
-        `Lifecycle action failed: "${action.command}" exited with code ${result.exitCode}\n${result.stderr}`,
-      );
+      const label = action.action === "copy" ? `copy ${action.match} -> ${action.destination}` : action.command;
+      throw new Error(`Lifecycle action failed: "${label}" exited with code ${result.exitCode}\n${result.stderr}`);
     }
   }
 
@@ -75,6 +86,7 @@ export async function runLifecyclePhase(
   baseEnv: Record<string, string> | undefined,
   phase: "setup" | "teardown",
   context?: LifecyclePhaseContext,
+  options?: LifecycleExecOptions,
 ): Promise<LifecyclePhaseOutcome> {
   const outputFile = path.join(
     os.tmpdir(),
@@ -99,7 +111,7 @@ export async function runLifecyclePhase(
   let error: Error | undefined;
   let results: LifecycleResult[] = [];
   try {
-    results = await executeLifecycleActions(actions, cwd, env);
+    results = await executeLifecycleActions(actions, cwd, env, options);
   } catch (err) {
     error = err instanceof Error ? err : new Error(String(err));
   }
@@ -129,7 +141,7 @@ export async function runLifecyclePhase(
   return { results, ...(output !== undefined ? { output } : {}), ...(error ? { error } : {}) };
 }
 
-function runScript(action: LifecycleAction, cwd: string, env?: Record<string, string>): Promise<LifecycleResult> {
+function runScript(action: RunScriptAction, cwd: string, env?: Record<string, string>): Promise<LifecycleResult> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const child = spawn(action.command, {
@@ -177,4 +189,111 @@ function runScript(action: LifecycleAction, cwd: string, env?: Record<string, st
       });
     });
   });
+}
+
+/**
+ * Copy files matching `action.match` (glob, resolved relative to
+ * `options.sourceRoot` — defaults to `cwd`) into `action.destination`
+ * (resolved relative to `cwd`, the agent workspace). Each match keeps its
+ * path relative to the longest non-glob prefix of `match`, so directory
+ * structure under that prefix is preserved.
+ *
+ * In debug mode, the resolved source/destination absolute paths and each
+ * per-file copy are logged so authors can verify their patterns.
+ */
+function runCopy(action: CopyAction, cwd: string, options?: LifecycleExecOptions): LifecycleResult {
+  const start = Date.now();
+  const sourceRoot = options?.sourceRoot ?? cwd;
+  const debugLog = options?.debug ? (msg: string) => options.logger?.info(`[copy] ${msg}`) : undefined;
+  const result = (exitCode: number, stderr = ""): LifecycleResult => ({
+    action,
+    exitCode,
+    stdout: "",
+    stderr,
+    durationMs: Date.now() - start,
+  });
+
+  try {
+    const normalizedPattern = action.match.replace(/\\/g, "/").replace(/^\.\//, "");
+    const base = findGlobBase(normalizedPattern);
+    const baseAbs = path.resolve(sourceRoot, base);
+    const destAbs = path.resolve(cwd, action.destination);
+
+    debugLog?.(`pattern=${action.match}`);
+    debugLog?.(`resolved source base=${baseAbs}`);
+    debugLog?.(`resolved destination=${destAbs}`);
+
+    if (!fs.existsSync(baseAbs)) {
+      // A literal path that doesn't exist is a hard error — the author named
+      // a specific file. A glob whose base is missing is just "zero matches".
+      const isLiteral = base === normalizedPattern;
+      if (isLiteral) return result(1, `source base does not exist: ${baseAbs}`);
+      debugLog?.("no files matched");
+      return result(0);
+    }
+
+    const matches = collectMatches(baseAbs, normalizedPattern, base);
+
+    if (matches.length === 0) {
+      debugLog?.("no files matched");
+      return result(0);
+    }
+
+    fs.mkdirSync(destAbs, { recursive: true });
+    matches.sort((a, b) => a.relFromBase.localeCompare(b.relFromBase));
+    for (const m of matches) {
+      const dst = path.join(destAbs, m.relFromBase);
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.copyFileSync(m.src, dst);
+      debugLog?.(`${m.src} -> ${dst}`);
+    }
+    debugLog?.(`copied ${matches.length} file(s)`);
+
+    return result(0);
+  } catch (err) {
+    return result(1, err instanceof Error ? err.message : String(err));
+  }
+}
+
+interface CopyMatch {
+  src: string;
+  /** Path relative to the glob base — preserved under the destination. */
+  relFromBase: string;
+}
+
+/**
+ * Resolve a glob pattern (already normalized, with `base` computed by
+ * {@link findGlobBase}) into the set of files it matches under `baseAbs`.
+ * When `baseAbs` is a file (literal pattern), that single file is the match.
+ * When `base` consumed the entire pattern but points to a directory, all
+ * files under it are matched (equivalent to appending `**\/*`).
+ */
+function collectMatches(baseAbs: string, normalizedPattern: string, base: string): CopyMatch[] {
+  if (fs.statSync(baseAbs).isFile()) {
+    return [{ src: baseAbs, relFromBase: path.basename(baseAbs) }];
+  }
+  const patternRelToBase =
+    base.length === 0 ? normalizedPattern : normalizedPattern.slice(base.length).replace(/^\//, "");
+  const effectivePattern = patternRelToBase.length === 0 ? "**/*" : patternRelToBase;
+  const re = globToRegExp(effectivePattern);
+  const matches: CopyMatch[] = [];
+  walk(baseAbs, "", (relPath) => {
+    if (re.test(relPath)) matches.push({ src: path.join(baseAbs, relPath), relFromBase: relPath });
+  });
+  return matches;
+}
+
+/**
+ * Longest leading path prefix containing no glob metacharacters. For
+ * `fixture/thing/*` this is `fixture/thing`; for `fixture/**\/*.txt` it's
+ * `fixture`; for a literal path it's the path itself.
+ */
+function findGlobBase(normalizedPattern: string): string {
+  const segments = normalizedPattern.split("/");
+  const baseSegs: string[] = [];
+  for (const seg of segments) {
+    if (/[*?[]/.test(seg)) break;
+    baseSegs.push(seg);
+  }
+  return baseSegs.join("/");
 }
