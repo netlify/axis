@@ -1,6 +1,7 @@
 import type { NormalizedEntry } from "../transcript/types.js";
 import type { RubricCriterion } from "../types/scenario.js";
 import type { RunResult } from "../types/output.js";
+import type { AgentMetadata } from "../types/agent.js";
 import type { GoalAchievementScore, CriterionGrade } from "../types/scoring.js";
 import { callJudge } from "./judge.js";
 import { parseJsonFromText } from "./parse-json.js";
@@ -102,6 +103,7 @@ function buildStringRubricPrompt(
     prompt: getOriginalPrompt(result),
     transcript: formatTranscriptForJudge(entries),
     finalResult: finalResult ?? "(no final result)",
+    executionStats: formatExecutionStats(result.output.metadata),
     rubric,
   });
 }
@@ -120,8 +122,33 @@ function buildArrayRubricPrompt(
     prompt: getOriginalPrompt(result),
     transcript: formatTranscriptForJudge(entries),
     finalResult: finalResult ?? "(no final result)",
+    executionStats: formatExecutionStats(result.output.metadata),
     rubricText,
   });
+}
+
+function formatExecutionStats(metadata: AgentMetadata): string {
+  const duration = formatDuration(metadata.durationMs);
+  const tokens = formatTokens(metadata.tokenUsage);
+  return `Duration: ${duration} | Tokens: ${tokens}`;
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const totalSeconds = ms / 1000;
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.round(totalSeconds - minutes * 60);
+  return `${minutes}m ${seconds}s`;
+}
+
+function formatTokens(usage: AgentMetadata["tokenUsage"]): string {
+  if (!usage) return "(unknown)";
+  const cached = usage.cacheReadInput ?? 0;
+  const total = usage.input + usage.output + cached;
+  const parts = [`input: ${usage.input.toLocaleString("en-US")}`, `output: ${usage.output.toLocaleString("en-US")}`];
+  if (cached > 0) parts.push(`cached: ${cached.toLocaleString("en-US")}`);
+  return `${total.toLocaleString("en-US")} (${parts.join(", ")})`;
 }
 
 function getOriginalPrompt(result: RunResult): string {

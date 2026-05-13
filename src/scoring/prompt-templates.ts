@@ -216,6 +216,11 @@ AGENT'S FINAL RESULT:
 
 ---
 
+EXECUTION STATS:
+{{executionStats}}
+
+---
+
 RUBRIC:
 {{rubric}}
 
@@ -234,6 +239,7 @@ Score guide: 0 = not met at all, 5 = partially met, 10 = fully met.`,
     { name: "prompt", description: "The original task prompt given to the agent", type: "text" },
     { name: "transcript", description: "Condensed agent transcript", type: "text" },
     { name: "finalResult", description: "The agent's final result text", type: "text" },
+    { name: "executionStats", description: "Human-readable duration and token usage for the run", type: "string" },
     { name: "rubric", description: "The evaluation criterion as a single string", type: "text" },
   ],
 };
@@ -263,6 +269,11 @@ AGENT'S FINAL RESULT:
 
 ---
 
+EXECUTION STATS:
+{{executionStats}}
+
+---
+
 RUBRIC CRITERIA:
 {{rubricText}}
 
@@ -282,6 +293,7 @@ When done, respond with ONLY valid JSON on its own line:
     { name: "prompt", description: "The original task prompt given to the agent", type: "text" },
     { name: "transcript", description: "Condensed agent transcript", type: "text" },
     { name: "finalResult", description: "The agent's final result text", type: "text" },
+    { name: "executionStats", description: "Human-readable duration and token usage for the run", type: "string" },
     { name: "rubricText", description: "Formatted rubric criteria with weights", type: "text" },
   ],
 };

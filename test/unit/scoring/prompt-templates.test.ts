@@ -169,10 +169,13 @@ describe("template content regression", () => {
       prompt: "Deploy app",
       transcript: "[1] ASSISTANT: I deployed the app",
       finalResult: "App deployed",
+      executionStats: "Duration: 12.3s | Tokens: 5,234 (input: 1,200, output: 4,034)",
       rubric: "The app should be deployed",
     });
     expect(stringResult).toContain("SCENARIO: Goal Scenario");
     expect(stringResult).toContain("Deploy app");
+    expect(stringResult).toContain("EXECUTION STATS:");
+    expect(stringResult).toContain("Duration: 12.3s");
     expect(stringResult).not.toContain("{{");
 
     const arrayResult = interpolate(templates.goal_array_rubric.template, {
@@ -180,9 +183,11 @@ describe("template content regression", () => {
       prompt: "Deploy app",
       transcript: "[1] ASSISTANT: I deployed the app",
       finalResult: "App deployed",
+      executionStats: "Duration: 12.3s | Tokens: 5,234 (input: 1,200, output: 4,034)",
       rubricText: '0. "App is deployed" (weight: 1.0)',
     });
     expect(arrayResult).toContain("RUBRIC CRITERIA:");
+    expect(arrayResult).toContain("EXECUTION STATS:");
     expect(arrayResult).not.toContain("{{");
   });
 });
