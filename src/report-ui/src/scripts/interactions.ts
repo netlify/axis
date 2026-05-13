@@ -26,12 +26,8 @@ export function initInteractions(): void {
 
       const isExpanded = header.classList.contains("expanded");
 
-      const agentRows = document.querySelectorAll<HTMLTableRowElement>(
-        `.agent-row[data-scenario="${scenarioKey}"]`,
-      );
-      const detailRows = document.querySelectorAll<HTMLTableRowElement>(
-        `.detail-row[data-scenario="${scenarioKey}"]`,
-      );
+      const agentRows = document.querySelectorAll<HTMLTableRowElement>(`.agent-row[data-scenario="${scenarioKey}"]`);
+      const detailRows = document.querySelectorAll<HTMLTableRowElement>(`.detail-row[data-scenario="${scenarioKey}"]`);
 
       if (isExpanded) {
         header.classList.remove("expanded");
@@ -85,10 +81,9 @@ export function initInteractions(): void {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       // The audits list is the immediate next sibling of the toggle button.
-      const list =
-        (btn.nextElementSibling as HTMLElement | null)?.classList.contains("audits-list")
-          ? (btn.nextElementSibling as HTMLElement)
-          : btn.parentElement?.querySelector<HTMLElement>(".audits-list") ?? null;
+      const list = (btn.nextElementSibling as HTMLElement | null)?.classList.contains("audits-list")
+        ? (btn.nextElementSibling as HTMLElement)
+        : (btn.parentElement?.querySelector<HTMLElement>(".audits-list") ?? null);
       if (!list) return;
 
       const isVisible = list.classList.contains("visible");
@@ -240,7 +235,9 @@ interface ArtifactJson {
 }
 
 function readArtifacts(key: string): ArtifactJson[] | null {
-  const dataEl = document.querySelector<HTMLScriptElement>(`script.artifacts-data[data-artifacts-key="${CSS.escape(key)}"]`);
+  const dataEl = document.querySelector<HTMLScriptElement>(
+    `script.artifacts-data[data-artifacts-key="${CSS.escape(key)}"]`,
+  );
   if (!dataEl?.textContent) return null;
   try {
     return JSON.parse(dataEl.textContent) as ArtifactJson[];
@@ -340,9 +337,7 @@ function openArtifactModal(section: HTMLElement, key: string, idx: number): void
   if (!artifacts || !artifacts[idx]) return;
   const a = artifacts[idx];
 
-  const modal = section.querySelector<HTMLElement>(
-    `.artifact-modal[data-artifact-modal-key="${CSS.escape(key)}"]`,
-  );
+  const modal = section.querySelector<HTMLElement>(`.artifact-modal[data-artifact-modal-key="${CSS.escape(key)}"]`);
   if (!modal) return;
 
   const titleEl = modal.querySelector<HTMLElement>(".artifact-modal-title");
@@ -366,9 +361,7 @@ function initArtifacts(): void {
       e.stopPropagation();
       const key = btn.dataset.artifactsKey;
       if (!key) return;
-      const tree = document.querySelector<HTMLElement>(
-        `.art-tree-root[data-artifacts-key="${CSS.escape(key)}"]`,
-      );
+      const tree = document.querySelector<HTMLElement>(`.art-tree-root[data-artifacts-key="${CSS.escape(key)}"]`);
       if (!tree) return;
       const wasHidden = tree.hidden;
       tree.hidden = !wasHidden;

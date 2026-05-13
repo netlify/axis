@@ -104,11 +104,7 @@ program
       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
       scenariosPath = await prompt(rl, `  Scenarios directory (${scenariosPath}): `, scenariosPath);
-      const agentAnswer = await prompt(
-        rl,
-        `  Agents [${BUILT_IN_AGENTS.join(", ")}] (claude-code): `,
-        "claude-code",
-      );
+      const agentAnswer = await prompt(rl, `  Agents [${BUILT_IN_AGENTS.join(", ")}] (claude-code): `, "claude-code");
       agents = agentAnswer
         .split(/[\s,]+/)
         .filter(Boolean)

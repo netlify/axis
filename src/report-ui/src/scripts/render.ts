@@ -16,13 +16,7 @@ import type {
   ArtifactEntry,
 } from "./types";
 import { isScoredSummary } from "./types";
-import {
-  getLandedTierIndex,
-  getSpeedTierKind,
-  getSpeedTiers,
-  tierKindLabel,
-  tierLabel,
-} from "./speed-tiers";
+import { getLandedTierIndex, getSpeedTierKind, getSpeedTiers, tierKindLabel, tierLabel } from "./speed-tiers";
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -43,7 +37,7 @@ function stripUnsafeHtml(html: string): string {
   return html
     .replace(/<\s*\/?\s*(script|style|iframe|object|embed)[^>]*>/gi, "")
     .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/(href|src)\s*=\s*("\s*javascript:[^"]*"|'\s*javascript:[^']*'|\s*javascript:[^\s>]+)/gi, "$1=\"#\"");
+    .replace(/(href|src)\s*=\s*("\s*javascript:[^"]*"|'\s*javascript:[^']*'|\s*javascript:[^\s>]+)/gi, '$1="#"');
 }
 
 // --- Utilities ---
@@ -332,8 +326,10 @@ function renderScenarioGroup(group: ScenarioGroup, startIndex: number, hasScores
   const agentRows = group.entries
     .map((entry, i) => {
       const globalIndex = startIndex + i;
-      return renderAgentRow(entry, globalIndex, hasScores, group.scenarioKey) +
-        renderDetailRow(entry, globalIndex, group.scenarioKey);
+      return (
+        renderAgentRow(entry, globalIndex, hasScores, group.scenarioKey) +
+        renderDetailRow(entry, globalIndex, group.scenarioKey)
+      );
     })
     .join("");
   return header + agentRows;
@@ -373,9 +369,10 @@ function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, s
   const errorBtn = entry.error
     ? `<button class="error-btn" data-error-index="${index}" title="${escapeHtml(friendlyError(entry.error))}">!</button>`
     : "";
-  const infoBtn = entry.prompt || entry.agentConfig
-    ? `<button class="info-btn" data-modal-index="${index}" title="View resolved configuration" type="button">\u2139</button>`
-    : "";
+  const infoBtn =
+    entry.prompt || entry.agentConfig
+      ? `<button class="info-btn" data-modal-index="${index}" title="View resolved configuration" type="button">\u2139</button>`
+      : "";
 
   if (hasScores) {
     return `
@@ -567,7 +564,15 @@ function renderCategoryCard(label: string, cat: CategoryScore, sparseIndex?: Spa
 
   const necessityForBreakdown = includeNecessity && cat.necessity.rationale !== "default" ? cat.necessity : null;
   const breakdownBlock = hasRealAudits
-    ? renderCategoryBreakdown(dimEntries, imperfectDims, nonDefaultAudits, includeRelevance, isPerfect, necessityForBreakdown, sparseIndex)
+    ? renderCategoryBreakdown(
+        dimEntries,
+        imperfectDims,
+        nonDefaultAudits,
+        includeRelevance,
+        isPerfect,
+        necessityForBreakdown,
+        sparseIndex,
+      )
     : "";
 
   return `
@@ -650,7 +655,10 @@ function renderCategoryBreakdown(
 
   const unnecessaryLinks = necessity
     ? necessity.unnecessaryIds
-        .map((id) => `<a class="interaction-link" data-interaction-id="${id}" title="Jump to this interaction in the transcript">#${id}</a>`)
+        .map(
+          (id) =>
+            `<a class="interaction-link" data-interaction-id="${id}" title="Jump to this interaction in the transcript">#${id}</a>`,
+        )
         .join(", ")
     : "";
   const necessityRow = necessity
@@ -677,14 +685,16 @@ function renderCategoryBreakdown(
 
   return `
     <div class="dimensions-grid">${allDims.map((e) => dimensionItem(e.label, e.value)).join("")}</div>
-    ${hasContent
-      ? `<div class="deductions-summary">
+    ${
+      hasContent
+        ? `<div class="deductions-summary">
            <div class="deductions-header">Score breakdown</div>
            ${necessityRow}
            ${imperfectRows}
            ${showAllToggle}
          </div>`
-      : ""}`;
+        : ""
+    }`;
 }
 
 function renderAuditDimScores(a: InteractionAudit, showRelevance: boolean, interaction?: Interaction): string {
@@ -714,9 +724,10 @@ function renderSpeedTooltip(interaction: Interaction): string {
   const kind = getSpeedTierKind(interaction.categories);
   const tiers = getSpeedTiers(kind);
   const landed = getLandedTierIndex(interaction.durationMs, kind);
-  const durationText = interaction.durationMs !== null && interaction.durationMs > 0
-    ? fmtDuration(interaction.durationMs)
-    : "no timing data";
+  const durationText =
+    interaction.durationMs !== null && interaction.durationMs > 0
+      ? fmtDuration(interaction.durationMs)
+      : "no timing data";
 
   const rows = tiers
     .map((t, i) => {
@@ -758,9 +769,7 @@ function renderWaterfall(si: SparseIndex, totalDurationMs: number): string {
 
   // Prefer the agent's full run duration so the timeline matches the row's reported duration.
   // Fall back to the interaction window if the entry's duration is missing.
-  const wallClockMs = totalDurationMs > 0
-    ? totalDurationMs
-    : si.stats.wallClockMs || computeWallClock(interactions);
+  const wallClockMs = totalDurationMs > 0 ? totalDurationMs : si.stats.wallClockMs || computeWallClock(interactions);
   if (wallClockMs <= 0) return "";
 
   const ticks = computeTickMarks(wallClockMs);
@@ -842,7 +851,8 @@ function renderWaterfallRow(ix: Interaction, totalMs: number): string {
 
 function renderWaterfallTooltip(ix: Interaction, label: string, catLabel: string): string {
   const meta: string[] = [];
-  if (ix.durationMs !== null) meta.push(`<span><strong>Duration</strong> ${escapeHtml(fmtDuration(ix.durationMs))}</span>`);
+  if (ix.durationMs !== null)
+    meta.push(`<span><strong>Duration</strong> ${escapeHtml(fmtDuration(ix.durationMs))}</span>`);
   meta.push(`<span><strong>Context</strong> ${escapeHtml(fmtSize(ix.contextBytes))}</span>`);
   if (ix.startMs !== null) meta.push(`<span><strong>Start</strong> +${escapeHtml(fmtDuration(ix.startMs))}</span>`);
   if (ix.hasError) meta.push(`<span class="wf-tooltip-error">Error</span>`);
@@ -1107,11 +1117,12 @@ function renderModalLifecycle(label: string, actions: LifecycleAction[]): string
 function renderModalMcp(servers: Record<string, McpServerConfig>): string {
   const items = Object.entries(servers)
     .map(([name, cfg]) => {
-      const detail = "url" in cfg && cfg.url
-        ? `<code>${escapeHtml(cfg.url)}</code>`
-        : "command" in cfg && cfg.command
-          ? `<code>${escapeHtml([cfg.command, ...(cfg.args ?? [])].join(" "))}</code>`
-          : "";
+      const detail =
+        "url" in cfg && cfg.url
+          ? `<code>${escapeHtml(cfg.url)}</code>`
+          : "command" in cfg && cfg.command
+            ? `<code>${escapeHtml([cfg.command, ...(cfg.args ?? [])].join(" "))}</code>`
+            : "";
       return `<li><span class="modal-config-label-inline">${escapeHtml(name)}</span> ${detail}</li>`;
     })
     .join("");

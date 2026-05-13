@@ -90,8 +90,9 @@ function makeReport(overrides?: Partial<ReportManifest>): ReportManifest {
 }
 
 function extractAxisData(html: string): any {
-  const match = html.match(/<script is:inline id="axis-data"[^>]*>([\s\S]*?)<\/script>/)
-    ?? html.match(/<script id="axis-data"[^>]*>([\s\S]*?)<\/script>/);
+  const match =
+    html.match(/<script is:inline id="axis-data"[^>]*>([\s\S]*?)<\/script>/) ??
+    html.match(/<script id="axis-data"[^>]*>([\s\S]*?)<\/script>/);
   if (!match) throw new Error("axis-data script tag not found in HTML");
   // Reverse the < and > escaping done in generateReportHtml
   const json = match[1].replace(/\\u003c/g, "<").replace(/\\u003e/g, ">");

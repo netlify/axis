@@ -416,7 +416,9 @@ h3 {
   cursor: pointer;
   vertical-align: middle;
   line-height: 1;
-  transition: background var(--transition), border-color var(--transition);
+  transition:
+    background var(--transition),
+    border-color var(--transition);
 }
 
 .error-btn:hover {
@@ -725,7 +727,6 @@ h3 {
 
 /* --- Deductions Summary --- */
 
-
 /* --- Category Deductions --- */
 
 .dim-tags {
@@ -783,7 +784,9 @@ h3 {
   color: var(--accent);
   text-decoration: none;
   border-bottom: 1px dashed transparent;
-  transition: border-color var(--transition), color var(--transition);
+  transition:
+    border-color var(--transition),
+    color var(--transition);
 }
 
 .interaction-link:hover {
@@ -796,7 +799,8 @@ a.wf-id.interaction-link {
 }
 
 @keyframes interaction-flash {
-  0%, 35% {
+  0%,
+  35% {
     background: var(--yellow-light);
     box-shadow: inset 3px 0 0 var(--yellow);
   }
@@ -1293,9 +1297,18 @@ a.wf-id.interaction-link {
   flex-shrink: 0;
 }
 
-.wf-tooltip-cat-env { background: var(--cat-env); color: var(--text); }
-.wf-tooltip-cat-svc { background: var(--cat-svc); color: var(--text); }
-.wf-tooltip-cat-agent { background: var(--cat-agent); color: var(--text); }
+.wf-tooltip-cat-env {
+  background: var(--cat-env);
+  color: var(--text);
+}
+.wf-tooltip-cat-svc {
+  background: var(--cat-svc);
+  color: var(--text);
+}
+.wf-tooltip-cat-agent {
+  background: var(--cat-agent);
+  color: var(--text);
+}
 
 .wf-tooltip-meta {
   display: flex;
@@ -1533,7 +1546,9 @@ a.wf-id.interaction-link {
   cursor: pointer;
   vertical-align: middle;
   line-height: 1;
-  transition: background var(--transition), border-color var(--transition);
+  transition:
+    background var(--transition),
+    border-color var(--transition);
 }
 
 .info-btn:hover {
@@ -1591,7 +1606,9 @@ a.wf-id.interaction-link {
 .modal {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg), 0 8px 32px rgba(0, 0, 0, 0.12);
+  box-shadow:
+    var(--shadow-lg),
+    0 8px 32px rgba(0, 0, 0, 0.12);
   max-width: 640px;
   width: 100%;
   max-height: 80vh;
@@ -2116,7 +2133,9 @@ a.wf-id.interaction-link {
   background: var(--bg-card);
   color: var(--text-primary);
   cursor: pointer;
-  transition: background 0.1s ease, border-color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
 }
 
 .artifacts-toggle:hover,
@@ -2234,7 +2253,10 @@ a.wf-id.interaction-link {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
 }
 
 .art-tree-eye:hover,

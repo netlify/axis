@@ -2,7 +2,12 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
-import { loadConfig, discoverScenarios, matchesScenarioFilter, matchesAgentFilter } from "../../../src/config/loader.js";
+import {
+  loadConfig,
+  discoverScenarios,
+  matchesScenarioFilter,
+  matchesAgentFilter,
+} from "../../../src/config/loader.js";
 
 const FIXTURES_DIR = path.resolve(import.meta.dirname, "../../e2e/fixtures/basic");
 
@@ -35,10 +40,7 @@ describe("loadConfig", () => {
     it("loads a .js config with an object default export", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-js-cfg-"));
       const configPath = path.join(tmpDir, "axis.config.js");
-      await fs.writeFile(
-        configPath,
-        `export default { scenarios: "./scenarios", agents: ["mock-agent"] };\n`,
-      );
+      await fs.writeFile(configPath, `export default { scenarios: "./scenarios", agents: ["mock-agent"] };\n`);
 
       const { config, configDir } = await loadConfig(configPath);
       expect(config.scenarios).toBe("./scenarios");
@@ -49,10 +51,7 @@ describe("loadConfig", () => {
     it("loads a .js config with a sync function default export", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-js-cfg-"));
       const configPath = path.join(tmpDir, "axis.config.js");
-      await fs.writeFile(
-        configPath,
-        `export default () => ({ scenarios: "./scenarios", agents: ["mock-agent"] });\n`,
-      );
+      await fs.writeFile(configPath, `export default () => ({ scenarios: "./scenarios", agents: ["mock-agent"] });\n`);
 
       const { config } = await loadConfig(configPath);
       expect(config.agents).toEqual(["mock-agent"]);
@@ -88,10 +87,7 @@ describe("loadConfig", () => {
     it("throws when JS config has no default export", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-js-cfg-"));
       const configPath = path.join(tmpDir, "axis.config.js");
-      await fs.writeFile(
-        configPath,
-        `export const config = { scenarios: "./scenarios", agents: ["mock-agent"] };\n`,
-      );
+      await fs.writeFile(configPath, `export const config = { scenarios: "./scenarios", agents: ["mock-agent"] };\n`);
 
       await expect(loadConfig(configPath)).rejects.toThrow("must have a default export");
     });
@@ -186,9 +182,7 @@ describe("discoverScenarios", () => {
   });
 
   it("throws on nonexistent directory", async () => {
-    await expect(discoverScenarios(FIXTURES_DIR, "./nonexistent")).rejects.toThrow(
-      "Could not read scenarios path",
-    );
+    await expect(discoverScenarios(FIXTURES_DIR, "./nonexistent")).rejects.toThrow("Could not read scenarios path");
   });
 
   describe("variants", () => {
@@ -238,10 +232,7 @@ describe("discoverScenarios", () => {
         name: "Test",
         prompt: "base prompt",
         rubric: "base rubric",
-        variants: [
-          { name: "variant-a" },
-          { name: "variant-b" },
-        ],
+        variants: [{ name: "variant-a" }, { name: "variant-b" }],
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -280,9 +271,7 @@ describe("discoverScenarios", () => {
         name: "Parent",
         prompt: "parent prompt",
         rubric: "parent rubric",
-        variants: [
-          { name: "v1", prompt: "override prompt", rubric: "override rubric" },
-        ],
+        variants: [{ name: "v1", prompt: "override prompt", rubric: "override rubric" }],
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -300,9 +289,7 @@ describe("discoverScenarios", () => {
         prompt: "test",
         rubric: "test",
         skills: ["./parent-skill"],
-        variants: [
-          { name: "v1", skills: ["./variant-skill"] },
-        ],
+        variants: [{ name: "v1", skills: ["./variant-skill"] }],
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -349,10 +336,7 @@ describe("discoverScenarios", () => {
         prompt: "test",
         rubric: "test",
         skip: true,
-        variants: [
-          { name: "active", skip: false },
-          { name: "skipped" },
-        ],
+        variants: [{ name: "active", skip: false }, { name: "skipped" }],
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -372,10 +356,7 @@ describe("discoverScenarios", () => {
         prompt: "test",
         rubric: "test",
         artifacts: ["parent.log", "shared.log"],
-        variants: [
-          { name: "with-override", artifacts: ["variant.log"] },
-          { name: "inherits" },
-        ],
+        variants: [{ name: "with-override", artifacts: ["variant.log"] }, { name: "inherits" }],
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -395,9 +376,7 @@ describe("discoverScenarios", () => {
         prompt: "test",
         rubric: "test",
         setup: [{ action: "run_script", command: "parent-setup" }],
-        variants: [
-          { name: "v1", setup: [{ action: "run_script", command: "variant-setup" }] },
-        ],
+        variants: [{ name: "v1", setup: [{ action: "run_script", command: "variant-setup" }] }],
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -434,10 +413,7 @@ describe("discoverScenarios", () => {
         name: "Test",
         prompt: "test",
         rubric: "test",
-        variants: [
-          { name: "v1" },
-          { name: "v2" },
-        ],
+        variants: [{ name: "v1" }, { name: "v2" }],
       });
       await writeScenarioJson("scenarios/other.json", {
         name: "Other",
@@ -458,10 +434,7 @@ describe("discoverScenarios", () => {
         name: "Test",
         prompt: "test",
         rubric: "test",
-        variants: [
-          { name: "v1" },
-          { name: "v2" },
-        ],
+        variants: [{ name: "v1" }, { name: "v2" }],
       });
 
       const filtered = await discoverScenarios(tmpDir, "./scenarios", ["test@v1"]);
@@ -477,10 +450,7 @@ describe("discoverScenarios", () => {
         name: "Post",
         prompt: "test",
         rubric: "test",
-        variants: [
-          { name: "v1" },
-          { name: "v2" },
-        ],
+        variants: [{ name: "v1" }, { name: "v2" }],
       });
       await writeScenarioJson("scenarios/other.json", {
         name: "Other",
@@ -502,10 +472,7 @@ describe("discoverScenarios", () => {
         prompt: "test",
         rubric: "test",
         agents: ["claude-code"],
-        variants: [
-          { name: "gemini-only", agents: ["gemini"] },
-          { name: "inherits" },
-        ],
+        variants: [{ name: "gemini-only", agents: ["gemini"] }, { name: "inherits" }],
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -677,10 +644,7 @@ describe("discoverScenarios", () => {
       await writeScenario("scenarios/clash.json", "On Disk Clash");
 
       await expect(
-        discoverScenarios(tmpDir, [
-          "./scenarios",
-          { key: "clash", name: "Inline Clash", prompt: "p", rubric: "r" },
-        ]),
+        discoverScenarios(tmpDir, ["./scenarios", { key: "clash", name: "Inline Clash", prompt: "p", rubric: "r" }]),
       ).rejects.toThrow("Duplicate scenario key");
     });
   });
@@ -700,10 +664,7 @@ describe("discoverScenarios", () => {
 
     it("discovers .js scenarios with path-derived keys", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile(
-        "scenarios/foo.js",
-        `export default { name: "Foo", prompt: "p", rubric: "r" };\n`,
-      );
+      await writeFile("scenarios/foo.js", `export default { name: "Foo", prompt: "p", rubric: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios).toHaveLength(1);
@@ -725,10 +686,7 @@ describe("discoverScenarios", () => {
 
     it("derives keys from nested subdirectories for module files", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile(
-        "scenarios/cms/post.ts",
-        `export default { name: "Post", prompt: "p", rubric: "r" };\n`,
-      );
+      await writeFile("scenarios/cms/post.ts", `export default { name: "Post", prompt: "p", rubric: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key)).toEqual(["cms/post"]);
@@ -736,10 +694,7 @@ describe("discoverScenarios", () => {
 
     it("calls a function default export and uses the resolved object", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile(
-        "scenarios/dyn.js",
-        `export default async () => ({ name: "Dyn", prompt: "p", rubric: "r" });\n`,
-      );
+      await writeFile("scenarios/dyn.js", `export default async () => ({ name: "Dyn", prompt: "p", rubric: "r" });\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios).toHaveLength(1);
@@ -749,10 +704,7 @@ describe("discoverScenarios", () => {
     it("silently skips module files with no default export", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
       await writeFile("scenarios/helper.ts", `export const util = () => 42;\n`);
-      await writeFile(
-        "scenarios/real.ts",
-        `export default { name: "Real", prompt: "p", rubric: "r" };\n`,
-      );
+      await writeFile("scenarios/real.ts", `export default { name: "Real", prompt: "p", rubric: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key)).toEqual(["real"]);
@@ -762,10 +714,7 @@ describe("discoverScenarios", () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
       await writeFile("scenarios/string-default.ts", `export default "not a scenario";\n`);
       await writeFile("scenarios/array-default.ts", `export default [1, 2, 3];\n`);
-      await writeFile(
-        "scenarios/real.ts",
-        `export default { name: "Real", prompt: "p", rubric: "r" };\n`,
-      );
+      await writeFile("scenarios/real.ts", `export default { name: "Real", prompt: "p", rubric: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key)).toEqual(["real"]);
@@ -773,14 +722,8 @@ describe("discoverScenarios", () => {
 
     it("discovers .json and .ts side-by-side in the same directory", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile(
-        "scenarios/json-one.json",
-        JSON.stringify({ name: "JSON One", prompt: "p", rubric: "r" }),
-      );
-      await writeFile(
-        "scenarios/ts-one.ts",
-        `export default { name: "TS One", prompt: "p", rubric: "r" };\n`,
-      );
+      await writeFile("scenarios/json-one.json", JSON.stringify({ name: "JSON One", prompt: "p", rubric: "r" }));
+      await writeFile("scenarios/ts-one.ts", `export default { name: "TS One", prompt: "p", rubric: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key).sort()).toEqual(["json-one", "ts-one"]);
@@ -799,10 +742,7 @@ describe("discoverScenarios", () => {
 
     it("rejects a module scenario whose declared key does not match the path", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile(
-        "scenarios/foo.ts",
-        `export default { key: "bar", name: "X", prompt: "p", rubric: "r" };\n`,
-      );
+      await writeFile("scenarios/foo.ts", `export default { key: "bar", name: "X", prompt: "p", rubric: "r" };\n`);
 
       await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(
         `declared key "bar" does not match path-derived key "foo"`,
@@ -822,18 +762,12 @@ describe("discoverScenarios", () => {
       );
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
-      expect(scenarios.map((s) => s.key).sort()).toEqual([
-        "with-variants@a",
-        "with-variants@b",
-      ]);
+      expect(scenarios.map((s) => s.key).sort()).toEqual(["with-variants@a", "with-variants@b"]);
     });
 
     it("loads a single .ts file as a string entry (strict — throws on missing default)", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile(
-        "lone.ts",
-        `export default { name: "Lone", prompt: "p", rubric: "r" };\n`,
-      );
+      await writeFile("lone.ts", `export default { name: "Lone", prompt: "p", rubric: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./lone.ts");
       expect(scenarios).toHaveLength(1);
@@ -844,9 +778,7 @@ describe("discoverScenarios", () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
       await writeFile("lone.ts", `export const x = 1;\n`);
 
-      await expect(discoverScenarios(tmpDir, "./lone.ts")).rejects.toThrow(
-        "must default-export an object",
-      );
+      await expect(discoverScenarios(tmpDir, "./lone.ts")).rejects.toThrow("must default-export an object");
     });
   });
 });

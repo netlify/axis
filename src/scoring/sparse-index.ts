@@ -20,10 +20,7 @@ export interface BuildSparseIndexOptions {
   agentEndTime?: string;
 }
 
-export function buildSparseIndex(
-  normalized: NormalizedTranscript,
-  options: BuildSparseIndexOptions = {},
-): SparseIndex {
+export function buildSparseIndex(normalized: NormalizedTranscript, options: BuildSparseIndexOptions = {}): SparseIndex {
   const { entries } = normalized;
   const interactions: Interaction[] = [];
   const lines: string[] = [];
@@ -209,7 +206,9 @@ function buildToolInteraction(
   const effectiveToolInput = entry.toolInput ?? pairedToolInput;
   const inputSummary = effectiveInputSummary ? `(${truncate(effectiveInputSummary, 60)})` : "";
   const detail = `${toolName}${inputSummary}`;
-  const inputBytes = effectiveToolInput ? textSize(JSON.stringify(effectiveToolInput)) : textSize(effectiveInputSummary);
+  const inputBytes = effectiveToolInput
+    ? textSize(JSON.stringify(effectiveToolInput))
+    : textSize(effectiveInputSummary);
   const contextBytes = inputBytes + textSize(resultText);
   const outcome = buildOutcome(hasError, durationMs, contextBytes);
 

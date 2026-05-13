@@ -1,5 +1,9 @@
 {
   "scenarios": "./scenarios",
-  "agents": [{"agent": "claude-code", "model":"claude-sonnet-4-6"}, {"agent": "claude-code", "model":"claude-opus-4-6"}, "codex"],
+  "agents": [
+    { "agent": "claude-code", "model": "claude-sonnet-4-6" },
+    { "agent": "claude-code", "model": "claude-opus-4-6" },
+    "codex"
+  ],
   "artifacts": ["./*.md"]
 }

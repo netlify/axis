@@ -127,8 +127,7 @@ describe("runLifecyclePhase", () => {
       [
         {
           action: "run_script",
-          command:
-            'printf "%s|%s|%s|%s" "$AXIS_AGENT" "$AXIS_SCENARIO" "$AXIS_MODEL" "$AXIS_VARIANT" > "$AXIS_OUTPUT"',
+          command: 'printf "%s|%s|%s|%s" "$AXIS_AGENT" "$AXIS_SCENARIO" "$AXIS_MODEL" "$AXIS_VARIANT" > "$AXIS_OUTPUT"',
         },
       ],
       "/tmp",

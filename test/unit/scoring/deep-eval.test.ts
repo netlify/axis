@@ -894,21 +894,51 @@ describe("mergeCategoryResults", () => {
 
     const envResult: CategoryEvalResult = {
       category: "environment",
-      audits: [{ id: 1, categories: ["environment"], success: 0.9, speed: 1.0, weight: 0.8, contextRelevance: 0.7, rationale: "env" }],
+      audits: [
+        {
+          id: 1,
+          categories: ["environment"],
+          success: 0.9,
+          speed: 1.0,
+          weight: 0.8,
+          contextRelevance: 0.7,
+          rationale: "env",
+        },
+      ],
       necessity: { category: "environment", score: 0.85, unnecessaryIds: [], rationale: "env" },
       patterns: [],
     };
 
     const svcResult: CategoryEvalResult = {
       category: "service",
-      audits: [{ id: 2, categories: ["service"], success: 0.7, speed: 1.0, weight: 0.6, contextRelevance: 0.5, rationale: "svc" }],
+      audits: [
+        {
+          id: 2,
+          categories: ["service"],
+          success: 0.7,
+          speed: 1.0,
+          weight: 0.6,
+          contextRelevance: 0.5,
+          rationale: "svc",
+        },
+      ],
       necessity: { category: "service", score: 0.9, unnecessaryIds: [], rationale: "svc" },
       patterns: [{ description: "API pattern", interactionIds: [2], severity: "medium" }],
     };
 
     const agentResult: CategoryEvalResult = {
       category: "agent",
-      audits: [{ id: 3, categories: ["agent"], success: 1.0, speed: 1.0, weight: 0.95, contextRelevance: 0.85, rationale: "agent" }],
+      audits: [
+        {
+          id: 3,
+          categories: ["agent"],
+          success: 1.0,
+          speed: 1.0,
+          weight: 0.95,
+          contextRelevance: 0.85,
+          rationale: "agent",
+        },
+      ],
       necessity: { category: "agent", score: 0.95, unnecessaryIds: [], rationale: "agent" },
       patterns: [],
     };
@@ -941,7 +971,17 @@ describe("mergeCategoryResults", () => {
     // Only environment result provided — service interaction #2 should get default
     const envResult: CategoryEvalResult = {
       category: "environment",
-      audits: [{ id: 1, categories: ["environment"], success: 0.9, speed: 1.0, weight: 0.8, contextRelevance: 0.7, rationale: "env" }],
+      audits: [
+        {
+          id: 1,
+          categories: ["environment"],
+          success: 0.9,
+          speed: 1.0,
+          weight: 0.8,
+          contextRelevance: 0.7,
+          rationale: "env",
+        },
+      ],
       necessity: { category: "environment", score: 0.85, unnecessaryIds: [], rationale: "env" },
       patterns: [],
     };
@@ -957,20 +997,38 @@ describe("mergeCategoryResults", () => {
   });
 
   it("handles multi-category interactions with first-write-wins", () => {
-    const sparseIndex = makeSparseIndex([
-      { id: 1, categories: ["service", "environment"] },
-    ]);
+    const sparseIndex = makeSparseIndex([{ id: 1, categories: ["service", "environment"] }]);
 
     const envResult: CategoryEvalResult = {
       category: "environment",
-      audits: [{ id: 1, categories: ["service", "environment"], success: 0.5, speed: 1.0, weight: 0.5, contextRelevance: 0.5, rationale: "env view" }],
+      audits: [
+        {
+          id: 1,
+          categories: ["service", "environment"],
+          success: 0.5,
+          speed: 1.0,
+          weight: 0.5,
+          contextRelevance: 0.5,
+          rationale: "env view",
+        },
+      ],
       necessity: { category: "environment", score: 0.8, unnecessaryIds: [], rationale: "env" },
       patterns: [],
     };
 
     const svcResult: CategoryEvalResult = {
       category: "service",
-      audits: [{ id: 1, categories: ["service", "environment"], success: 0.9, speed: 1.0, weight: 0.9, contextRelevance: 0.9, rationale: "svc view" }],
+      audits: [
+        {
+          id: 1,
+          categories: ["service", "environment"],
+          success: 0.9,
+          speed: 1.0,
+          weight: 0.9,
+          contextRelevance: 0.9,
+          rationale: "svc view",
+        },
+      ],
       necessity: { category: "service", score: 0.9, unnecessaryIds: [], rationale: "svc" },
       patterns: [],
     };

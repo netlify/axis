@@ -87,9 +87,7 @@ function validateScenariosField(data: unknown, filePath: string): void {
     const entry = data[i];
     if (typeof entry === "string") continue;
     if (typeof entry !== "object" || entry === null) {
-      throw new Error(
-        `Invalid config at ${filePath}: scenarios[${i}] must be a string path or a scenario object`,
-      );
+      throw new Error(`Invalid config at ${filePath}: scenarios[${i}] must be a string path or a scenario object`);
     }
     validateScenario(entry, `${filePath} (scenarios[${i}])`, "inline");
   }
@@ -116,9 +114,7 @@ export function validateScenario(
 
   if (mode === "inline") {
     if (typeof obj.key !== "string" || obj.key.length === 0) {
-      throw new Error(
-        `Invalid scenario at ${filePath}: inline scenarios must include a non-empty "key" string`,
-      );
+      throw new Error(`Invalid scenario at ${filePath}: inline scenarios must include a non-empty "key" string`);
     }
   } else if (obj.key !== undefined) {
     // File-mode: an explicit `key` is allowed (helpers like `withSharedVariants` may
@@ -237,9 +233,7 @@ function validateVariants(data: unknown, filePath: string): void {
             throw new Error(`Invalid scenario at ${filePath}: variants[${i}].rubric[${j}] missing "check" string`);
           }
           if (entry.weight !== undefined && typeof entry.weight !== "number") {
-            throw new Error(
-              `Invalid scenario at ${filePath}: variants[${i}].rubric[${j}].weight must be a number`,
-            );
+            throw new Error(`Invalid scenario at ${filePath}: variants[${i}].rubric[${j}].weight must be a number`);
           }
         }
         variant.rubric = resolveRubricWeights(variant.rubric as RubricCriterion[]);
@@ -254,9 +248,7 @@ function validateVariants(data: unknown, filePath: string): void {
 
     if (variant.agents !== undefined) {
       if (!Array.isArray(variant.agents) || variant.agents.length === 0) {
-        throw new Error(
-          `Invalid scenario at ${filePath}: variants[${i}].agents must be a non-empty array of strings`,
-        );
+        throw new Error(`Invalid scenario at ${filePath}: variants[${i}].agents must be a non-empty array of strings`);
       }
       for (let j = 0; j < variant.agents.length; j++) {
         if (typeof variant.agents[j] !== "string") {

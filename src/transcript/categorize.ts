@@ -139,16 +139,7 @@ const AGENT_INTERNAL_PATH_PATTERNS = [".claude/", ".codex/", ".gemini/", "CLAUDE
  * (filesystem, shell, process). ACP-based adapters set `kind` on tool calls
  * because their `toolName` is a human-readable title, not a stable identifier.
  */
-const ENVIRONMENT_KINDS = new Set([
-  "read",
-  "search",
-  "edit",
-  "modify",
-  "add",
-  "delete",
-  "move",
-  "execute",
-]);
+const ENVIRONMENT_KINDS = new Set(["read", "search", "edit", "modify", "add", "delete", "move", "execute"]);
 
 /** ACP kinds that represent agent-internal operations (metacognition, mode). */
 const AGENT_KINDS = new Set(["think", "switch_mode"]);

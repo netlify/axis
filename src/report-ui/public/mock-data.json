@@ -32,10 +32,30 @@
         "goalAchievement": {
           "score": 95,
           "criteria": [
-            { "check": "Agent fetched the documentation URL", "weight": 0.25, "score": 10, "rationale": "Agent used WebFetch on the exact URL provided." },
-            { "check": "Agent wrote summary.md with substantive content", "weight": 0.25, "score": 10, "rationale": "summary.md exists with 42 lines of well-structured markdown." },
-            { "check": "Summary covers what the product does", "weight": 0.25, "score": 10, "rationale": "Clearly explains async workloads and their purpose." },
-            { "check": "Summary includes setup steps and key concepts", "weight": 0.25, "score": 8, "rationale": "Key concepts well covered but setup steps are sparse." }
+            {
+              "check": "Agent fetched the documentation URL",
+              "weight": 0.25,
+              "score": 10,
+              "rationale": "Agent used WebFetch on the exact URL provided."
+            },
+            {
+              "check": "Agent wrote summary.md with substantive content",
+              "weight": 0.25,
+              "score": 10,
+              "rationale": "summary.md exists with 42 lines of well-structured markdown."
+            },
+            {
+              "check": "Summary covers what the product does",
+              "weight": 0.25,
+              "score": 10,
+              "rationale": "Clearly explains async workloads and their purpose."
+            },
+            {
+              "check": "Summary includes setup steps and key concepts",
+              "weight": 0.25,
+              "score": 8,
+              "rationale": "Key concepts well covered but setup steps are sparse."
+            }
           ]
         },
         "environment": {
@@ -43,16 +63,46 @@
           "interactionCount": 1,
           "auditedCount": 1,
           "dimensions": { "success": 100, "speed": 100, "weight": 100, "relevance": 80, "necessity": 100 },
-          "audits": [{ "id": 6, "categories": ["environment"], "success": 1, "speed": 1, "weight": 1, "contextRelevance": 0.8, "rationale": "Write operation succeeded and was appropriately sized." }],
-          "necessity": { "category": "environment", "score": 1, "unnecessaryIds": [], "rationale": "Writing summary.md was the core deliverable." }
+          "audits": [
+            {
+              "id": 6,
+              "categories": ["environment"],
+              "success": 1,
+              "speed": 1,
+              "weight": 1,
+              "contextRelevance": 0.8,
+              "rationale": "Write operation succeeded and was appropriately sized."
+            }
+          ],
+          "necessity": {
+            "category": "environment",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "Writing summary.md was the core deliverable."
+          }
         },
         "service": {
           "score": 78,
           "interactionCount": 1,
           "auditedCount": 1,
           "dimensions": { "success": 90, "speed": 100, "weight": 80, "relevance": 80, "necessity": 100 },
-          "audits": [{ "id": 4, "categories": ["service"], "success": 0.9, "speed": 1, "weight": 0.8, "contextRelevance": 0.8, "rationale": "Fetch succeeded and returned good content coverage." }],
-          "necessity": { "category": "service", "score": 1, "unnecessaryIds": [], "rationale": "Fetching the docs was required." }
+          "audits": [
+            {
+              "id": 4,
+              "categories": ["service"],
+              "success": 0.9,
+              "speed": 1,
+              "weight": 0.8,
+              "contextRelevance": 0.8,
+              "rationale": "Fetch succeeded and returned good content coverage."
+            }
+          ],
+          "necessity": {
+            "category": "service",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "Fetching the docs was required."
+          }
         },
         "agent": {
           "score": 82,
@@ -60,8 +110,24 @@
           "auditedCount": 0,
           "dimensions": { "success": 100, "speed": 90, "weight": 85, "relevance": 85, "necessity": 90 },
           "audits": [
-            { "id": 1, "categories": ["agent"], "success": 1, "speed": 0.9, "weight": 0.85, "contextRelevance": 0.85, "rationale": "default" },
-            { "id": 2, "categories": ["agent"], "success": 1, "speed": 0.9, "weight": 0.85, "contextRelevance": 0.85, "rationale": "default" }
+            {
+              "id": 1,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.9,
+              "weight": 0.85,
+              "contextRelevance": 0.85,
+              "rationale": "default"
+            },
+            {
+              "id": 2,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.9,
+              "weight": 0.85,
+              "contextRelevance": 0.85,
+              "rationale": "default"
+            }
           ],
           "necessity": { "category": "agent", "score": 0.9, "unnecessaryIds": [], "rationale": "default" }
         },
@@ -77,15 +143,91 @@
             "#7   agent    assistant   summary.md has been written."
           ],
           "interactions": [
-            { "id": 1, "entryIndices": [0], "categories": ["agent"], "sparseLine": "#1   agent    user        Fetch the documentation...", "toolName": null, "hasError": false, "durationMs": 2100, "contextBytes": 236, "startMs": 0 },
-            { "id": 2, "entryIndices": [1], "categories": ["agent"], "sparseLine": "#2   agent    assistant   Fetching...", "toolName": null, "hasError": false, "durationMs": 1300, "contextBytes": 56, "startMs": 2100 },
-            { "id": 3, "entryIndices": [2, 3], "categories": ["agent"], "sparseLine": "#3   agent    tool_use    ToolSearch...", "toolName": "ToolSearch", "hasError": false, "durationMs": 211, "contextBytes": 57, "startMs": 3400 },
-            { "id": 4, "entryIndices": [4, 5], "categories": ["service"], "sparseLine": "#4   service  tool_use    Fetch...", "toolName": "Fetch", "hasError": false, "durationMs": 10195, "contextBytes": 3089, "startMs": 3611 },
-            { "id": 5, "entryIndices": [6], "categories": ["agent"], "sparseLine": "#5   agent    assistant   Writing...", "toolName": null, "hasError": false, "durationMs": 2194, "contextBytes": 40, "startMs": 13806 },
-            { "id": 6, "entryIndices": [7, 8], "categories": ["environment"], "sparseLine": "#6   env      tool_use    Write...", "toolName": "Write", "hasError": false, "durationMs": 11670, "contextBytes": 2975, "startMs": 16000 },
-            { "id": 7, "entryIndices": [9], "categories": ["agent"], "sparseLine": "#7   agent    assistant   Done.", "toolName": null, "hasError": false, "durationMs": 2000, "contextBytes": 465, "startMs": 27670 }
+            {
+              "id": 1,
+              "entryIndices": [0],
+              "categories": ["agent"],
+              "sparseLine": "#1   agent    user        Fetch the documentation...",
+              "toolName": null,
+              "hasError": false,
+              "durationMs": 2100,
+              "contextBytes": 236,
+              "startMs": 0
+            },
+            {
+              "id": 2,
+              "entryIndices": [1],
+              "categories": ["agent"],
+              "sparseLine": "#2   agent    assistant   Fetching...",
+              "toolName": null,
+              "hasError": false,
+              "durationMs": 1300,
+              "contextBytes": 56,
+              "startMs": 2100
+            },
+            {
+              "id": 3,
+              "entryIndices": [2, 3],
+              "categories": ["agent"],
+              "sparseLine": "#3   agent    tool_use    ToolSearch...",
+              "toolName": "ToolSearch",
+              "hasError": false,
+              "durationMs": 211,
+              "contextBytes": 57,
+              "startMs": 3400
+            },
+            {
+              "id": 4,
+              "entryIndices": [4, 5],
+              "categories": ["service"],
+              "sparseLine": "#4   service  tool_use    Fetch...",
+              "toolName": "Fetch",
+              "hasError": false,
+              "durationMs": 10195,
+              "contextBytes": 3089,
+              "startMs": 3611
+            },
+            {
+              "id": 5,
+              "entryIndices": [6],
+              "categories": ["agent"],
+              "sparseLine": "#5   agent    assistant   Writing...",
+              "toolName": null,
+              "hasError": false,
+              "durationMs": 2194,
+              "contextBytes": 40,
+              "startMs": 13806
+            },
+            {
+              "id": 6,
+              "entryIndices": [7, 8],
+              "categories": ["environment"],
+              "sparseLine": "#6   env      tool_use    Write...",
+              "toolName": "Write",
+              "hasError": false,
+              "durationMs": 11670,
+              "contextBytes": 2975,
+              "startMs": 16000
+            },
+            {
+              "id": 7,
+              "entryIndices": [9],
+              "categories": ["agent"],
+              "sparseLine": "#7   agent    assistant   Done.",
+              "toolName": null,
+              "hasError": false,
+              "durationMs": 2000,
+              "contextBytes": 465,
+              "startMs": 27670
+            }
           ],
-          "stats": { "totalInteractions": 7, "byCategory": { "environment": 1, "service": 1, "agent": 5 }, "totalErrors": 0, "totalDurationMs": 22076, "wallClockMs": 29670 }
+          "stats": {
+            "totalInteractions": 7,
+            "byCategory": { "environment": 1, "service": 1, "agent": 5 },
+            "totalErrors": 0,
+            "totalDurationMs": 22076,
+            "wallClockMs": 29670
+          }
         }
       }
     },
@@ -111,10 +253,30 @@
         "goalAchievement": {
           "score": 80,
           "criteria": [
-            { "check": "Agent fetched the documentation URL", "weight": 0.25, "score": 10, "rationale": "URL was fetched successfully." },
-            { "check": "Agent wrote summary.md with substantive content", "weight": 0.25, "score": 8, "rationale": "File written but content is brief." },
-            { "check": "Summary covers what the product does", "weight": 0.25, "score": 7, "rationale": "High-level coverage but lacking detail." },
-            { "check": "Summary includes setup steps and key concepts", "weight": 0.25, "score": 5, "rationale": "Setup steps entirely missing." }
+            {
+              "check": "Agent fetched the documentation URL",
+              "weight": 0.25,
+              "score": 10,
+              "rationale": "URL was fetched successfully."
+            },
+            {
+              "check": "Agent wrote summary.md with substantive content",
+              "weight": 0.25,
+              "score": 8,
+              "rationale": "File written but content is brief."
+            },
+            {
+              "check": "Summary covers what the product does",
+              "weight": 0.25,
+              "score": 7,
+              "rationale": "High-level coverage but lacking detail."
+            },
+            {
+              "check": "Summary includes setup steps and key concepts",
+              "weight": 0.25,
+              "score": 5,
+              "rationale": "Setup steps entirely missing."
+            }
           ]
         },
         "environment": {
@@ -122,15 +284,40 @@
           "interactionCount": 2,
           "auditedCount": 1,
           "dimensions": { "success": 100, "speed": 80, "weight": 80, "relevance": 60, "necessity": 100 },
-          "audits": [{ "id": 3, "categories": ["environment"], "success": 1, "speed": 0.8, "weight": 0.8, "contextRelevance": 0.6, "rationale": "Write succeeded but content quality was lower." }],
-          "necessity": { "category": "environment", "score": 1, "unnecessaryIds": [], "rationale": "Write was necessary." }
+          "audits": [
+            {
+              "id": 3,
+              "categories": ["environment"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.8,
+              "contextRelevance": 0.6,
+              "rationale": "Write succeeded but content quality was lower."
+            }
+          ],
+          "necessity": {
+            "category": "environment",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "Write was necessary."
+          }
         },
         "service": {
           "score": 65,
           "interactionCount": 1,
           "auditedCount": 1,
           "dimensions": { "success": 70, "speed": 100, "weight": 60, "relevance": 70, "necessity": 100 },
-          "audits": [{ "id": 2, "categories": ["service"], "success": 0.7, "speed": 1, "weight": 0.6, "contextRelevance": 0.7, "rationale": "Fetch returned incomplete content." }],
+          "audits": [
+            {
+              "id": 2,
+              "categories": ["service"],
+              "success": 0.7,
+              "speed": 1,
+              "weight": 0.6,
+              "contextRelevance": 0.7,
+              "rationale": "Fetch returned incomplete content."
+            }
+          ],
           "necessity": { "category": "service", "score": 1, "unnecessaryIds": [], "rationale": "Fetch required." }
         },
         "agent": {
@@ -138,7 +325,17 @@
           "interactionCount": 4,
           "auditedCount": 0,
           "dimensions": { "success": 100, "speed": 80, "weight": 80, "relevance": 80, "necessity": 80 },
-          "audits": [{ "id": 1, "categories": ["agent"], "success": 1, "speed": 0.8, "weight": 0.8, "contextRelevance": 0.8, "rationale": "default" }],
+          "audits": [
+            {
+              "id": 1,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.8,
+              "contextRelevance": 0.8,
+              "rationale": "default"
+            }
+          ],
           "necessity": { "category": "agent", "score": 0.8, "unnecessaryIds": [], "rationale": "default" }
         },
         "weights": { "goal_achievement": 0.4, "environment": 0.2, "service": 0.2, "agent": 0.2 }
@@ -165,9 +362,24 @@
         "goalAchievement": {
           "score": 100,
           "criteria": [
-            { "check": "Agent identified the off-by-one error", "weight": 0.3, "score": 10, "rationale": "Correctly identified the <= vs < comparison in the loop." },
-            { "check": "Agent applied the correct fix", "weight": 0.4, "score": 10, "rationale": "Changed <= to < which resolves the duplicate item issue." },
-            { "check": "Agent ran tests and they pass", "weight": 0.3, "score": 10, "rationale": "All 12 tests pass after the fix." }
+            {
+              "check": "Agent identified the off-by-one error",
+              "weight": 0.3,
+              "score": 10,
+              "rationale": "Correctly identified the <= vs < comparison in the loop."
+            },
+            {
+              "check": "Agent applied the correct fix",
+              "weight": 0.4,
+              "score": 10,
+              "rationale": "Changed <= to < which resolves the duplicate item issue."
+            },
+            {
+              "check": "Agent ran tests and they pass",
+              "weight": 0.3,
+              "score": 10,
+              "rationale": "All 12 tests pass after the fix."
+            }
           ]
         },
         "environment": {
@@ -175,8 +387,23 @@
           "interactionCount": 3,
           "auditedCount": 1,
           "dimensions": { "success": 100, "speed": 100, "weight": 100, "relevance": 95, "necessity": 100 },
-          "audits": [{ "id": 4, "categories": ["environment"], "success": 1, "speed": 1, "weight": 1, "contextRelevance": 0.95, "rationale": "File edit was precise and minimal." }],
-          "necessity": { "category": "environment", "score": 1, "unnecessaryIds": [], "rationale": "All file operations were necessary." }
+          "audits": [
+            {
+              "id": 4,
+              "categories": ["environment"],
+              "success": 1,
+              "speed": 1,
+              "weight": 1,
+              "contextRelevance": 0.95,
+              "rationale": "File edit was precise and minimal."
+            }
+          ],
+          "necessity": {
+            "category": "environment",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "All file operations were necessary."
+          }
         },
         "service": {
           "score": 100,
@@ -184,14 +411,29 @@
           "auditedCount": 0,
           "dimensions": { "success": 100, "speed": 100, "weight": 100, "relevance": 100, "necessity": 100 },
           "audits": [],
-          "necessity": { "category": "service", "score": 1, "unnecessaryIds": [], "rationale": "No service calls needed for this task." }
+          "necessity": {
+            "category": "service",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "No service calls needed for this task."
+          }
         },
         "agent": {
           "score": 90,
           "interactionCount": 6,
           "auditedCount": 0,
           "dimensions": { "success": 100, "speed": 95, "weight": 90, "relevance": 95, "necessity": 95 },
-          "audits": [{ "id": 1, "categories": ["agent"], "success": 1, "speed": 0.95, "weight": 0.9, "contextRelevance": 0.95, "rationale": "default" }],
+          "audits": [
+            {
+              "id": 1,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.95,
+              "weight": 0.9,
+              "contextRelevance": 0.95,
+              "rationale": "default"
+            }
+          ],
           "necessity": { "category": "agent", "score": 0.95, "unnecessaryIds": [], "rationale": "default" }
         },
         "weights": { "goal_achievement": 0.4, "environment": 0.2, "service": 0.2, "agent": 0.2 }
@@ -218,9 +460,24 @@
         "goalAchievement": {
           "score": 85,
           "criteria": [
-            { "check": "Agent identified the off-by-one error", "weight": 0.3, "score": 10, "rationale": "Found the error but took extra steps." },
-            { "check": "Agent applied the correct fix", "weight": 0.4, "score": 8, "rationale": "Fix is correct but agent also made an unnecessary refactor." },
-            { "check": "Agent ran tests and they pass", "weight": 0.3, "score": 7, "rationale": "Tests pass but agent ran them twice unnecessarily." }
+            {
+              "check": "Agent identified the off-by-one error",
+              "weight": 0.3,
+              "score": 10,
+              "rationale": "Found the error but took extra steps."
+            },
+            {
+              "check": "Agent applied the correct fix",
+              "weight": 0.4,
+              "score": 8,
+              "rationale": "Fix is correct but agent also made an unnecessary refactor."
+            },
+            {
+              "check": "Agent ran tests and they pass",
+              "weight": 0.3,
+              "score": 7,
+              "rationale": "Tests pass but agent ran them twice unnecessarily."
+            }
           ]
         },
         "environment": {
@@ -229,10 +486,31 @@
           "auditedCount": 2,
           "dimensions": { "success": 100, "speed": 80, "weight": 70, "relevance": 75, "necessity": 80 },
           "audits": [
-            { "id": 3, "categories": ["environment"], "success": 1, "speed": 0.8, "weight": 0.7, "contextRelevance": 0.75, "rationale": "Unnecessary file reads before the fix." },
-            { "id": 5, "categories": ["environment"], "success": 1, "speed": 0.8, "weight": 0.7, "contextRelevance": 0.75, "rationale": "Extra edit that was later reverted." }
+            {
+              "id": 3,
+              "categories": ["environment"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.7,
+              "contextRelevance": 0.75,
+              "rationale": "Unnecessary file reads before the fix."
+            },
+            {
+              "id": 5,
+              "categories": ["environment"],
+              "success": 1,
+              "speed": 0.8,
+              "weight": 0.7,
+              "contextRelevance": 0.75,
+              "rationale": "Extra edit that was later reverted."
+            }
           ],
-          "necessity": { "category": "environment", "score": 0.8, "unnecessaryIds": [5], "rationale": "One unnecessary edit was made and reverted." }
+          "necessity": {
+            "category": "environment",
+            "score": 0.8,
+            "unnecessaryIds": [5],
+            "rationale": "One unnecessary edit was made and reverted."
+          }
         },
         "service": {
           "score": 100,
@@ -240,15 +518,35 @@
           "auditedCount": 0,
           "dimensions": { "success": 100, "speed": 100, "weight": 100, "relevance": 100, "necessity": 100 },
           "audits": [],
-          "necessity": { "category": "service", "score": 1, "unnecessaryIds": [], "rationale": "No service calls needed." }
+          "necessity": {
+            "category": "service",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "No service calls needed."
+          }
         },
         "agent": {
           "score": 70,
           "interactionCount": 8,
           "auditedCount": 0,
           "dimensions": { "success": 100, "speed": 75, "weight": 70, "relevance": 75, "necessity": 70 },
-          "audits": [{ "id": 1, "categories": ["agent"], "success": 1, "speed": 0.75, "weight": 0.7, "contextRelevance": 0.75, "rationale": "default" }],
-          "necessity": { "category": "agent", "score": 0.7, "unnecessaryIds": [6, 7], "rationale": "Agent spent unnecessary cycles reasoning about refactoring." }
+          "audits": [
+            {
+              "id": 1,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.75,
+              "weight": 0.7,
+              "contextRelevance": 0.75,
+              "rationale": "default"
+            }
+          ],
+          "necessity": {
+            "category": "agent",
+            "score": 0.7,
+            "unnecessaryIds": [6, 7],
+            "rationale": "Agent spent unnecessary cycles reasoning about refactoring."
+          }
         },
         "weights": { "goal_achievement": 0.4, "environment": 0.2, "service": 0.2, "agent": 0.2 }
       }
@@ -274,9 +572,24 @@
         "goalAchievement": {
           "score": 70,
           "criteria": [
-            { "check": "Agent identified the off-by-one error", "weight": 0.3, "score": 8, "rationale": "Found the error after several attempts." },
-            { "check": "Agent applied the correct fix", "weight": 0.4, "score": 7, "rationale": "Fix works but is not the minimal change." },
-            { "check": "Agent ran tests and they pass", "weight": 0.3, "score": 6, "rationale": "Tests pass but 2 unrelated tests were broken and fixed." }
+            {
+              "check": "Agent identified the off-by-one error",
+              "weight": 0.3,
+              "score": 8,
+              "rationale": "Found the error after several attempts."
+            },
+            {
+              "check": "Agent applied the correct fix",
+              "weight": 0.4,
+              "score": 7,
+              "rationale": "Fix works but is not the minimal change."
+            },
+            {
+              "check": "Agent ran tests and they pass",
+              "weight": 0.3,
+              "score": 6,
+              "rationale": "Tests pass but 2 unrelated tests were broken and fixed."
+            }
           ]
         },
         "environment": {
@@ -285,9 +598,22 @@
           "auditedCount": 3,
           "dimensions": { "success": 85, "speed": 70, "weight": 60, "relevance": 65, "necessity": 70 },
           "audits": [
-            { "id": 2, "categories": ["environment"], "success": 0.85, "speed": 0.7, "weight": 0.6, "contextRelevance": 0.65, "rationale": "Multiple file reads that were not needed." }
+            {
+              "id": 2,
+              "categories": ["environment"],
+              "success": 0.85,
+              "speed": 0.7,
+              "weight": 0.6,
+              "contextRelevance": 0.65,
+              "rationale": "Multiple file reads that were not needed."
+            }
           ],
-          "necessity": { "category": "environment", "score": 0.7, "unnecessaryIds": [3, 6], "rationale": "Two unnecessary file operations." }
+          "necessity": {
+            "category": "environment",
+            "score": 0.7,
+            "unnecessaryIds": [3, 6],
+            "rationale": "Two unnecessary file operations."
+          }
         },
         "service": {
           "score": 100,
@@ -295,15 +621,35 @@
           "auditedCount": 0,
           "dimensions": { "success": 100, "speed": 100, "weight": 100, "relevance": 100, "necessity": 100 },
           "audits": [],
-          "necessity": { "category": "service", "score": 1, "unnecessaryIds": [], "rationale": "No service calls needed." }
+          "necessity": {
+            "category": "service",
+            "score": 1,
+            "unnecessaryIds": [],
+            "rationale": "No service calls needed."
+          }
         },
         "agent": {
           "score": 60,
           "interactionCount": 10,
           "auditedCount": 0,
           "dimensions": { "success": 100, "speed": 65, "weight": 60, "relevance": 65, "necessity": 60 },
-          "audits": [{ "id": 1, "categories": ["agent"], "success": 1, "speed": 0.65, "weight": 0.6, "contextRelevance": 0.65, "rationale": "default" }],
-          "necessity": { "category": "agent", "score": 0.6, "unnecessaryIds": [4, 8, 9], "rationale": "Excessive deliberation and backtracking." }
+          "audits": [
+            {
+              "id": 1,
+              "categories": ["agent"],
+              "success": 1,
+              "speed": 0.65,
+              "weight": 0.6,
+              "contextRelevance": 0.65,
+              "rationale": "default"
+            }
+          ],
+          "necessity": {
+            "category": "agent",
+            "score": 0.6,
+            "unnecessaryIds": [4, 8, 9],
+            "rationale": "Excessive deliberation and backtracking."
+          }
         },
         "weights": { "goal_achievement": 0.4, "environment": 0.2, "service": 0.2, "agent": 0.2 }
       }

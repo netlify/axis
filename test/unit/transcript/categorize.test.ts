@@ -232,9 +232,9 @@ describe("categorizeInteraction", () => {
   });
 
   it("classifies ACP kind=edit as environment", () => {
-    expect(
-      categorizeInteraction("tool_use", "Writing to src/data/products.ts", { kind: "edit" }),
-    ).toEqual(["environment"]);
+    expect(categorizeInteraction("tool_use", "Writing to src/data/products.ts", { kind: "edit" })).toEqual([
+      "environment",
+    ]);
   });
 
   it("classifies ACP kind=search as environment", () => {
@@ -242,9 +242,7 @@ describe("categorizeInteraction", () => {
   });
 
   it("classifies ACP kind=execute as environment", () => {
-    expect(categorizeInteraction("tool_use", "Running build script", { kind: "execute" })).toEqual([
-      "environment",
-    ]);
+    expect(categorizeInteraction("tool_use", "Running build script", { kind: "execute" })).toEqual(["environment"]);
   });
 
   it("classifies ACP kind=modify/add/delete/move as environment", () => {
@@ -261,9 +259,7 @@ describe("categorizeInteraction", () => {
   });
 
   it("classifies ACP kind=switch_mode as agent", () => {
-    expect(categorizeInteraction("tool_use", "Switch to plan mode", { kind: "switch_mode" })).toEqual([
-      "agent",
-    ]);
+    expect(categorizeInteraction("tool_use", "Switch to plan mode", { kind: "switch_mode" })).toEqual(["agent"]);
   });
 
   it("classifies ACP kind=fetch as service", () => {

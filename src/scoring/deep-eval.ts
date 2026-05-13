@@ -250,10 +250,7 @@ function getResponseFormat(category: InteractionCategory): string {
  * Build the full content section for interactions in a specific category.
  * Includes as much content as fits within the total budget.
  */
-function buildCategoryInteractionContent(
-  interactions: Interaction[],
-  normalized: NormalizedTranscript,
-): string {
+function buildCategoryInteractionContent(interactions: Interaction[], normalized: NormalizedTranscript): string {
   const sections: string[] = [];
   let totalChars = 0;
 
@@ -268,9 +265,7 @@ function buildCategoryInteractionContent(
         : fullContent;
 
     if (totalChars + truncatedContent.length > MAX_TOTAL_CONTENT) {
-      sections.push(
-        `\n... (remaining ${interactions.length - idx} interactions shown only in sparse index above)`,
-      );
+      sections.push(`\n... (remaining ${interactions.length - idx} interactions shown only in sparse index above)`);
       break;
     }
 
@@ -426,10 +421,7 @@ export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseI
  * Interactions that appear in multiple categories get the audit from the first
  * category that evaluated them (multi-category interactions are rare).
  */
-export function mergeCategoryResults(
-  categoryResults: CategoryEvalResult[],
-  sparseIndex: SparseIndex,
-): DeepEvalResult {
+export function mergeCategoryResults(categoryResults: CategoryEvalResult[], sparseIndex: SparseIndex): DeepEvalResult {
   const auditMap = new Map<number, InteractionAudit>();
 
   // Collect all audits, first-write-wins for multi-category interactions
@@ -544,7 +536,9 @@ function parseCategoryAudits(
       // weight/contextRelevance may be absent for env/service (success-only responses)
       weight: typeof obj.weight === "number" ? clamp01(obj.weight) : DEFAULT_AUDIT_SCORES.weight,
       contextRelevance:
-        typeof obj.contextRelevance === "number" ? clamp01(obj.contextRelevance) : DEFAULT_AUDIT_SCORES.contextRelevance,
+        typeof obj.contextRelevance === "number"
+          ? clamp01(obj.contextRelevance)
+          : DEFAULT_AUDIT_SCORES.contextRelevance,
       rationale: typeof obj.rationale === "string" ? obj.rationale : "",
     });
   }

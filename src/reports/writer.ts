@@ -15,10 +15,7 @@ const REPORTS_DIR = ".axis/reports";
  * Call this early — before scoring — so the report dir is available
  * for writing raw data that judges can read.
  */
-export function initReport(
-  timestamp: string,
-  configDir: string,
-): { reportId: string; reportDir: string } {
+export function initReport(timestamp: string, configDir: string): { reportId: string; reportDir: string } {
   const reportId = generateReportId(timestamp);
   const reportDir = path.join(configDir, REPORTS_DIR, reportId);
   fs.mkdirSync(reportDir, { recursive: true });

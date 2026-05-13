@@ -379,9 +379,7 @@ describe("run", () => {
       mockGetAdapter.mockReturnValue(mockAdapter);
 
       const cfg = {
-        scenarios: [
-          { key: "s", name: "S", prompt: "p", rubric: "r", agents: ["mock-agent"] },
-        ],
+        scenarios: [{ key: "s", name: "S", prompt: "p", rubric: "r", agents: ["mock-agent"] }],
         agents: [
           { agent: "mock-agent", model: "opus" },
           { agent: "mock-agent", model: "sonnet" },

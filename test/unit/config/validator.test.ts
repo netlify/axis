@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  validateConfig,
-  validateScenario,
-  resolveRubricWeights,
-} from "../../../src/config/validator.js";
+import { validateConfig, validateScenario, resolveRubricWeights } from "../../../src/config/validator.js";
 
 describe("validateConfig", () => {
   it("accepts a valid config with string agents", () => {
@@ -77,9 +73,7 @@ describe("validateConfig", () => {
       scenarios: [{ name: "No Key", prompt: "p", rubric: "r" }],
       agents: ["claude-code"],
     };
-    expect(() => validateConfig(config, "test.json")).toThrow(
-      `inline scenarios must include a non-empty "key" string`,
-    );
+    expect(() => validateConfig(config, "test.json")).toThrow(`inline scenarios must include a non-empty "key" string`);
   });
 
   it("rejects inline scenario with empty-string key", () => {
@@ -87,9 +81,7 @@ describe("validateConfig", () => {
       scenarios: [{ key: "", name: "Empty Key", prompt: "p", rubric: "r" }],
       agents: ["claude-code"],
     };
-    expect(() => validateConfig(config, "test.json")).toThrow(
-      `inline scenarios must include a non-empty "key" string`,
-    );
+    expect(() => validateConfig(config, "test.json")).toThrow(`inline scenarios must include a non-empty "key" string`);
   });
 
   it("rejects agent with non-array scenarios", () => {
@@ -316,7 +308,7 @@ describe("validateConfig", () => {
       agents: ["claude-code"],
       settings: { limits: { run: { time_minutes: 0 } } },
     };
-    expect(() => validateConfig(config, "test.json")).toThrow("time_minutes\" must be a positive number");
+    expect(() => validateConfig(config, "test.json")).toThrow('time_minutes" must be a positive number');
   });
 
   it("rejects negative time_minutes", () => {
@@ -325,7 +317,7 @@ describe("validateConfig", () => {
       agents: ["claude-code"],
       settings: { limits: { run: { time_minutes: -5 } } },
     };
-    expect(() => validateConfig(config, "test.json")).toThrow("time_minutes\" must be a positive number");
+    expect(() => validateConfig(config, "test.json")).toThrow('time_minutes" must be a positive number');
   });
 
   it("rejects non-number time_minutes", () => {
@@ -334,7 +326,7 @@ describe("validateConfig", () => {
       agents: ["claude-code"],
       settings: { limits: { run: { time_minutes: "10" } } },
     };
-    expect(() => validateConfig(config, "test.json")).toThrow("time_minutes\" must be a positive number");
+    expect(() => validateConfig(config, "test.json")).toThrow('time_minutes" must be a positive number');
   });
 
   it("rejects zero tokens in scenario limits", () => {
@@ -343,7 +335,7 @@ describe("validateConfig", () => {
       agents: ["claude-code"],
       settings: { limits: { scenario: { tokens: 0 } } },
     };
-    expect(() => validateConfig(config, "test.json")).toThrow("tokens\" must be a positive integer");
+    expect(() => validateConfig(config, "test.json")).toThrow('tokens" must be a positive integer');
   });
 
   it("rejects float tokens", () => {
@@ -352,7 +344,7 @@ describe("validateConfig", () => {
       agents: ["claude-code"],
       settings: { limits: { scenario: { tokens: 1.5 } } },
     };
-    expect(() => validateConfig(config, "test.json")).toThrow("tokens\" must be a positive integer");
+    expect(() => validateConfig(config, "test.json")).toThrow('tokens" must be a positive integer');
   });
 
   it("rejects negative tokens", () => {
@@ -361,7 +353,7 @@ describe("validateConfig", () => {
       agents: ["claude-code"],
       settings: { limits: { scenario: { tokens: -100 } } },
     };
-    expect(() => validateConfig(config, "test.json")).toThrow("tokens\" must be a positive integer");
+    expect(() => validateConfig(config, "test.json")).toThrow('tokens" must be a positive integer');
   });
 
   it("accepts valid top-level skills", () => {
@@ -414,9 +406,7 @@ describe("validateConfig", () => {
 
   it("rejects a non-array top-level artifacts", () => {
     const config = { scenarios: "./s", agents: ["x"], artifacts: "*.log" };
-    expect(() => validateConfig(config, "test.json")).toThrow(
-      `"artifacts" must be an array of non-empty glob strings`,
-    );
+    expect(() => validateConfig(config, "test.json")).toThrow(`"artifacts" must be an array of non-empty glob strings`);
   });
 });
 
@@ -438,18 +428,14 @@ describe("validateScenario", () => {
 
   it("rejects a file-mode scenario with an empty-string key", () => {
     const scenario = { ...validScenario, key: "" };
-    expect(() => validateScenario(scenario, "test.json")).toThrow(
-      `"key" must be a non-empty string`,
-    );
+    expect(() => validateScenario(scenario, "test.json")).toThrow(`"key" must be a non-empty string`);
   });
 
   it("inline mode requires a non-empty key", () => {
     expect(() => validateScenario(validScenario, "config.ts", "inline")).toThrow(
       `inline scenarios must include a non-empty "key" string`,
     );
-    expect(() =>
-      validateScenario({ ...validScenario, key: "ok" }, "config.ts", "inline"),
-    ).not.toThrow();
+    expect(() => validateScenario({ ...validScenario, key: "ok" }, "config.ts", "inline")).not.toThrow();
   });
 
   it("accepts a scenario with setup and teardown", () => {
@@ -590,12 +576,12 @@ describe("validateScenario", () => {
 
   it("rejects scenario with invalid limits", () => {
     const scenario = { ...validScenario, limits: { time_minutes: -1 } };
-    expect(() => validateScenario(scenario, "test.json")).toThrow("time_minutes\" must be a positive number");
+    expect(() => validateScenario(scenario, "test.json")).toThrow('time_minutes" must be a positive number');
   });
 
   it("rejects scenario with non-integer tokens limit", () => {
     const scenario = { ...validScenario, limits: { tokens: 1.5 } };
-    expect(() => validateScenario(scenario, "test.json")).toThrow("tokens\" must be a positive integer");
+    expect(() => validateScenario(scenario, "test.json")).toThrow('tokens" must be a positive integer');
   });
 
   it("accepts a scenario with mcp_servers", () => {
@@ -615,10 +601,7 @@ describe("validateScenario", () => {
     it("accepts valid variants", () => {
       const scenario = {
         ...validScenario,
-        variants: [
-          { name: "variant-a" },
-          { name: "variant_b", prompt: "Override prompt" },
-        ],
+        variants: [{ name: "variant-a" }, { name: "variant_b", prompt: "Override prompt" }],
       };
       expect(() => validateScenario(scenario, "test.json")).not.toThrow();
     });
@@ -759,7 +742,7 @@ describe("validateScenario", () => {
         ...validScenario,
         variants: [{ name: "v", limits: { tokens: -1 } }],
       };
-      expect(() => validateScenario(scenario, "test.json")).toThrow("tokens\" must be a positive integer");
+      expect(() => validateScenario(scenario, "test.json")).toThrow('tokens" must be a positive integer');
     });
 
     it("rejects non-object variant entries", () => {

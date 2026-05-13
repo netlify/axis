@@ -19,11 +19,7 @@ export interface JudgeCallOptions {
  * deployed, etc.). Falls back to a disposable temp directory only when
  * no workspace is set (e.g. programmatic API usage without the runner).
  */
-export async function callJudge(
-  runResult: RunResult,
-  prompt: string,
-  options: JudgeCallOptions,
-): Promise<string> {
+export async function callJudge(runResult: RunResult, prompt: string, options: JudgeCallOptions): Promise<string> {
   const adapter = getAdapter(runResult.agentConfig.agent);
   const originalWorkspace = runResult.workingDirectory;
 

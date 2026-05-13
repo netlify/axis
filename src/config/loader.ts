@@ -195,9 +195,7 @@ async function collectFromPath(absolutePath: string, scenarios: Scenario[]): Pro
 
   const ext = path.extname(absolutePath).toLowerCase();
   if (!SCENARIO_EXTENSIONS.has(ext)) {
-    throw new Error(
-      `Scenario file must end in one of ${[...SCENARIO_EXTENSIONS].join(", ")}: ${absolutePath}`,
-    );
+    throw new Error(`Scenario file must end in one of ${[...SCENARIO_EXTENSIONS].join(", ")}: ${absolutePath}`);
   }
   // Single-file entry is explicit, so missing default exports are an error (not silent skip).
   const baseKey = path.basename(absolutePath, ext);
@@ -221,11 +219,7 @@ async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Pro
     if (!SCENARIO_EXTENSIONS.has(ext)) continue;
 
     // Derive key from path relative to the walk root: scenarios/cms/create-post.ts → "cms/create-post"
-    const baseKey = path
-      .relative(rootDir, fullPath)
-      .replace(SCENARIO_EXT_RE, "")
-      .split(path.sep)
-      .join("/");
+    const baseKey = path.relative(rootDir, fullPath).replace(SCENARIO_EXT_RE, "").split(path.sep).join("/");
     // Walking a directory: silently skip module files that don't default-export a scenario object,
     // so user-authored helpers/utilities can live alongside scenarios without special handling.
     const loaded = await loadScenarioFromPath(fullPath, baseKey, true);
@@ -272,11 +266,7 @@ async function loadJsonScenario(filePath: string, baseKey: string): Promise<Scen
   return finalizeScenarioObject(parsed, filePath, baseKey);
 }
 
-async function loadModuleScenario(
-  filePath: string,
-  baseKey: string,
-  silentSkip: boolean,
-): Promise<Scenario[] | null> {
+async function loadModuleScenario(filePath: string, baseKey: string, silentSkip: boolean): Promise<Scenario[] | null> {
   let mod: { default?: unknown };
   try {
     mod = await importModule(filePath);
@@ -291,9 +281,7 @@ async function loadModuleScenario(
 
   if (def === undefined || def === null || typeof def !== "object" || Array.isArray(def)) {
     if (silentSkip) return null;
-    throw new Error(
-      `Scenario module at ${filePath} must default-export an object (or function returning one)`,
-    );
+    throw new Error(`Scenario module at ${filePath} must default-export an object (or function returning one)`);
   }
 
   return finalizeScenarioObject(def, filePath, baseKey);
@@ -359,9 +347,7 @@ function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: stri
     agents: variant.agents ?? parent.agents,
     skills: variant.skills !== undefined ? variant.skills : parent.skills,
     mcp_servers:
-      variant.mcp_servers !== undefined
-        ? { ...parent.mcp_servers, ...variant.mcp_servers }
-        : parent.mcp_servers,
+      variant.mcp_servers !== undefined ? { ...parent.mcp_servers, ...variant.mcp_servers } : parent.mcp_servers,
     limits: variant.limits ?? parent.limits,
     artifacts: variant.artifacts !== undefined ? variant.artifacts : parent.artifacts,
   };

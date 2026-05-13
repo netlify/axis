@@ -16,15 +16,15 @@ AXIS (Agent Experience Index Score) is a synthetic testing framework for AI agen
 
 ## Architecture
 
-| Layer    | Key Files                                                  | Purpose                                                              |
-| -------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
-| CLI      | `src/cli.ts`                                               | Entry point, ink display, signal handling                            |
+| Layer    | Key Files                                                  | Purpose                                                                                         |
+| -------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| CLI      | `src/cli.ts`                                               | Entry point, ink display, signal handling                                                       |
 | Runner   | `src/runner/runner.ts`, `lifecycle.ts`                     | Job orchestration, concurrency, isolation; `runLifecyclePhase` captures `$AXIS_OUTPUT` markdown |
-| Adapters | `src/adapters/*.ts`                                        | Spawn agent CLIs, parse NDJSON streams                               |
-| Scoring  | `src/scoring/`                                             | LLM judge + interaction-based evaluation pipeline                    |
-| Reports  | `src/reports/writer.ts`, `reader.ts`                       | Persistent `.axis/reports/` store                                    |
-| Display  | `src/ui/format.ts`, `LiveStatus.tsx`, `AnimatedTokens.tsx` | Pure formatting + ink components (incl. live token counter)          |
-| Types    | `src/types/`                                               | Shared interfaces (`agent`, `config`, `output`, `scoring`, `report`) |
+| Adapters | `src/adapters/*.ts`                                        | Spawn agent CLIs, parse NDJSON streams                                                          |
+| Scoring  | `src/scoring/`                                             | LLM judge + interaction-based evaluation pipeline                                               |
+| Reports  | `src/reports/writer.ts`, `reader.ts`                       | Persistent `.axis/reports/` store                                                               |
+| Display  | `src/ui/format.ts`, `LiveStatus.tsx`, `AnimatedTokens.tsx` | Pure formatting + ink components (incl. live token counter)                                     |
+| Types    | `src/types/`                                               | Shared interfaces (`agent`, `config`, `output`, `scoring`, `report`)                            |
 
 ### Adapter Pattern
 
@@ -85,15 +85,15 @@ User-facing documentation lives in `src/docs-site/` (Astro), published at https:
 
 `README.md` is intentionally lean: tagline, quick start, link tree to the docs site, and the programmatic API surface. Don't expand it back into a full reference -update the docs site instead.
 
-| Change Type                         | Where to update                                                |
-| ----------------------------------- | -------------------------------------------------------------- |
-| New/modified CLI flags or commands  | `src/docs-site/src/pages/cli.astro`                            |
-| New/modified config fields          | `src/docs-site/src/pages/configuration.astro`                  |
-| New/modified scenario schema fields | `src/docs-site/src/pages/configuration.astro`                  |
-| Scoring algorithm changes           | `src/docs-site/src/pages/scoring.astro`                        |
-| Adapter contract / built-in changes | `src/docs-site/src/pages/running.astro`                        |
-| Report / baseline format changes    | `src/docs-site/src/pages/running.astro` + `cli.astro`          |
-| New/modified public exports         | `README.md` Programmatic API section (kept here, not in docs)  |
+| Change Type                         | Where to update                                               |
+| ----------------------------------- | ------------------------------------------------------------- |
+| New/modified CLI flags or commands  | `src/docs-site/src/pages/cli.astro`                           |
+| New/modified config fields          | `src/docs-site/src/pages/configuration.astro`                 |
+| New/modified scenario schema fields | `src/docs-site/src/pages/configuration.astro`                 |
+| Scoring algorithm changes           | `src/docs-site/src/pages/scoring.astro`                       |
+| Adapter contract / built-in changes | `src/docs-site/src/pages/running.astro`                       |
+| Report / baseline format changes    | `src/docs-site/src/pages/running.astro` + `cli.astro`         |
+| New/modified public exports         | `README.md` Programmatic API section (kept here, not in docs) |
 
 ## Build & Test
 

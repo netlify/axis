@@ -83,7 +83,6 @@ async function scoreArrayRubric(
   return { score, criteria };
 }
 
-
 /** Max characters for the condensed transcript section. */
 const MAX_TRANSCRIPT_CHARS = 50_000;
 

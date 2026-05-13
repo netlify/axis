@@ -76,7 +76,10 @@ export async function runLifecyclePhase(
   phase: "setup" | "teardown",
   context?: LifecyclePhaseContext,
 ): Promise<LifecyclePhaseOutcome> {
-  const outputFile = path.join(os.tmpdir(), `axis-${phase}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.md`);
+  const outputFile = path.join(
+    os.tmpdir(),
+    `axis-${phase}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.md`,
+  );
   // Pre-create empty file so scripts can append even with redirections like `>>`.
   fs.writeFileSync(outputFile, "");
 

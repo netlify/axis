@@ -133,4 +133,3 @@ describe("writeCodexMcpConfig", () => {
     expect(content).toContain('MSG = "hello \\"world\\"\\nnewline"');
   });
 });
-
