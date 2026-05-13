@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.3](https://github.com/netlify/axis/compare/v1.7.2...v1.7.3) (2026-05-13)
+
+
+### Bug Fixes
+
+* improve the exports for scenarioinput ([f4742d7](https://github.com/netlify/axis/commit/f4742d749831b24282d7d8dcfb16f265a97ff62c))
+
 ## [1.7.2](https://github.com/netlify/axis/compare/v1.7.1...v1.7.2) (2026-05-13)
 
 ### Bug Fixes
