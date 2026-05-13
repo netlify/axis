@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/netlify/axis/compare/v1.7.4...v1.8.0) (2026-05-13)
+
+
+### Features
+
+* support before/after all hooks ([a3cab68](https://github.com/netlify/axis/commit/a3cab68fe2594b5b5bba7f5e4c713035c2c982e4))
+
 ## [1.7.4](https://github.com/netlify/axis/compare/v1.7.3...v1.7.4) (2026-05-13)
 
 
