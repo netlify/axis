@@ -19,7 +19,7 @@ AXIS (Agent Experience Index Score) is a synthetic testing framework for AI agen
 | Layer    | Key Files                                                  | Purpose                                                                                         |
 | -------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | CLI      | `src/cli.ts`                                               | Entry point, ink display, signal handling                                                       |
-| Runner   | `src/runner/runner.ts`, `lifecycle.ts`                     | Job orchestration, concurrency, isolation; `runLifecyclePhase` captures `$AXIS_OUTPUT` markdown |
+| Runner   | `src/runner/runner.ts`, `lifecycle.ts`                     | Job orchestration, concurrency, isolation; `runLifecyclePhase` captures `$AXIS_OUTPUT` markdown for `setup`/`teardown`/`beforeAll`/`afterAll` phases |
 | Adapters | `src/adapters/*.ts`                                        | Spawn agent CLIs, parse NDJSON streams                                                          |
 | Scoring  | `src/scoring/`                                             | LLM judge + interaction-based evaluation pipeline                                               |
 | Reports  | `src/reports/writer.ts`, `reader.ts`                       | Persistent `.axis/reports/` store                                                               |
@@ -113,3 +113,4 @@ npm test                       # vitest, all unit tests
 - The `close` event listener must be registered BEFORE readline to avoid missing it
 - Live token counter uses `chars / 5` (intentionally conservative) so the UI never has to reverse; runner enforces monotonicity in `updateTokens`
 - `setupOutput` / `teardownOutput` (captured from `$AXIS_OUTPUT`) live on `RunResult` but `scoreRunResult` returns a fresh `ScoredRunResult` -`cli.ts` re-propagates them onto the scored copy alongside `artifacts`, otherwise they vanish from the manifest
+- Run-level `beforeAll` / `afterAll` hooks (on `AxisConfig`) fire from `cli.ts` -not the programmatic `run()` API. `beforeAll` runs before `initReport`; `afterAll` runs after `finalizeReport` so `$AXIS_REPORT_DIR/report.json` is on disk. Both abort the run on failure

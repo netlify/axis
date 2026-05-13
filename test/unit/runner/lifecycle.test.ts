@@ -178,6 +178,52 @@ describe("runLifecyclePhase", () => {
 
     expect(outcome.output).toBe("[unset]");
   });
+
+  it("accepts the beforeAll phase and exposes AXIS_PHASE=beforeAll", async () => {
+    const outcome = await runLifecyclePhase(
+      [{ action: "run_script", command: 'printf "%s" "$AXIS_PHASE" > "$AXIS_OUTPUT"' }],
+      "/tmp",
+      undefined,
+      "beforeAll",
+    );
+
+    expect(outcome.error).toBeUndefined();
+    expect(outcome.output).toBe("beforeAll");
+  });
+
+  it("accepts the afterAll phase and propagates caller-supplied env vars", async () => {
+    const outcome = await runLifecyclePhase(
+      [
+        {
+          action: "run_script",
+          command:
+            'printf "%s|%s|%s|%s" "$AXIS_PHASE" "$AXIS_REPORT_DIR" "$AXIS_TOTAL" "$AXIS_COMPLETED" > "$AXIS_OUTPUT"',
+        },
+      ],
+      "/tmp",
+      {
+        AXIS_REPORT_DIR: "/tmp/fake-report",
+        AXIS_TOTAL: "3",
+        AXIS_COMPLETED: "2",
+      },
+      "afterAll",
+    );
+
+    expect(outcome.error).toBeUndefined();
+    expect(outcome.output).toBe("afterAll|/tmp/fake-report|3|2");
+  });
+
+  it("captures error when a beforeAll action fails", async () => {
+    const outcome = await runLifecyclePhase(
+      [{ action: "run_script", command: "exit 7" }],
+      "/tmp",
+      undefined,
+      "beforeAll",
+    );
+
+    expect(outcome.error).toBeInstanceOf(Error);
+    expect(outcome.error?.message).toMatch(/exited with code 7/);
+  });
 });
 
 describe("copy lifecycle action", () => {

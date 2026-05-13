@@ -5,7 +5,8 @@ import * as path from "node:path";
 import * as readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
-import { run } from "./runner/runner.js";
+import { run, buildJobEnv } from "./runner/runner.js";
+import { runLifecyclePhase } from "./runner/lifecycle.js";
 import { loadConfig } from "./config/loader.js";
 import { scoreRunResult, buildScoredOutput } from "./scoring/index.js";
 import { initReport, finalizeReport } from "./reports/writer.js";
@@ -218,6 +219,13 @@ async function executeRunPipeline(
 
   const concurrency = opts.concurrency ?? config.settings?.concurrency;
 
+  if (config.beforeAll && config.beforeAll.length > 0) {
+    const env = buildJobEnv(config);
+    const outcome = await runLifecyclePhase(config.beforeAll, configDir, env, "beforeAll");
+    if (outcome.output) logger.info(outcome.output);
+    if (outcome.error) throw outcome.error;
+  }
+
   // Create report directory early so scoring can write raw data for judges to read
   const { reportId, reportDir } = initReport(new Date().toISOString(), configDir);
 
@@ -282,6 +290,20 @@ async function executeRunPipeline(
   if (opts.outputDir) {
     const reportPath = writeReportFile(output, opts.outputDir);
     logger.info(`Report written to ${reportPath}`);
+  }
+
+  if (config.afterAll && config.afterAll.length > 0) {
+    const env: Record<string, string> = {
+      ...buildJobEnv(config),
+      AXIS_REPORT_DIR: reportDir,
+      AXIS_TOTAL: String(output.summary.total),
+      AXIS_COMPLETED: String(output.summary.completed),
+      AXIS_FAILED: String(output.summary.failed),
+      AXIS_DURATION_MS: String(output.durationMs),
+    };
+    const outcome = await runLifecyclePhase(config.afterAll, configDir, env, "afterAll");
+    if (outcome.output) logger.info(outcome.output);
+    if (outcome.error) throw outcome.error;
   }
 
   return { output, reportId, configDir };

@@ -1,4 +1,4 @@
-import type { ScenarioInput } from "./scenario.js";
+import type { LifecycleAction, ScenarioInput } from "./scenario.js";
 
 /**
  * Shape of an inline scenario entry in `AxisConfig.scenarios`. Same as
@@ -40,6 +40,20 @@ export interface AxisConfig {
    * are relative to each scenario's workspace. Merged with per-scenario artifacts.
    */
   artifacts?: string[];
+  /**
+   * Lifecycle actions run once before any scenarios start. Fired from the CLI
+   * (not the programmatic `run()` API). A failure aborts the run with a
+   * non-zero exit code. Scripts execute with cwd set to the config directory.
+   */
+  beforeAll?: LifecycleAction[];
+  /**
+   * Lifecycle actions run once after all scenarios have been scored and the
+   * report manifest is finalized. Fired from the CLI (not the programmatic
+   * `run()` API). Scripts receive `AXIS_REPORT_DIR`, `AXIS_TOTAL`,
+   * `AXIS_COMPLETED`, `AXIS_FAILED`, and `AXIS_DURATION_MS`. A failure causes
+   * a non-zero exit code, though the report is already on disk.
+   */
+  afterAll?: LifecycleAction[];
 }
 
 /** A skill resolved from its source reference to an on-disk directory. */

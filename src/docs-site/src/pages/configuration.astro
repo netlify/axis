@@ -66,7 +66,13 @@ const mcpExample = `{
   "skills": ["./skills/deploy"],
   "adapters": {
     "my-agent": "./adapters/my-agent.ts"
-  }
+  },
+  "beforeAll": [
+    { "action": "run_script", "command": "docker compose up -d test-db" }
+  ],
+  "afterAll": [
+    { "action": "run_script", "command": "echo \\"done: $AXIS_COMPLETED/$AXIS_TOTAL (report: $AXIS_REPORT_DIR)\\"" }
+  ]
 }`}</code></pre>
 
   <h2 id="config-formats">Config File Formats</h2>
@@ -221,6 +227,132 @@ export default async () => {
         <td><code>string[]</code></td>
         <td><span class="req-no">No</span></td>
         <td>Glob patterns of files to capture from each scenario's workspace after teardown. Merged with per-scenario <code>artifacts</code>.</td>
+      </tr>
+      <tr>
+        <td><code>beforeAll</code></td>
+        <td><code>LifecycleAction[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Lifecycle actions that run once before any scenarios start. See
+          <a href="#run-lifecycle">Run-Level Lifecycle</a>.
+        </td>
+      </tr>
+      <tr>
+        <td><code>afterAll</code></td>
+        <td><code>LifecycleAction[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Lifecycle actions that run once after every scenario has been scored and the report is
+          finalized. See <a href="#run-lifecycle">Run-Level Lifecycle</a>.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="run-lifecycle">Run-Level Lifecycle</h2>
+  <p>
+    <code>beforeAll</code> and <code>afterAll</code> are run-level counterparts to a scenario's
+    <a href="/scenarios#setup-teardown"><code>setup</code> and <code>teardown</code></a>: they
+    fire once per run rather than once per scenario. Use them to spin up shared infrastructure
+    before any agents start, or to upload the final report and send a completion notification
+    after everything is scored.
+  </p>
+  <p>
+    Both fields accept the same <a href="/scenarios#lifecycle-action-types">lifecycle action
+    types</a> as scenario hooks (<code>run_script</code> and <code>copy</code>), and scripts run
+    with the config directory as their working directory.
+  </p>
+  <pre><code>{`{
+  "beforeAll": [
+    { "action": "run_script", "command": "docker compose up -d test-postgres" }
+  ],
+  "afterAll": [
+    { "action": "run_script", "command": "./scripts/notify-slack.sh" },
+    { "action": "run_script", "command": "docker compose down" }
+  ]
+}`}</code></pre>
+  <p>
+    A typical <code>afterAll</code> script can use the <code>AXIS_*</code> environment variables
+    below to assemble a summary message:
+  </p>
+  <pre><code>{`#!/usr/bin/env bash
+# scripts/notify-slack.sh
+curl -X POST "$SLACK_WEBHOOK" \\
+  -H 'Content-Type: application/json' \\
+  -d "{\\"text\\": \\"AXIS run: $AXIS_COMPLETED/$AXIS_TOTAL passed in $AXIS_DURATION_MS ms (report: $AXIS_REPORT_DIR)\\"}"`}</code></pre>
+
+  <div class="callout callout-warn">
+    <div class="callout-title">Run-Level Lifecycle Details</div>
+    <ul>
+      <li>
+        Hooks fire from the <code>axis</code> CLI only &mdash; the programmatic <code>run()</code>
+        API does not invoke them. Library users own their own orchestration.
+      </li>
+      <li>
+        <code>beforeAll</code> runs <strong>before</strong> the report directory is created. A
+        failure (non-zero exit) aborts the entire run with no report on disk.
+      </li>
+      <li>
+        <code>afterAll</code> runs <strong>after</strong> every scenario has been scored and the
+        report is finalized, so <code>$AXIS_REPORT_DIR/report.json</code> is readable. A failure
+        causes a non-zero CLI exit but does not erase the report.
+      </li>
+      <li>
+        Both hooks honour the per-action 3-minute timeout. Each action runs sequentially &mdash;
+        the first non-zero exit aborts the phase.
+      </li>
+    </ul>
+  </div>
+
+  <h3 id="run-lifecycle-environment-variables">Run-level lifecycle environment variables</h3>
+  <p>
+    Both phases get the shared <code>$AXIS_OUTPUT</code> markdown sink and a <code>AXIS_PHASE</code>
+    discriminator (<code>beforeAll</code> or <code>afterAll</code>). <code>afterAll</code> additionally
+    receives summary stats and the path to the finalized report:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Variable</th>
+        <th>Phase</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>AXIS_PHASE</code></td>
+        <td>Both</td>
+        <td>Either <code>beforeAll</code> or <code>afterAll</code>.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_OUTPUT</code></td>
+        <td>Both</td>
+        <td>Path to a per-phase markdown file. Anything written here surfaces in the CLI log.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_REPORT_DIR</code></td>
+        <td><code>afterAll</code></td>
+        <td>Absolute path to the just-written <code>.axis/reports/&#123;reportId&#125;/</code> directory. <code>report.json</code>, <code>report.html</code>, and the per-scenario JSON files are all on disk by the time this script runs.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_TOTAL</code></td>
+        <td><code>afterAll</code></td>
+        <td>Number of jobs executed (agent &times; scenario combinations).</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_COMPLETED</code></td>
+        <td><code>afterAll</code></td>
+        <td>Number of jobs that finished successfully.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_FAILED</code></td>
+        <td><code>afterAll</code></td>
+        <td>Number of jobs that failed.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_DURATION_MS</code></td>
+        <td><code>afterAll</code></td>
+        <td>Total run duration in milliseconds.</td>
       </tr>
     </tbody>
   </table>

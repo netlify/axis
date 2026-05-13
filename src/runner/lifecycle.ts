@@ -80,11 +80,13 @@ export interface LifecyclePhaseContext {
  * actions in the phase so multiple scripts can append. Output is captured
  * even when an action fails — partial notes still surface in the report.
  */
+export type LifecyclePhase = "setup" | "teardown" | "beforeAll" | "afterAll";
+
 export async function runLifecyclePhase(
   actions: LifecycleAction[],
   cwd: string,
   baseEnv: Record<string, string> | undefined,
-  phase: "setup" | "teardown",
+  phase: LifecyclePhase,
   context?: LifecyclePhaseContext,
   options?: LifecycleExecOptions,
 ): Promise<LifecyclePhaseOutcome> {

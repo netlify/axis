@@ -637,7 +637,7 @@ function createWorkspace(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "axis-"));
 }
 
-function buildJobEnv(config: AxisConfig): Record<string, string> {
+export function buildJobEnv(config: AxisConfig): Record<string, string> {
   const allowedKeys = new Set<string>([...SYSTEM_VARS, ...DEFAULT_PASS_ENV, ...(config.env ?? [])]);
 
   const env: Record<string, string> = {};
