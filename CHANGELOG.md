@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1](https://github.com/netlify/axis/compare/v1.8.0...v1.8.1) (2026-05-14)
+
+
+### Bug Fixes
+
+* add execution status to scoring context ([e9898ea](https://github.com/netlify/axis/commit/e9898ea880f765fab0df2d84289747336307704d))
+* gemini token counting and acp error reporting ([8f1d7c2](https://github.com/netlify/axis/commit/8f1d7c234e9089b4e6432e857ca8d574fe059c08))
+
 ## [1.8.0](https://github.com/netlify/axis/compare/v1.7.4...v1.8.0) (2026-05-13)
 
 
