@@ -591,7 +591,7 @@ async function executeJob(
       scenarioName: scenario.name,
       agentName,
       prompt: scenario.prompt,
-      rubric: scenario.rubric,
+      judge: scenario.judge,
       agentConfig,
       output,
       workingDirectory: workspace,
@@ -693,7 +693,7 @@ function buildFailedResult(job: Job, error: string): RunResult {
     scenarioName: job.scenario.name,
     agentName: job.agentName,
     prompt: job.scenario.prompt,
-    rubric: job.scenario.rubric,
+    judge: job.scenario.judge,
     agentConfig: job.agentConfig,
     resolvedConfig: buildResolvedRunConfig(job.scenario, job.axisConfig, job.agentConfig),
     output: {

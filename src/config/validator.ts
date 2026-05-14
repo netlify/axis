@@ -1,5 +1,5 @@
 import type { AxisConfig } from "../types/config.js";
-import type { RubricCriterion, Scenario } from "../types/scenario.js";
+import type { JudgeCriterion, Scenario } from "../types/scenario.js";
 
 export function validateConfig(data: unknown, filePath: string): asserts data is AxisConfig {
   if (typeof data !== "object" || data === null) {
@@ -131,22 +131,28 @@ export function validateScenario(
   if (typeof obj.prompt !== "string") {
     throw new Error(`Invalid scenario at ${filePath}: missing required field "prompt"`);
   }
-  if (typeof obj.rubric === "string") {
-    // String rubric — freeform evaluation description
-  } else if (Array.isArray(obj.rubric)) {
-    for (let i = 0; i < obj.rubric.length; i++) {
-      const entry = obj.rubric[i] as Record<string, unknown>;
+  // Silently accept legacy "rubric" field as an alias for "judge".
+  if (obj.judge === undefined && obj.rubric !== undefined) {
+    obj.judge = obj.rubric;
+    delete obj.rubric;
+  }
+
+  if (typeof obj.judge === "string") {
+    // String judge — freeform evaluation description
+  } else if (Array.isArray(obj.judge)) {
+    for (let i = 0; i < obj.judge.length; i++) {
+      const entry = obj.judge[i] as Record<string, unknown>;
       if (typeof entry.check !== "string") {
-        throw new Error(`Invalid scenario at ${filePath}: rubric[${i}] missing "check" string`);
+        throw new Error(`Invalid scenario at ${filePath}: judge[${i}] missing "check" string`);
       }
       if (entry.weight !== undefined && typeof entry.weight !== "number") {
-        throw new Error(`Invalid scenario at ${filePath}: rubric[${i}].weight must be a number`);
+        throw new Error(`Invalid scenario at ${filePath}: judge[${i}].weight must be a number`);
       }
     }
     // Resolve weights so downstream code always has them
-    obj.rubric = resolveRubricWeights(obj.rubric as RubricCriterion[]);
+    obj.judge = resolveJudgeWeights(obj.judge as JudgeCriterion[]);
   } else {
-    throw new Error(`Invalid scenario at ${filePath}: "rubric" must be a string or array`);
+    throw new Error(`Invalid scenario at ${filePath}: "judge" must be a string or array`);
   }
 
   if (obj.skip !== undefined && typeof obj.skip !== "boolean") {
@@ -223,22 +229,28 @@ function validateVariants(data: unknown, filePath: string): void {
       throw new Error(`Invalid scenario at ${filePath}: variants[${i}].prompt must be a string`);
     }
 
-    if (variant.rubric !== undefined) {
-      if (typeof variant.rubric === "string") {
-        // String rubric — freeform evaluation description
-      } else if (Array.isArray(variant.rubric)) {
-        for (let j = 0; j < variant.rubric.length; j++) {
-          const entry = variant.rubric[j] as Record<string, unknown>;
+    // Silently accept legacy "rubric" field as an alias for "judge".
+    if (variant.judge === undefined && variant.rubric !== undefined) {
+      variant.judge = variant.rubric;
+      delete variant.rubric;
+    }
+
+    if (variant.judge !== undefined) {
+      if (typeof variant.judge === "string") {
+        // String judge — freeform evaluation description
+      } else if (Array.isArray(variant.judge)) {
+        for (let j = 0; j < variant.judge.length; j++) {
+          const entry = variant.judge[j] as Record<string, unknown>;
           if (typeof entry.check !== "string") {
-            throw new Error(`Invalid scenario at ${filePath}: variants[${i}].rubric[${j}] missing "check" string`);
+            throw new Error(`Invalid scenario at ${filePath}: variants[${i}].judge[${j}] missing "check" string`);
           }
           if (entry.weight !== undefined && typeof entry.weight !== "number") {
-            throw new Error(`Invalid scenario at ${filePath}: variants[${i}].rubric[${j}].weight must be a number`);
+            throw new Error(`Invalid scenario at ${filePath}: variants[${i}].judge[${j}].weight must be a number`);
           }
         }
-        variant.rubric = resolveRubricWeights(variant.rubric as RubricCriterion[]);
+        variant.judge = resolveJudgeWeights(variant.judge as JudgeCriterion[]);
       } else {
-        throw new Error(`Invalid scenario at ${filePath}: variants[${i}].rubric must be a string or array`);
+        throw new Error(`Invalid scenario at ${filePath}: variants[${i}].judge must be a string or array`);
       }
     }
 
@@ -344,23 +356,23 @@ function validateSkillsSources(data: unknown, filePath: string, field: string): 
 }
 
 /**
- * Resolve optional weights on rubric entries. Entries with explicit weights
+ * Resolve optional weights on judge entries. Entries with explicit weights
  * keep them; entries without a weight split the remaining budget equally.
  * If no entries have weights, each gets `1 / n`.
  */
-export function resolveRubricWeights(rubric: RubricCriterion[]): RubricCriterion[] {
-  if (rubric.length === 0) return rubric;
+export function resolveJudgeWeights(judge: JudgeCriterion[]): JudgeCriterion[] {
+  if (judge.length === 0) return judge;
 
-  const specified = rubric.filter((r) => r.weight !== undefined);
-  const unspecified = rubric.filter((r) => r.weight === undefined);
+  const specified = judge.filter((r) => r.weight !== undefined);
+  const unspecified = judge.filter((r) => r.weight === undefined);
 
-  if (unspecified.length === 0) return rubric;
+  if (unspecified.length === 0) return judge;
 
   const usedWeight = specified.reduce((sum, r) => sum + r.weight!, 0);
   const remaining = Math.max(0, 1.0 - usedWeight);
   const share = unspecified.length > 0 ? remaining / unspecified.length : 0;
 
-  return rubric.map((r) => (r.weight !== undefined ? r : { ...r, weight: share }));
+  return judge.map((r) => (r.weight !== undefined ? r : { ...r, weight: share }));
 }
 
 function validateLimits(data: unknown, filePath: string, field: string): void {

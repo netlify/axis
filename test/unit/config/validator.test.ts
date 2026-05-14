@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateConfig, validateScenario, resolveRubricWeights } from "../../../src/config/validator.js";
+import { validateConfig, validateScenario, resolveJudgeWeights } from "../../../src/config/validator.js";
 
 describe("validateConfig", () => {
   it("accepts a valid config with string agents", () => {
@@ -55,7 +55,7 @@ describe("validateConfig", () => {
 
   it("accepts scenarios as a mixed array of strings and inline scenarios", () => {
     const config = {
-      scenarios: ["./a", { key: "inline-1", name: "Inline", prompt: "p", rubric: "r" }],
+      scenarios: ["./a", { key: "inline-1", name: "Inline", prompt: "p", judge: "r" }],
       agents: ["claude-code"],
     };
     expect(() => validateConfig(config, "test.json")).not.toThrow();
@@ -70,7 +70,7 @@ describe("validateConfig", () => {
 
   it("rejects inline scenario without a key", () => {
     const config = {
-      scenarios: [{ name: "No Key", prompt: "p", rubric: "r" }],
+      scenarios: [{ name: "No Key", prompt: "p", judge: "r" }],
       agents: ["claude-code"],
     };
     expect(() => validateConfig(config, "test.json")).toThrow(`inline scenarios must include a non-empty "key" string`);
@@ -78,7 +78,7 @@ describe("validateConfig", () => {
 
   it("rejects inline scenario with empty-string key", () => {
     const config = {
-      scenarios: [{ key: "", name: "Empty Key", prompt: "p", rubric: "r" }],
+      scenarios: [{ key: "", name: "Empty Key", prompt: "p", judge: "r" }],
       agents: ["claude-code"],
     };
     expect(() => validateConfig(config, "test.json")).toThrow(`inline scenarios must include a non-empty "key" string`);
@@ -414,7 +414,7 @@ describe("validateScenario", () => {
   const validScenario = {
     name: "Test",
     prompt: "Do something",
-    rubric: [{ check: "Did it?", weight: 1.0 }],
+    judge: [{ check: "Did it?", weight: 1.0 }],
   };
 
   it("accepts a valid scenario", () => {
@@ -483,34 +483,79 @@ describe("validateScenario", () => {
     expect(() => validateScenario(rest, "test.json")).toThrow('"prompt"');
   });
 
-  it("accepts a string rubric", () => {
-    const scenario = { ...validScenario, rubric: "The agent should complete the task" };
+  it("accepts a string judge", () => {
+    const scenario = { ...validScenario, judge: "The agent should complete the task" };
     expect(() => validateScenario(scenario, "test.json")).not.toThrow();
   });
 
-  it("rejects missing rubric", () => {
-    const { rubric: _rubric, ...rest } = validScenario;
-    expect(() => validateScenario(rest, "test.json")).toThrow('"rubric"');
+  it("rejects missing judge", () => {
+    const { judge: _judge, ...rest } = validScenario;
+    expect(() => validateScenario(rest, "test.json")).toThrow('"judge"');
   });
 
-  it("rejects rubric of wrong type", () => {
-    const scenario = { ...validScenario, rubric: 42 };
-    expect(() => validateScenario(scenario, "test.json")).toThrow('"rubric"');
+  it("rejects judge of wrong type", () => {
+    const scenario = { ...validScenario, judge: 42 };
+    expect(() => validateScenario(scenario, "test.json")).toThrow('"judge"');
   });
 
-  it("rejects rubric entry without check", () => {
-    const scenario = { ...validScenario, rubric: [{ weight: 1.0 }] };
-    expect(() => validateScenario(scenario, "test.json")).toThrow("rubric[0]");
+  it("rejects judge entry without check", () => {
+    const scenario = { ...validScenario, judge: [{ weight: 1.0 }] };
+    expect(() => validateScenario(scenario, "test.json")).toThrow("judge[0]");
   });
 
-  it("accepts rubric entry without weight", () => {
-    const scenario = { ...validScenario, rubric: [{ check: "x" }] };
+  it("accepts judge entry without weight", () => {
+    const scenario = { ...validScenario, judge: [{ check: "x" }] };
     expect(() => validateScenario(scenario, "test.json")).not.toThrow();
   });
 
-  it("rejects rubric entry with non-number weight", () => {
-    const scenario = { ...validScenario, rubric: [{ check: "x", weight: "heavy" }] };
+  it("rejects judge entry with non-number weight", () => {
+    const scenario = { ...validScenario, judge: [{ check: "x", weight: "heavy" }] };
     expect(() => validateScenario(scenario, "test.json")).toThrow("weight must be a number");
+  });
+
+  describe("legacy rubric back-compat", () => {
+    it("silently accepts a string `rubric` as an alias for `judge`", () => {
+      const { judge: _drop, ...base } = validScenario;
+      const scenario: Record<string, unknown> = { ...base, rubric: "freeform check" };
+      expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+      expect(scenario.judge).toBe("freeform check");
+      expect(scenario.rubric).toBeUndefined();
+    });
+
+    it("silently accepts an array `rubric` and resolves weights", () => {
+      const { judge: _drop, ...base } = validScenario;
+      const scenario: Record<string, unknown> = {
+        ...base,
+        rubric: [{ check: "a" }, { check: "b" }],
+      };
+      expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+      const judge = scenario.judge as Array<{ check: string; weight: number }>;
+      expect(judge).toHaveLength(2);
+      expect(judge[0].weight).toBeCloseTo(0.5, 10);
+      expect(scenario.rubric).toBeUndefined();
+    });
+
+    it("prefers `judge` when both fields are present", () => {
+      const scenario: Record<string, unknown> = {
+        ...validScenario,
+        rubric: "ignored",
+      };
+      expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+      // judge wins; rubric is left in place (only stripped when used as fallback)
+      expect(Array.isArray(scenario.judge)).toBe(true);
+    });
+
+    it("accepts variant `rubric` as an alias for variant `judge`", () => {
+      const scenario = {
+        ...validScenario,
+        variants: [{ name: "v", rubric: [{ check: "a" }, { check: "b" }] }],
+      } as Record<string, unknown>;
+      expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+      const variant = (scenario.variants as Array<Record<string, unknown>>)[0];
+      const judge = variant.judge as Array<{ check: string; weight: number }>;
+      expect(judge[0].weight).toBeCloseTo(0.5, 10);
+      expect(variant.rubric).toBeUndefined();
+    });
   });
 
   it("accepts a scenario with agents override", () => {
@@ -645,7 +690,7 @@ describe("validateScenario", () => {
           {
             name: "full-override",
             prompt: "Custom prompt",
-            rubric: [{ check: "Custom check", weight: 1.0 }],
+            judge: [{ check: "Custom check", weight: 1.0 }],
             skip: true,
             agents: ["gemini"],
             skills: ["./custom-skill"],
@@ -696,28 +741,28 @@ describe("validateScenario", () => {
       expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].prompt must be a string");
     });
 
-    it("rejects variant with invalid rubric", () => {
-      const scenario = { ...validScenario, variants: [{ name: "v", rubric: 42 }] };
-      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].rubric must be a string or array");
+    it("rejects variant with invalid judge", () => {
+      const scenario = { ...validScenario, variants: [{ name: "v", judge: 42 }] };
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].judge must be a string or array");
     });
 
-    it("rejects variant with rubric entry missing check", () => {
+    it("rejects variant with judge entry missing check", () => {
       const scenario = {
         ...validScenario,
-        variants: [{ name: "v", rubric: [{ weight: 1.0 }] }],
+        variants: [{ name: "v", judge: [{ weight: 1.0 }] }],
       };
-      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].rubric[0] missing");
+      expect(() => validateScenario(scenario, "test.json")).toThrow("variants[0].judge[0] missing");
     });
 
-    it("resolves rubric weights on variant rubrics", () => {
+    it("resolves judge weights on variant judges", () => {
       const scenario = {
         ...validScenario,
-        variants: [{ name: "v", rubric: [{ check: "a" }, { check: "b" }] }],
+        variants: [{ name: "v", judge: [{ check: "a" }, { check: "b" }] }],
       };
       validateScenario(scenario, "test.json");
-      const rubric = scenario.variants[0].rubric as Array<{ check: string; weight: number }>;
-      expect(rubric[0].weight).toBeCloseTo(0.5, 10);
-      expect(rubric[1].weight).toBeCloseTo(0.5, 10);
+      const judge = scenario.variants[0].judge as Array<{ check: string; weight: number }>;
+      expect(judge[0].weight).toBeCloseTo(0.5, 10);
+      expect(judge[1].weight).toBeCloseTo(0.5, 10);
     });
 
     it("rejects variant with non-boolean skip", () => {
@@ -784,22 +829,22 @@ describe("validateScenario", () => {
   });
 });
 
-describe("resolveRubricWeights", () => {
+describe("resolveJudgeWeights", () => {
   it("returns empty array unchanged", () => {
-    expect(resolveRubricWeights([])).toEqual([]);
+    expect(resolveJudgeWeights([])).toEqual([]);
   });
 
   it("passes through entries that all have weights", () => {
-    const rubric = [
+    const judge = [
       { check: "a", weight: 0.5 },
       { check: "b", weight: 0.5 },
     ];
-    expect(resolveRubricWeights(rubric)).toEqual(rubric);
+    expect(resolveJudgeWeights(judge)).toEqual(judge);
   });
 
   it("distributes equally when no entries have weights", () => {
-    const rubric = [{ check: "a" }, { check: "b" }, { check: "c" }];
-    const resolved = resolveRubricWeights(rubric);
+    const judge = [{ check: "a" }, { check: "b" }, { check: "c" }];
+    const resolved = resolveJudgeWeights(judge);
     expect(resolved).toHaveLength(3);
     for (const r of resolved) {
       expect(r.weight).toBeCloseTo(1 / 3, 10);
@@ -807,23 +852,23 @@ describe("resolveRubricWeights", () => {
   });
 
   it("splits remaining weight among unweighted entries", () => {
-    const rubric = [{ check: "a", weight: 0.5 }, { check: "b" }, { check: "c" }];
-    const resolved = resolveRubricWeights(rubric);
+    const judge = [{ check: "a", weight: 0.5 }, { check: "b" }, { check: "c" }];
+    const resolved = resolveJudgeWeights(judge);
     expect(resolved[0].weight).toBe(0.5);
     expect(resolved[1].weight).toBeCloseTo(0.25, 10);
     expect(resolved[2].weight).toBeCloseTo(0.25, 10);
   });
 
   it("gives zero to unweighted entries when specified weights sum to 1", () => {
-    const rubric = [{ check: "a", weight: 1.0 }, { check: "b" }];
-    const resolved = resolveRubricWeights(rubric);
+    const judge = [{ check: "a", weight: 1.0 }, { check: "b" }];
+    const resolved = resolveJudgeWeights(judge);
     expect(resolved[0].weight).toBe(1.0);
     expect(resolved[1].weight).toBe(0);
   });
 
   it("clamps remaining at zero when specified weights exceed 1", () => {
-    const rubric = [{ check: "a", weight: 0.7 }, { check: "b", weight: 0.5 }, { check: "c" }];
-    const resolved = resolveRubricWeights(rubric);
+    const judge = [{ check: "a", weight: 0.7 }, { check: "b", weight: 0.5 }, { check: "c" }];
+    const resolved = resolveJudgeWeights(judge);
     expect(resolved[2].weight).toBe(0);
   });
 
@@ -831,12 +876,12 @@ describe("resolveRubricWeights", () => {
     const scenario = {
       name: "test",
       prompt: "do the thing",
-      rubric: [{ check: "a", weight: 0.4 }, { check: "b" }, { check: "c" }],
+      judge: [{ check: "a", weight: 0.4 }, { check: "b" }, { check: "c" }],
     };
     validateScenario(scenario, "test.json");
-    const rubric = scenario.rubric as Array<{ check: string; weight: number }>;
-    expect(rubric[0].weight).toBe(0.4);
-    expect(rubric[1].weight).toBeCloseTo(0.3, 10);
-    expect(rubric[2].weight).toBeCloseTo(0.3, 10);
+    const judge = scenario.judge as Array<{ check: string; weight: number }>;
+    expect(judge[0].weight).toBe(0.4);
+    expect(judge[1].weight).toBeCloseTo(0.3, 10);
+    expect(judge[2].weight).toBeCloseTo(0.3, 10);
   });
 });

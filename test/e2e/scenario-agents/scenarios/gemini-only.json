@@ -1,6 +1,6 @@
 {
   "name": "Gemini Only",
   "prompt": "Run with gemini only",
-  "rubric": "Test passes",
+  "judge": "Test passes",
   "agents": ["gemini"]
 }

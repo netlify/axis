@@ -5,7 +5,7 @@
 
   "prompt": "Write a JavaScript file called isPrime.js in /tmp/axis-e2e-generate that exports a function `isPrime(n)` which returns true if n is a prime number and false otherwise. It should handle edge cases (negative numbers, 0, 1). Do not use any external libraries.",
 
-  "rubric": [
+  "judge": [
     { "check": "File isPrime.js exists at the target path", "weight": 0.2 },
     { "check": "Exports a function named isPrime", "weight": 0.2 },
     { "check": "Correctly identifies prime numbers (e.g. 2, 3, 7, 13)", "weight": 0.2 },

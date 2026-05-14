@@ -20,7 +20,7 @@
       "tokenUsage": { "input": 8, "output": 1146, "cacheReadInput": 51619 },
       "totalCostUsd": 0.0566,
       "prompt": "Fetch the documentation page at https://docs.netlify.com/build/async-workloads/overview/ and write a detailed summary to summary.md.",
-      "rubric": [
+      "judge": [
         { "check": "Agent fetched the documentation URL", "weight": 0.25 },
         { "check": "Agent wrote summary.md with substantive content", "weight": 0.25 },
         { "check": "Summary covers what the product does", "weight": 0.25 },
@@ -241,7 +241,7 @@
       "tokenUsage": { "input": 120, "output": 980, "cacheReadInput": 0 },
       "totalCostUsd": 0.0321,
       "prompt": "Fetch the documentation page at https://docs.netlify.com/build/async-workloads/overview/ and write a detailed summary to summary.md.",
-      "rubric": [
+      "judge": [
         { "check": "Agent fetched the documentation URL", "weight": 0.25 },
         { "check": "Agent wrote summary.md with substantive content", "weight": 0.25 },
         { "check": "Summary covers what the product does", "weight": 0.25 },
@@ -351,7 +351,7 @@
       "tokenUsage": { "input": 3200, "output": 890, "cacheReadInput": 22000 },
       "totalCostUsd": 0.0289,
       "prompt": "The pagination in src/utils/paginate.ts has an off-by-one error. Find and fix it, then run the tests to verify.",
-      "rubric": [
+      "judge": [
         { "check": "Agent identified the off-by-one error", "weight": 0.3 },
         { "check": "Agent applied the correct fix", "weight": 0.4 },
         { "check": "Agent ran tests and they pass", "weight": 0.3 }
@@ -449,7 +449,7 @@
       "tokenUsage": { "input": 4100, "output": 1200, "cacheReadInput": 0 },
       "totalCostUsd": 0.0198,
       "prompt": "The pagination in src/utils/paginate.ts has an off-by-one error. Find and fix it, then run the tests to verify.",
-      "rubric": [
+      "judge": [
         { "check": "Agent identified the off-by-one error", "weight": 0.3 },
         { "check": "Agent applied the correct fix", "weight": 0.4 },
         { "check": "Agent ran tests and they pass", "weight": 0.3 }
@@ -561,7 +561,7 @@
       "tokenUsage": { "input": 2800, "output": 650, "cacheReadInput": 0 },
       "totalCostUsd": 0.0142,
       "prompt": "The pagination in src/utils/paginate.ts has an off-by-one error. Find and fix it, then run the tests to verify.",
-      "rubric": [
+      "judge": [
         { "check": "Agent identified the off-by-one error", "weight": 0.3 },
         { "check": "Agent applied the correct fix", "weight": 0.4 },
         { "check": "Agent ran tests and they pass", "weight": 0.3 }

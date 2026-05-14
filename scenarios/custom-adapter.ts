@@ -15,7 +15,7 @@ export default withSharedVariants(
       "3. The module must export the adapter as the default export.\n" +
       "4. Register the adapter in `axis.config.json` under the top-level `adapters` field with the name `echo`, pointing at `./adapters/echo-adapter.ts`. Add `echo` to the `agents` list so it actually runs.",
 
-    rubric: [
+    judge: [
       { check: "File `adapters/echo-adapter.ts` exists in the workspace", weight: 0.1 },
       {
         check:

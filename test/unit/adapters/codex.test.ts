@@ -42,7 +42,7 @@ function makeInput(prompt = "test prompt"): AgentInput {
       key: "test",
       name: "Test",
       prompt,
-      rubric: [{ check: "test", weight: 1.0 }],
+      judge: [{ check: "test", weight: 1.0 }],
     },
     workingDirectory: "/tmp",
   };

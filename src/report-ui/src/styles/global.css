@@ -1696,13 +1696,13 @@ a.wf-id.interaction-link {
   overflow-y: auto;
 }
 
-.modal-rubric-table {
+.modal-judge-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8125rem;
 }
 
-.modal-rubric-table thead th {
+.modal-judge-table thead th {
   text-align: left;
   padding: 6px 10px;
   font-size: 0.6875rem;
@@ -1713,13 +1713,13 @@ a.wf-id.interaction-link {
   border-bottom: 1px solid var(--light-gray);
 }
 
-.modal-rubric-table tbody td {
+.modal-judge-table tbody td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--light-gray);
   color: var(--text-secondary);
 }
 
-.modal-rubric-weight {
+.modal-judge-weight {
   width: 60px;
   text-align: right;
   font-family: var(--font-mono);

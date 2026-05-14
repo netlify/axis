@@ -1,5 +1,5 @@
 {
   "name": "All Agents",
   "prompt": "Run with all agents",
-  "rubric": "Test passes"
+  "judge": "Test passes"
 }

@@ -120,7 +120,7 @@ describe("renderSummaryTable variant display", () => {
           scenarioName: "Deploy [baseline]",
           agentName: "claude-code",
           prompt: "deploy",
-          rubric: "check",
+          judge: "check",
           agentConfig: { agent: "claude-code" },
           output: {
             transcript: [],
@@ -133,7 +133,7 @@ describe("renderSummaryTable variant display", () => {
           scenarioName: "Deploy [with-mcp]",
           agentName: "claude-code",
           prompt: "deploy",
-          rubric: "check",
+          judge: "check",
           agentConfig: { agent: "claude-code" },
           output: {
             transcript: [],
@@ -146,7 +146,7 @@ describe("renderSummaryTable variant display", () => {
           scenarioName: "Hello World",
           agentName: "claude-code",
           prompt: "hello",
-          rubric: "check",
+          judge: "check",
           agentConfig: { agent: "claude-code" },
           output: {
             transcript: [],

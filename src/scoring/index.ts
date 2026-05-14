@@ -1,6 +1,6 @@
 import type { RunOutput, RunResult } from "../types/output.js";
 import type { ScoringWeights } from "../types/config.js";
-import type { RubricCriterion } from "../types/scenario.js";
+import type { JudgeCriterion } from "../types/scenario.js";
 import type {
   CategoryScore,
   GoalAchievementScore,
@@ -64,7 +64,7 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
       scenarioName: result.scenarioName,
       agentName: result.agentName,
       prompt: result.prompt,
-      rubric: result.rubric,
+      judge: result.judge,
       agentConfig: result.agentConfig,
       output: result.output,
       score,
@@ -136,7 +136,7 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
     scenarioName: result.scenarioName,
     agentName: result.agentName,
     prompt: result.prompt,
-    rubric: result.rubric,
+    judge: result.judge,
     agentConfig: result.agentConfig,
     output: result.output,
     score,
@@ -196,7 +196,7 @@ function buildZeroScore(
 
   return {
     axisScore: 0,
-    goalAchievement: buildZeroGoalAchievement(result.rubric, reason),
+    goalAchievement: buildZeroGoalAchievement(result.judge, reason),
     environment: buildZeroCategoryScore("environment"),
     service: buildZeroCategoryScore("service"),
     agent: buildZeroCategoryScore("agent"),
@@ -205,17 +205,17 @@ function buildZeroScore(
   };
 }
 
-function buildZeroGoalAchievement(rubric: RunResult["rubric"], reason: string): GoalAchievementScore {
-  if (typeof rubric === "string") {
+function buildZeroGoalAchievement(judge: RunResult["judge"], reason: string): GoalAchievementScore {
+  if (typeof judge === "string") {
     return {
       score: 0,
-      criteria: [{ check: rubric, weight: 1, score: 0, rationale: reason }],
+      criteria: [{ check: judge, weight: 1, score: 0, rationale: reason }],
     };
   }
-  if (Array.isArray(rubric) && rubric.length > 0) {
+  if (Array.isArray(judge) && judge.length > 0) {
     return {
       score: 0,
-      criteria: rubric.map((c: RubricCriterion) => ({
+      criteria: judge.map((c: JudgeCriterion) => ({
         check: c.check,
         weight: c.weight ?? 1,
         score: 0,

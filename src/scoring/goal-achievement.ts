@@ -1,5 +1,5 @@
 import type { NormalizedEntry } from "../transcript/types.js";
-import type { RubricCriterion } from "../types/scenario.js";
+import type { JudgeCriterion } from "../types/scenario.js";
 import type { RunResult } from "../types/output.js";
 import type { AgentMetadata } from "../types/agent.js";
 import type { GoalAchievementScore, CriterionGrade } from "../types/scoring.js";
@@ -11,27 +11,27 @@ export async function scoreGoalAchievement(
   result: RunResult,
   normalizedEntries: NormalizedEntry[],
 ): Promise<GoalAchievementScore> {
-  const { rubric } = result;
+  const { judge } = result;
   const { result: finalResult } = result.output;
 
-  if (typeof rubric === "string") {
-    return scoreStringRubric(result, rubric, normalizedEntries, finalResult);
+  if (typeof judge === "string") {
+    return scoreStringJudge(result, judge, normalizedEntries, finalResult);
   }
 
-  if (!rubric || rubric.length === 0) {
+  if (!judge || judge.length === 0) {
     return { score: 0, criteria: [] };
   }
 
-  return scoreArrayRubric(result, rubric, normalizedEntries, finalResult);
+  return scoreArrayJudge(result, judge, normalizedEntries, finalResult);
 }
 
-async function scoreStringRubric(
+async function scoreStringJudge(
   runResult: RunResult,
-  rubric: string,
+  judge: string,
   entries: NormalizedEntry[],
   finalResult: string | null,
 ): Promise<GoalAchievementScore> {
-  const prompt = buildStringRubricPrompt(runResult, entries, finalResult, rubric);
+  const prompt = buildStringJudgePrompt(runResult, entries, finalResult, judge);
   const responseText = await callJudge(runResult, prompt, {
     scenarioKey: "__judge__",
     scenarioName: "AXIS Judge",
@@ -43,7 +43,7 @@ async function scoreStringRubric(
       score: 0,
       criteria: [
         {
-          check: rubric,
+          check: judge,
           weight: 1.0,
           score: 0,
           rationale: "Failed to parse judge response",
@@ -57,7 +57,7 @@ async function scoreStringRubric(
     score: Math.round((score / 10) * 100),
     criteria: [
       {
-        check: rubric,
+        check: judge,
         weight: 1.0,
         score,
         rationale: (parsed.rationale as string) ?? "",
@@ -66,19 +66,19 @@ async function scoreStringRubric(
   };
 }
 
-async function scoreArrayRubric(
+async function scoreArrayJudge(
   runResult: RunResult,
-  rubric: RubricCriterion[],
+  judge: JudgeCriterion[],
   entries: NormalizedEntry[],
   finalResult: string | null,
 ): Promise<GoalAchievementScore> {
-  const prompt = buildArrayRubricPrompt(runResult, entries, finalResult, rubric);
+  const prompt = buildArrayJudgePrompt(runResult, entries, finalResult, judge);
   const responseText = await callJudge(runResult, prompt, {
     scenarioKey: "__judge__",
     scenarioName: "AXIS Judge",
   });
 
-  const criteria = parseArrayJudgeResponse(responseText, rubric);
+  const criteria = parseArrayJudgeResponse(responseText, judge);
   const score = computeWeightedScore(criteria);
 
   return { score, criteria };
@@ -90,40 +90,40 @@ const MAX_TRANSCRIPT_CHARS = 50_000;
 /** Max characters per individual transcript entry. */
 const MAX_ENTRY_CHARS = 2_000;
 
-function buildStringRubricPrompt(
+function buildStringJudgePrompt(
   result: RunResult,
   entries: NormalizedEntry[],
   finalResult: string | null,
-  rubric: string,
+  judge: string,
 ): string {
-  const { goal_string_rubric } = getPromptTemplates();
+  const { goal_string_judge } = getPromptTemplates();
 
-  return interpolate(goal_string_rubric.template, {
+  return interpolate(goal_string_judge.template, {
     scenarioName: result.scenarioName,
     prompt: getOriginalPrompt(result),
     transcript: formatTranscriptForJudge(entries),
     finalResult: finalResult ?? "(no final result)",
     executionStats: formatExecutionStats(result.output.metadata),
-    rubric,
+    judge,
   });
 }
 
-function buildArrayRubricPrompt(
+function buildArrayJudgePrompt(
   result: RunResult,
   entries: NormalizedEntry[],
   finalResult: string | null,
-  rubric: RubricCriterion[],
+  judge: JudgeCriterion[],
 ): string {
-  const rubricText = rubric.map((r, i) => `${i}. "${r.check}" (weight: ${r.weight!})`).join("\n");
-  const { goal_array_rubric } = getPromptTemplates();
+  const judgeText = judge.map((r, i) => `${i}. "${r.check}" (weight: ${r.weight!})`).join("\n");
+  const { goal_array_judge } = getPromptTemplates();
 
-  return interpolate(goal_array_rubric.template, {
+  return interpolate(goal_array_judge.template, {
     scenarioName: result.scenarioName,
     prompt: getOriginalPrompt(result),
     transcript: formatTranscriptForJudge(entries),
     finalResult: finalResult ?? "(no final result)",
     executionStats: formatExecutionStats(result.output.metadata),
-    rubricText,
+    judgeText,
   });
 }
 
@@ -210,10 +210,10 @@ function truncate(text: string, maxLen: number): string {
   return text.slice(0, maxLen) + "...";
 }
 
-function parseArrayJudgeResponse(responseText: string, rubric: RubricCriterion[]): CriterionGrade[] {
+function parseArrayJudgeResponse(responseText: string, judge: JudgeCriterion[]): CriterionGrade[] {
   const parsed = parseJsonFromText(responseText);
   if (!parsed || !Array.isArray(parsed.grades)) {
-    return rubric.map((r) => ({
+    return judge.map((r) => ({
       check: r.check,
       weight: r.weight!,
       score: 0,
@@ -227,7 +227,7 @@ function parseArrayJudgeResponse(responseText: string, rubric: RubricCriterion[]
     rationale: string;
   }>;
 
-  return rubric.map((r, i) => {
+  return judge.map((r, i) => {
     const grade = grades.find((g) => g.criterion_index === i);
     return {
       check: r.check,

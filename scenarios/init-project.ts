@@ -7,9 +7,9 @@ export default withSharedVariants(
     name: "Initialize a new AXIS project",
 
     prompt:
-      "Initialize a new AXIS project in the current working directory. Create an `axis.config.json` that points to a `./scenarios` directory and uses `claude-code` as the agent. Then create one scenario at `scenarios/url-fetch.json` that asks the agent to fetch https://example.com and describe what it sees. The scenario must include a `name`, a `prompt`, and a `rubric` with at least two items, each having a `check` field.",
+      "Initialize a new AXIS project in the current working directory. Create an `axis.config.json` that points to a `./scenarios` directory and uses `claude-code` as the agent. Then create one scenario at `scenarios/url-fetch.json` that asks the agent to fetch https://example.com and describe what it sees. The scenario must include a `name`, a `prompt`, and a `judge` with at least two items, each having a `check` field.",
 
-    rubric: [
+    judge: [
       {
         check: "An `axis.config.json` file was created in the workspace root and contains valid JSON",
         weight: 0.2,
@@ -20,8 +20,8 @@ export default withSharedVariants(
         weight: 0.2,
       },
       { check: "A `scenarios/url-fetch.json` file was created and contains valid JSON", weight: 0.2 },
-      { check: "The scenario file has top-level `name`, `prompt`, and `rubric` fields", weight: 0.2 },
-      { check: "The rubric is an array with at least two items, each containing a `check` field", weight: 0.2 },
+      { check: "The scenario file has top-level `name`, `prompt`, and `judge` fields", weight: 0.2 },
+      { check: "The judge is an array with at least two items, each containing a `check` field", weight: 0.2 },
     ],
   },
   {

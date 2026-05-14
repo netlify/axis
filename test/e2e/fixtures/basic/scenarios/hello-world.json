@@ -1,5 +1,5 @@
 {
   "name": "Hello World",
   "prompt": "Say hello",
-  "rubric": "The agent should say hello."
+  "judge": "The agent should say hello."
 }

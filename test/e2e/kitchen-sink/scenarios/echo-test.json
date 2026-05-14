@@ -1,7 +1,7 @@
 {
   "name": "Largest English word",
   "prompt": "Tell me the largest word in the English language. Include the word in your response.",
-  "rubric": [
+  "judge": [
     { "check": "Response contains the word pneumonoultramicroscopicsilicovolcanoconiosis", "weight": 0.7 },
     { "check": "Response explains what the word means", "weight": 0.3 }
   ]

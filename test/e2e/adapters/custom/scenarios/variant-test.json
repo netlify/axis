@@ -1,7 +1,7 @@
 {
   "name": "Variant echo test",
   "prompt": "Hello from variant",
-  "rubric": "The agent should echo back the prompt text.",
+  "judge": "The agent should echo back the prompt text.",
   "variants": [
     {
       "name": "baseline"

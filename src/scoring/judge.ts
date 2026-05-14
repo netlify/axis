@@ -34,7 +34,7 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
         key: options.scenarioKey,
         name: options.scenarioName,
         prompt,
-        rubric: [],
+        judge: [],
       },
       workingDirectory: workspace,
     });

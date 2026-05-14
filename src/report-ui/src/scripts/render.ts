@@ -12,7 +12,7 @@ import type {
   McpServerConfig,
   SparseIndex,
   Interaction,
-  RubricCriterion,
+  JudgeCriterion,
   ArtifactEntry,
 } from "./types";
 import { isScoredSummary } from "./types";
@@ -129,7 +129,7 @@ interface ScenarioGroup {
   scenarioName: string;
   entries: ResultEntry[];
   prompt?: string;
-  rubric?: string | RubricCriterion[];
+  judge?: string | JudgeCriterion[];
 }
 
 function groupByScenario(results: ResultEntry[]): ScenarioGroup[] {
@@ -143,7 +143,7 @@ function groupByScenario(results: ResultEntry[]): ScenarioGroup[] {
         scenarioName: getBaseScenarioName(entry.scenarioName),
         entries: [],
         prompt: entry.prompt,
-        rubric: entry.rubric,
+        judge: entry.judge ?? entry.rubric,
       };
       map.set(baseKey, group);
     }
@@ -1030,7 +1030,7 @@ function renderModal(entry: ResultEntry, index: number): string {
           ${resolved?.skills?.length ? renderModalSkills(resolved.skills) : ""}
           ${resolved?.mcpServers && Object.keys(resolved.mcpServers).length ? renderModalMcp(resolved.mcpServers) : ""}
           ${entry.prompt ? renderModalPrompt(entry.prompt) : ""}
-          ${entry.rubric ? renderModalRubric(entry.rubric) : ""}
+          ${(entry.judge ?? entry.rubric) ? renderModalJudge((entry.judge ?? entry.rubric)!) : ""}
           ${resolved?.setup?.length ? renderModalLifecycle("Setup", resolved.setup) : ""}
           ${resolved?.teardown?.length ? renderModalLifecycle("Teardown", resolved.teardown) : ""}
         </div>
@@ -1145,29 +1145,29 @@ function renderModalPrompt(prompt: string): string {
     </div>`;
 }
 
-function renderModalRubric(rubric: string | RubricCriterion[]): string {
-  if (typeof rubric === "string") {
+function renderModalJudge(judge: string | JudgeCriterion[]): string {
+  if (typeof judge === "string") {
     return `
       <div class="modal-section">
-        <h4>Rubric</h4>
-        <pre class="modal-prompt">${escapeHtml(rubric)}</pre>
+        <h4>Judge</h4>
+        <pre class="modal-prompt">${escapeHtml(judge)}</pre>
       </div>`;
   }
 
-  const rows = rubric
+  const rows = judge
     .map(
       (c) => `
       <tr>
         <td>${escapeHtml(c.check)}</td>
-        <td class="modal-rubric-weight">${Math.round(c.weight * 100)}%</td>
+        <td class="modal-judge-weight">${Math.round((c.weight ?? 0) * 100)}%</td>
       </tr>`,
     )
     .join("");
 
   return `
     <div class="modal-section">
-      <h4>Rubric</h4>
-      <table class="modal-rubric-table">
+      <h4>Judge</h4>
+      <table class="modal-judge-table">
         <thead><tr><th>Check</th><th>Weight</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>

@@ -46,7 +46,7 @@ function makeInput(overrides: Partial<AgentInput> = {}): AgentInput {
       key: "t",
       name: "T",
       prompt: "hi",
-      rubric: [{ check: "c", weight: 1 }],
+      judge: [{ check: "c", weight: 1 }],
     },
     workingDirectory: "/tmp",
     ...overrides,

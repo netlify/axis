@@ -5,7 +5,7 @@
 
   "prompt": "Create a file called hello.txt in /tmp/axis-test with the content 'Hello from AXIS'. Then read the file back and confirm its contents.",
 
-  "rubric": [
+  "judge": [
     { "check": "File hello.txt was created at the target path", "weight": 0.4 },
     { "check": "File contains the text 'Hello from AXIS'", "weight": 0.4 },
     { "check": "Agent verified the file contents after creation", "weight": 0.2 }

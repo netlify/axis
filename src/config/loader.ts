@@ -269,13 +269,14 @@ async function loadScenarioFromPath(
 
 /**
  * Top-level fields that, if present in a JSON file, signal "this is intended to
- * be a scenario." `prompt` and `rubric` are AXIS-specific enough that no common
+ * be a scenario." `prompt` and `judge` are AXIS-specific enough that no common
  * non-scenario JSON (package.json, tsconfig.json, lockfiles, framework state)
  * uses them. When walking a directory and neither appears, the JSON is some
  * other artifact and we skip it silently instead of treating it as a malformed
- * scenario. `name` is intentionally excluded — package.json has it.
+ * scenario. `name` is intentionally excluded — package.json has it. `rubric`
+ * remains a marker for back-compat with legacy scenarios.
  */
-const SCENARIO_MARKER_FIELDS = ["prompt", "rubric"] as const;
+const SCENARIO_MARKER_FIELDS = ["prompt", "judge", "rubric"] as const;
 
 async function loadJsonScenario(filePath: string, baseKey: string, silentSkip: boolean): Promise<Scenario[] | null> {
   const raw = await fs.readFile(filePath, "utf-8");
@@ -380,7 +381,7 @@ function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: stri
     key: `${baseKey}@${variant.name}`,
     name: `${parent.name} [${variant.name}]`,
     prompt: variant.prompt ?? parent.prompt,
-    rubric: variant.rubric ?? parent.rubric,
+    judge: variant.judge ?? parent.judge,
     skip: variant.skip ?? parent.skip,
     setup: variant.setup ?? parent.setup,
     teardown: variant.teardown ?? parent.teardown,

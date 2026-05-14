@@ -34,7 +34,9 @@ export interface ResultEntry {
   error?: string;
   file: string;
   prompt?: string;
-  rubric?: string | RubricCriterion[];
+  judge?: string | JudgeCriterion[];
+  /** @deprecated Legacy field; read for back-compat with reports written before the rename. */
+  rubric?: string | JudgeCriterion[];
   agentConfig?: Record<string, unknown>;
   resolvedConfig?: ResolvedRunConfig;
   artifacts?: ArtifactEntry[];
@@ -67,7 +69,7 @@ export type McpServerConfig =
   | { type?: "stdio"; command: string; args?: string[]; env?: Record<string, string> }
   | { type: "http"; url: string; headers?: Record<string, string> };
 
-export interface RubricCriterion {
+export interface JudgeCriterion {
   check: string;
   weight?: number;
 }

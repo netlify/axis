@@ -98,7 +98,7 @@ describe("kitchen-sink (all adapters)", () => {
     expect(scenarioKeys).toEqual(["echo-test"]);
   });
 
-  it("echo-test scenario has correct prompt and rubric", async () => {
+  it("echo-test scenario has correct prompt and judge", async () => {
     const output = await run({
       configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
       logger: silentLogger,
@@ -109,8 +109,8 @@ describe("kitchen-sink (all adapters)", () => {
     for (const result of echoResults) {
       expect(result.scenarioName).toBe("Largest English word");
       expect(result.prompt).toContain("largest word in the English language");
-      expect(result.rubric).toBeInstanceOf(Array);
-      expect(result.rubric).toHaveLength(2);
+      expect(result.judge).toBeInstanceOf(Array);
+      expect(result.judge).toHaveLength(2);
     }
   });
 

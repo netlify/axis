@@ -104,7 +104,7 @@ function makeRunOutput(overrides: Partial<RunOutput> = {}): RunOutput {
         scenarioName: "Test Scenario",
         agentName: "claude-code",
         prompt: "Visit the target and verify content",
-        rubric: [{ check: "Did it", weight: 1.0 }],
+        judge: [{ check: "Did it", weight: 1.0 }],
         agentConfig: { agent: "claude-code" },
         output: {
           transcript: [
@@ -245,9 +245,9 @@ describe("scoreResults", () => {
       expect(runDeepEval).not.toHaveBeenCalled();
     });
 
-    it("populates rubric criteria with the failure reason on zero score", async () => {
+    it("populates judge criteria with the failure reason on zero score", async () => {
       const output = makeRunOutput();
-      output.results[0].rubric = [{ check: "Did the thing", weight: 1.0 }];
+      output.results[0].judge = [{ check: "Did the thing", weight: 1.0 }];
       output.results[0].output.metadata.exitCode = 1;
       output.results[0].output.metadata.error = "Authentication required";
 
@@ -259,9 +259,9 @@ describe("scoreResults", () => {
       expect(criteria[0].rationale).toContain("Authentication required");
     });
 
-    it("handles a string rubric on failed runs", async () => {
+    it("handles a string judge on failed runs", async () => {
       const output = makeRunOutput();
-      output.results[0].rubric = "Agent should echo prompt";
+      output.results[0].judge = "Agent should echo prompt";
       output.results[0].output.metadata.exitCode = 1;
 
       const scored = await scoreResults(output);

@@ -75,7 +75,7 @@ describe("run", () => {
     expect(output.results[0].scenarioName).toBe("Hello World");
     expect(output.results[0].output.result).toBe("Task completed successfully");
     expect(output.results[0].prompt).toBeDefined();
-    expect(output.results[0].rubric).toBeDefined();
+    expect(output.results[0].judge).toBeDefined();
     expect(output.results[0].agentConfig).toBeDefined();
     expect(output.results[0].agentConfig.agent).toBe("mock-agent");
     expect(mockAdapter.run).toHaveBeenCalled();
@@ -337,7 +337,7 @@ describe("run", () => {
 
     function writeConfig(agents: unknown): string {
       const cfg = {
-        scenarios: [{ key: "s", name: "S", prompt: "p", rubric: "r" }],
+        scenarios: [{ key: "s", name: "S", prompt: "p", judge: "r" }],
         agents,
       };
       const p = path.join(tmp, "axis.config.json");
@@ -379,7 +379,7 @@ describe("run", () => {
       mockGetAdapter.mockReturnValue(mockAdapter);
 
       const cfg = {
-        scenarios: [{ key: "s", name: "S", prompt: "p", rubric: "r", agents: ["mock-agent"] }],
+        scenarios: [{ key: "s", name: "S", prompt: "p", judge: "r", agents: ["mock-agent"] }],
         agents: [
           { agent: "mock-agent", model: "opus" },
           { agent: "mock-agent", model: "sonnet" },
@@ -822,7 +822,7 @@ describe("artifact capture", () => {
             key: "with-artifacts",
             name: "With Artifacts",
             prompt: "make some files",
-            rubric: "files were made",
+            judge: "files were made",
             artifacts: ["*.log", "out/**"],
           },
         ],
@@ -890,7 +890,7 @@ describe("artifact capture", () => {
             key: "no-artifacts",
             name: "No Artifacts",
             prompt: "x",
-            rubric: "x",
+            judge: "x",
           },
         ],
         agents: ["mock-agent"],
@@ -934,7 +934,7 @@ describe("artifact capture", () => {
             key: "merged",
             name: "Merged",
             prompt: "x",
-            rubric: "x",
+            judge: "x",
             artifacts: ["scenario.txt"],
           },
         ],

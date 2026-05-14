@@ -191,9 +191,9 @@ Include an audit for EVERY {{categoryName}} interaction listed in the details ab
   ],
 };
 
-const GOAL_STRING_RUBRIC_TEMPLATE: PromptTemplate = {
-  name: "goal_string_rubric",
-  description: "Evaluates goal achievement when the rubric is a single string criterion.",
+const GOAL_STRING_JUDGE_TEMPLATE: PromptTemplate = {
+  name: "goal_string_judge",
+  description: "Evaluates goal achievement when the judge is a single string criterion.",
   stage: "goal_achievement",
   template: `You are an expert evaluator for an AI agent testing framework called AXIS.
 
@@ -221,8 +221,8 @@ EXECUTION STATS:
 
 ---
 
-RUBRIC:
-{{rubric}}
+JUDGE:
+{{judge}}
 
 ---
 
@@ -240,13 +240,13 @@ Score guide: 0 = not met at all, 5 = partially met, 10 = fully met.`,
     { name: "transcript", description: "Condensed agent transcript", type: "text" },
     { name: "finalResult", description: "The agent's final result text", type: "text" },
     { name: "executionStats", description: "Human-readable duration and token usage for the run", type: "string" },
-    { name: "rubric", description: "The evaluation criterion as a single string", type: "text" },
+    { name: "judge", description: "The evaluation criterion as a single string", type: "text" },
   ],
 };
 
-const GOAL_ARRAY_RUBRIC_TEMPLATE: PromptTemplate = {
-  name: "goal_array_rubric",
-  description: "Evaluates goal achievement when the rubric has multiple weighted criteria.",
+const GOAL_ARRAY_JUDGE_TEMPLATE: PromptTemplate = {
+  name: "goal_array_judge",
+  description: "Evaluates goal achievement when the judge has multiple weighted criteria.",
   stage: "goal_achievement",
   template: `You are an expert evaluator for an AI agent testing framework called AXIS.
 
@@ -274,8 +274,8 @@ EXECUTION STATS:
 
 ---
 
-RUBRIC CRITERIA:
-{{rubricText}}
+JUDGE CRITERIA:
+{{judgeText}}
 
 ---
 
@@ -294,7 +294,7 @@ When done, respond with ONLY valid JSON on its own line:
     { name: "transcript", description: "Condensed agent transcript", type: "text" },
     { name: "finalResult", description: "The agent's final result text", type: "text" },
     { name: "executionStats", description: "Human-readable duration and token usage for the run", type: "string" },
-    { name: "rubricText", description: "Formatted rubric criteria with weights", type: "text" },
+    { name: "judgeText", description: "Formatted judge criteria with weights", type: "text" },
   ],
 };
 
@@ -312,7 +312,7 @@ When done, respond with ONLY valid JSON on its own line:
 export function getPromptTemplates(): Record<string, PromptTemplate> {
   return {
     category_eval: CATEGORY_EVAL_TEMPLATE,
-    goal_string_rubric: GOAL_STRING_RUBRIC_TEMPLATE,
-    goal_array_rubric: GOAL_ARRAY_RUBRIC_TEMPLATE,
+    goal_string_judge: GOAL_STRING_JUDGE_TEMPLATE,
+    goal_array_judge: GOAL_ARRAY_JUDGE_TEMPLATE,
   };
 }

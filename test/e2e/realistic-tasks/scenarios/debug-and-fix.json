@@ -11,7 +11,7 @@
 
   "prompt": "There is a JavaScript file at /tmp/axis-e2e-debug/add.js that has a bug. Run the file, identify the bug, fix it, and verify the fix by running it again. The expected outputs are shown in the comments.",
 
-  "rubric": [
+  "judge": [
     { "check": "Agent ran the script and identified incorrect output", "weight": 0.25 },
     { "check": "Agent identified the bug (subtraction instead of addition)", "weight": 0.25 },
     { "check": "Agent fixed the bug in the file", "weight": 0.25 },

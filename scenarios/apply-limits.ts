@@ -14,7 +14,7 @@ export default withSharedVariants(
       "2. Add a per-scenario cap to `scenarios/long-task.json` ONLY: 5 minutes and 50,000 tokens.\n\n" +
       "Use the existing AXIS limits configuration shape — do not invent new field names. Do not modify any unrelated fields.",
 
-    rubric: [
+    judge: [
       {
         check:
           "`axis.config.json` still parses as valid JSON and preserves the original `scenarios` and `agents` fields",
@@ -23,7 +23,7 @@ export default withSharedVariants(
       { check: "The config contains `settings.limits.run` with `time_minutes: 30`", weight: 0.3 },
       {
         check:
-          "`scenarios/long-task.json` still parses as valid JSON and preserves its `name`, `prompt`, and `rubric` fields",
+          "`scenarios/long-task.json` still parses as valid JSON and preserves its `name`, `prompt`, and `judge` fields",
         weight: 0.15,
       },
       {

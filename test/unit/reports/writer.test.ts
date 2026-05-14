@@ -39,7 +39,7 @@ function makeRunOutput(): RunOutput {
         scenarioName: "Hello World",
         agentName: "claude-code",
         prompt: "Visit the target",
-        rubric: [{ check: "Page loaded", weight: 1.0 }],
+        judge: [{ check: "Page loaded", weight: 1.0 }],
         agentConfig: { agent: "claude-code" },
         output: {
           transcript: [{ type: "assistant", timestamp: "2025-04-13T18:30:43.000Z", content: { text: "Done" } }],
@@ -70,7 +70,7 @@ function makeScoredOutput(): ScoredOutput {
         scenarioName: "Create Post",
         agentName: "claude-code",
         prompt: "Create a blog post",
-        rubric: [{ check: "Post exists", weight: 1.0 }],
+        judge: [{ check: "Post exists", weight: 1.0 }],
         agentConfig: { agent: "claude-code" },
         output: {
           transcript: [],
@@ -284,13 +284,13 @@ describe("writeReportToStore", () => {
     expect(content).toContain(reportId);
   });
 
-  it("includes prompt, rubric, and agentConfig in manifest", () => {
+  it("includes prompt, judge, and agentConfig in manifest", () => {
     const output = makeRunOutput();
     const reportId = writeReportToStore(output, tmpDir);
     const manifest = JSON.parse(fs.readFileSync(path.join(tmpDir, ".axis/reports", reportId, "report.json"), "utf-8"));
 
     expect(manifest.results[0].prompt).toBe("Visit the target");
-    expect(manifest.results[0].rubric).toEqual([{ check: "Page loaded", weight: 1.0 }]);
+    expect(manifest.results[0].judge).toEqual([{ check: "Page loaded", weight: 1.0 }]);
     expect(manifest.results[0].agentConfig).toEqual({ agent: "claude-code" });
   });
 

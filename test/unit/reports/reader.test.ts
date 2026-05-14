@@ -39,7 +39,7 @@ function makeScoredOutput(timestamp: string, scenarioKey = "hello-world"): Score
         agentName: "claude-code",
         target: "https://example.com",
         prompt: "Visit the target",
-        rubric: "Check the page loads",
+        judge: "Check the page loads",
         agentConfig: { agent: "claude-code" },
         output: {
           transcript: [{ type: "assistant", timestamp, content: { text: "Done" } }],

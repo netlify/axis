@@ -3,7 +3,7 @@ import type { AgentConfig } from "./config.js";
 import type { ScoreResult } from "./scoring.js";
 import type { ArtifactEntry, ResolvedRunConfig, RunSummary } from "./output.js";
 import type { ScoredSummary } from "./scoring.js";
-import type { RubricCriterion } from "./scenario.js";
+import type { JudgeCriterion } from "./scenario.js";
 
 /** Lightweight report manifest — no transcripts, just summary data. */
 export interface ReportManifest {
@@ -33,8 +33,8 @@ export interface ReportResultEntry {
   file: string;
   /** The prompt given to the agent. */
   prompt?: string;
-  /** Rubric used for scoring. */
-  rubric?: string | RubricCriterion[];
+  /** Judge criteria used for scoring. */
+  judge?: string | JudgeCriterion[];
   /** Agent configuration. */
   agentConfig?: AgentConfig;
   /** Materialized scenario configuration (limits, skills, lifecycle, MCP) actually used for this run. */

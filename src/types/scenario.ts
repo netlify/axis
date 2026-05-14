@@ -12,7 +12,7 @@ export interface Scenario {
   skip?: boolean;
   setup?: LifecycleAction[];
   prompt: string;
-  rubric: string | RubricCriterion[];
+  judge: string | JudgeCriterion[];
   teardown?: LifecycleAction[];
   /** When set, only these agents run this scenario (overrides the global agents list). */
   agents?: string[];
@@ -41,7 +41,7 @@ export interface ScenarioVariant {
   skip?: boolean;
   setup?: LifecycleAction[];
   prompt?: string;
-  rubric?: string | RubricCriterion[];
+  judge?: string | JudgeCriterion[];
   teardown?: LifecycleAction[];
   agents?: string[];
   skills?: string[];
@@ -82,7 +82,10 @@ export interface CopyAction {
   destination: string;
 }
 
-export interface RubricCriterion {
+export interface JudgeCriterion {
   check: string;
   weight?: number;
 }
+
+/** @deprecated Use {@link JudgeCriterion} instead. */
+export type RubricCriterion = JudgeCriterion;

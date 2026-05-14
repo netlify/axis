@@ -11,7 +11,7 @@ export default withSharedVariants(
     prompt:
       "A scored AXIS report exists at `.axis/reports/2026-05-04-0900/report.json`. The Agent dimension scored 41 while Environment scored 94 and Service scored 91. Read the report, then write an explanation to `score-analysis.md` (in the workspace root) that answers: why did the Agent dimension score so much lower than Environment and Service, even though the agent successfully completed the task? Your answer must distinguish between *execution quality* (what Environment and Service measure) and *decision quality* (what Agent measures), and cite the specific signals from the report that explain the gap.",
 
-    rubric: [
+    judge: [
       { check: "File `score-analysis.md` was created in the workspace root with substantive content", weight: 0.15 },
       {
         check:

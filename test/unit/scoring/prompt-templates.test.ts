@@ -43,7 +43,7 @@ describe("getPromptTemplates", () => {
   const templates = getPromptTemplates();
 
   it("returns exactly 3 templates", () => {
-    expect(Object.keys(templates)).toEqual(["category_eval", "goal_string_rubric", "goal_array_rubric"]);
+    expect(Object.keys(templates)).toEqual(["category_eval", "goal_string_judge", "goal_array_judge"]);
   });
 
   it("each template has required fields", () => {
@@ -102,21 +102,21 @@ describe("template content regression", () => {
     expect(t).toContain("{{categoryName}}");
   });
 
-  it("goal_string_rubric template contains expected sections", () => {
-    const t = templates.goal_string_rubric.template;
+  it("goal_string_judge template contains expected sections", () => {
+    const t = templates.goal_string_judge.template;
     expect(t).toContain("SCENARIO: {{scenarioName}}");
     expect(t).toContain("AGENT TRANSCRIPT (condensed):");
     expect(t).toContain("AGENT'S FINAL RESULT:");
-    expect(t).toContain("RUBRIC:");
+    expect(t).toContain("JUDGE:");
     expect(t).toContain("Score guide: 0 = not met at all");
     expect(t).toContain("You are an expert evaluator for an AI agent testing framework called AXIS");
   });
 
-  it("goal_array_rubric template contains expected sections", () => {
-    const t = templates.goal_array_rubric.template;
+  it("goal_array_judge template contains expected sections", () => {
+    const t = templates.goal_array_judge.template;
     expect(t).toContain("SCENARIO: {{scenarioName}}");
     expect(t).toContain("AGENT TRANSCRIPT (condensed):");
-    expect(t).toContain("RUBRIC CRITERIA:");
+    expect(t).toContain("JUDGE CRITERIA:");
     expect(t).toContain("Score guide: 0 = not met at all");
     expect(t).toContain('"grades"');
   });
@@ -164,13 +164,13 @@ describe("template content regression", () => {
   });
 
   it("goal templates can be interpolated with representative values", () => {
-    const stringResult = interpolate(templates.goal_string_rubric.template, {
+    const stringResult = interpolate(templates.goal_string_judge.template, {
       scenarioName: "Goal Scenario",
       prompt: "Deploy app",
       transcript: "[1] ASSISTANT: I deployed the app",
       finalResult: "App deployed",
       executionStats: "Duration: 12.3s | Tokens: 5,234 (input: 1,200, output: 4,034)",
-      rubric: "The app should be deployed",
+      judge: "The app should be deployed",
     });
     expect(stringResult).toContain("SCENARIO: Goal Scenario");
     expect(stringResult).toContain("Deploy app");
@@ -178,15 +178,15 @@ describe("template content regression", () => {
     expect(stringResult).toContain("Duration: 12.3s");
     expect(stringResult).not.toContain("{{");
 
-    const arrayResult = interpolate(templates.goal_array_rubric.template, {
+    const arrayResult = interpolate(templates.goal_array_judge.template, {
       scenarioName: "Goal Scenario",
       prompt: "Deploy app",
       transcript: "[1] ASSISTANT: I deployed the app",
       finalResult: "App deployed",
       executionStats: "Duration: 12.3s | Tokens: 5,234 (input: 1,200, output: 4,034)",
-      rubricText: '0. "App is deployed" (weight: 1.0)',
+      judgeText: '0. "App is deployed" (weight: 1.0)',
     });
-    expect(arrayResult).toContain("RUBRIC CRITERIA:");
+    expect(arrayResult).toContain("JUDGE CRITERIA:");
     expect(arrayResult).toContain("EXECUTION STATS:");
     expect(arrayResult).not.toContain("{{");
   });

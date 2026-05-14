@@ -27,13 +27,13 @@ function createMockAdapter(resultText: string) {
   };
 }
 
-function makeRunResult(rubric: RunResult["rubric"]): RunResult {
+function makeRunResult(judge: RunResult["judge"]): RunResult {
   return {
     scenarioKey: "test",
     scenarioName: "Test Scenario",
     agentName: "claude-code",
     prompt: "Visit the target URL and verify the page content",
-    rubric,
+    judge,
     agentConfig: { agent: "claude-code" },
     output: {
       transcript: [{ type: "assistant", timestamp: new Date().toISOString(), content: { text: "I did the task" } }],
@@ -57,7 +57,7 @@ describe("scoreGoalAchievement", () => {
     vi.clearAllMocks();
   });
 
-  describe("array rubric", () => {
+  describe("array judge", () => {
     it("parses judge grades and computes weighted score", async () => {
       const adapter = createMockAdapter(
         JSON.stringify({
@@ -107,7 +107,7 @@ describe("scoreGoalAchievement", () => {
       expect(result.score).toBe(0);
     });
 
-    it("returns score 0 for empty rubric", async () => {
+    it("returns score 0 for empty judge", async () => {
       const runResult = makeRunResult([]);
       const result = await scoreGoalAchievement(runResult, getNormalizedEntries(runResult));
       expect(result.score).toBe(0);
@@ -129,7 +129,7 @@ describe("scoreGoalAchievement", () => {
     });
   });
 
-  describe("string rubric", () => {
+  describe("string judge", () => {
     it("parses judge score and rationale", async () => {
       const adapter = createMockAdapter(JSON.stringify({ score: 8, rationale: "Agent completed most tasks" }));
       mockGetAdapter.mockReturnValue(adapter);
@@ -144,7 +144,7 @@ describe("scoreGoalAchievement", () => {
       expect(result.score).toBe(80);
     });
 
-    it("returns zero on invalid response for string rubric", async () => {
+    it("returns zero on invalid response for string judge", async () => {
       const adapter = createMockAdapter("Unable to evaluate.");
       mockGetAdapter.mockReturnValue(adapter);
 

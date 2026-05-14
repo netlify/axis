@@ -339,10 +339,10 @@ describe("generateReportHtml", () => {
     expect(html).toContain("wf-legend");
   });
 
-  it("renders modal with prompt and rubric when present", () => {
+  it("renders modal with prompt and judge when present", () => {
     const report = makeReport();
     report.results[0].prompt = "Fetch docs and write summary.md";
-    report.results[0].rubric = [
+    report.results[0].judge = [
       { check: "Fetched the URL", weight: 0.5 },
       { check: "Wrote summary", weight: 0.5 },
     ];

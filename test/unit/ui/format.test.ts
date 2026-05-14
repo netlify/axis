@@ -81,7 +81,7 @@ function makeResult(overrides: Partial<{ error: string; exitCode: number }>): Ru
     scenarioName: "Test Scenario",
     agentName: "test-agent",
     prompt: "do something",
-    rubric: "verify it works",
+    judge: "verify it works",
     agentConfig: { agent: "test-adapter" },
     output,
   };

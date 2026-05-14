@@ -33,7 +33,7 @@ npm install @netlify/axis
 {
   "name": "Hello World",
   "prompt": "Navigate to https://example.com and describe what you see on the page.",
-  "rubric": [
+  "judge": [
     { "check": "Agent visited the target URL", "weight": 0.5 },
     { "check": "Agent provided a description of the page content", "weight": 0.5 }
   ]

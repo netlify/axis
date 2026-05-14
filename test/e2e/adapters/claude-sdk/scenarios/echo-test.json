@@ -1,5 +1,5 @@
 {
   "name": "Claude ACP echo test",
   "prompt": "Hello from AXIS Claude ACP adapter",
-  "rubric": "The agent should echo back the prompt text."
+  "judge": "The agent should echo back the prompt text."
 }

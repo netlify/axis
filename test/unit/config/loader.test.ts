@@ -138,7 +138,7 @@ describe("discoverScenarios", () => {
     expect(scenarios[0].key).toBe("hello-world");
     expect(scenarios[0].name).toBeDefined();
     expect(scenarios[0].prompt).toBeDefined();
-    expect(scenarios[0].rubric).toBeDefined();
+    expect(scenarios[0].judge).toBeDefined();
   });
 
   it("filters scenarios by key", async () => {
@@ -169,7 +169,7 @@ describe("discoverScenarios", () => {
       JSON.stringify({
         name: "Gemini Only",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         agents: ["gemini"],
       }),
     );
@@ -194,16 +194,13 @@ describe("discoverScenarios", () => {
 
       await fs.writeFile(
         path.join(scenariosDir, "real.json"),
-        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
       );
       await fs.writeFile(
         path.join(fixtureDir, "package.json"),
         JSON.stringify({ name: "fixture-site", version: "1.0.0", dependencies: {} }),
       );
-      await fs.writeFile(
-        path.join(fixtureDir, "state.json"),
-        JSON.stringify({ siteId: "abc", deployId: "xyz" }),
-      );
+      await fs.writeFile(path.join(fixtureDir, "state.json"), JSON.stringify({ siteId: "abc", deployId: "xyz" }));
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key)).toEqual(["real"]);
@@ -218,7 +215,7 @@ describe("discoverScenarios", () => {
       // Has `prompt` but no `name` — clearly intended as a scenario, must error.
       await fs.writeFile(
         path.join(scenariosDir, "broken.json"),
-        JSON.stringify({ prompt: "do thing", rubric: "judged" }),
+        JSON.stringify({ prompt: "do thing", judge: "judged" }),
       );
 
       await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(/missing required field "name"/);
@@ -232,7 +229,7 @@ describe("discoverScenarios", () => {
       await fs.mkdir(scenariosDir, { recursive: true });
       await fs.writeFile(
         path.join(scenariosDir, "real.json"),
-        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
       );
       await fs.writeFile(path.join(scenariosDir, "garbage.json"), "this is not json");
 
@@ -252,17 +249,17 @@ describe("discoverScenarios", () => {
 
       await fs.writeFile(
         path.join(scenariosDir, "real.json"),
-        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
       );
       // Files inside these dirs would otherwise be readdir'd and parsed.
       // Even if they happened to look like scenarios, we should not pick them up.
       await fs.writeFile(
         path.join(hidden, "state.json"),
-        JSON.stringify({ name: "Should Not Load", prompt: "p", rubric: "r" }),
+        JSON.stringify({ name: "Should Not Load", prompt: "p", judge: "r" }),
       );
       await fs.writeFile(
         path.join(vendored, "package.json"),
-        JSON.stringify({ name: "Should Not Load", prompt: "p", rubric: "r" }),
+        JSON.stringify({ name: "Should Not Load", prompt: "p", judge: "r" }),
       );
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -290,7 +287,7 @@ describe("discoverScenarios", () => {
 
       await fs.writeFile(
         path.join(scenariosDir, "real.json"),
-        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
       );
       await fs.writeFile(
         path.join(fixtureDir, "next.config.mjs"),
@@ -310,7 +307,7 @@ describe("discoverScenarios", () => {
 
       await fs.writeFile(
         path.join(scenariosDir, "real.json"),
-        JSON.stringify({ name: "Real", prompt: "p", rubric: "r" }),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
       );
       await fs.writeFile(path.join(scenariosDir, "broken.mjs"), `import "./does-not-exist.js";`);
 
@@ -335,7 +332,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/simple.json", {
         name: "Simple",
         prompt: "test",
-        rubric: "test rubric",
+        judge: "test judge",
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -351,7 +348,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/simple.json", {
         name: "Simple",
         prompt: "test",
-        rubric: "test rubric",
+        judge: "test judge",
         variants: [],
       });
 
@@ -367,7 +364,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Test",
         prompt: "base prompt",
-        rubric: "base rubric",
+        judge: "base judge",
         variants: [{ name: "variant-a" }, { name: "variant-b" }],
       });
 
@@ -386,7 +383,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Parent",
         prompt: "parent prompt",
-        rubric: "parent rubric",
+        judge: "parent judge",
         skills: ["./base-skill"],
         variants: [{ name: "v1" }],
       });
@@ -394,7 +391,7 @@ describe("discoverScenarios", () => {
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios).toHaveLength(1);
       expect(scenarios[0].prompt).toBe("parent prompt");
-      expect(scenarios[0].rubric).toBe("parent rubric");
+      expect(scenarios[0].judge).toBe("parent judge");
       expect(scenarios[0].skills).toEqual(["./base-skill"]);
       expect(scenarios[0].name).toBe("Parent [v1]");
 
@@ -406,14 +403,14 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Parent",
         prompt: "parent prompt",
-        rubric: "parent rubric",
-        variants: [{ name: "v1", prompt: "override prompt", rubric: "override rubric" }],
+        judge: "parent judge",
+        variants: [{ name: "v1", prompt: "override prompt", judge: "override judge" }],
       });
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios).toHaveLength(1);
       expect(scenarios[0].prompt).toBe("override prompt");
-      expect(scenarios[0].rubric).toBe("override rubric");
+      expect(scenarios[0].judge).toBe("override judge");
 
       await fs.rm(tmpDir, { recursive: true });
     });
@@ -423,7 +420,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Parent",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         skills: ["./parent-skill"],
         variants: [{ name: "v1", skills: ["./variant-skill"] }],
       });
@@ -439,7 +436,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Parent",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         mcp_servers: {
           shared: { type: "stdio", command: "parent-cmd" },
           parent_only: { type: "http", url: "https://parent.com" },
@@ -470,7 +467,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Parent",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         skip: true,
         variants: [{ name: "active", skip: false }, { name: "skipped" }],
       });
@@ -490,7 +487,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Parent",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         artifacts: ["parent.log", "shared.log"],
         variants: [{ name: "with-override", artifacts: ["variant.log"] }, { name: "inherits" }],
       });
@@ -510,7 +507,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Parent",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         setup: [{ action: "run_script", command: "parent-setup" }],
         variants: [{ name: "v1", setup: [{ action: "run_script", command: "variant-setup" }] }],
       });
@@ -528,14 +525,14 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Parent",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         variants: [{ name: "other" }],
       });
       // This file has key "test@other" which collides with the variant above
       await writeScenarioJson("scenarios/test@other.json", {
         name: "Collider",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
       });
 
       await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow("Duplicate scenario key");
@@ -548,13 +545,13 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Test",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         variants: [{ name: "v1" }, { name: "v2" }],
       });
       await writeScenarioJson("scenarios/other.json", {
         name: "Other",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
       });
 
       const filtered = await discoverScenarios(tmpDir, "./scenarios", ["test"]);
@@ -569,7 +566,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Test",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         variants: [{ name: "v1" }, { name: "v2" }],
       });
 
@@ -585,13 +582,13 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/cms/post.json", {
         name: "Post",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         variants: [{ name: "v1" }, { name: "v2" }],
       });
       await writeScenarioJson("scenarios/other.json", {
         name: "Other",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
       });
 
       const filtered = await discoverScenarios(tmpDir, "./scenarios", ["cms/*"]);
@@ -606,7 +603,7 @@ describe("discoverScenarios", () => {
       await writeScenarioJson("scenarios/test.json", {
         name: "Test",
         prompt: "test",
-        rubric: "test",
+        judge: "test",
         agents: ["claude-code"],
         variants: [{ name: "gemini-only", agents: ["gemini"] }, { name: "inherits" }],
       });
@@ -633,7 +630,7 @@ describe("discoverScenarios", () => {
         JSON.stringify({
           name,
           prompt: "test",
-          rubric: [{ check: "test", weight: 1.0 }],
+          judge: [{ check: "test", weight: 1.0 }],
         }),
       );
     }
@@ -699,7 +696,7 @@ describe("discoverScenarios", () => {
         JSON.stringify({
           name,
           prompt: "test",
-          rubric: [{ check: "test", weight: 1.0 }],
+          judge: [{ check: "test", weight: 1.0 }],
           ...extra,
         }),
       );
@@ -740,8 +737,8 @@ describe("discoverScenarios", () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-arr-"));
 
       const scenarios = await discoverScenarios(tmpDir, [
-        { key: "inline-1", name: "Inline 1", prompt: "p", rubric: "r" },
-        { key: "inline-2", name: "Inline 2", prompt: "p", rubric: "r" },
+        { key: "inline-1", name: "Inline 1", prompt: "p", judge: "r" },
+        { key: "inline-2", name: "Inline 2", prompt: "p", judge: "r" },
       ]);
 
       expect(scenarios.map((s) => s.key).sort()).toEqual(["inline-1", "inline-2"]);
@@ -753,7 +750,7 @@ describe("discoverScenarios", () => {
 
       const scenarios = await discoverScenarios(tmpDir, [
         "./scenarios",
-        { key: "inline", name: "Inline", prompt: "p", rubric: "r" },
+        { key: "inline", name: "Inline", prompt: "p", judge: "r" },
       ]);
 
       expect(scenarios.map((s) => s.key).sort()).toEqual(["inline", "on-disk"]);
@@ -767,7 +764,7 @@ describe("discoverScenarios", () => {
           key: "params",
           name: "Params",
           prompt: "p",
-          rubric: "r",
+          judge: "r",
           variants: [{ name: "a" }, { name: "b" }],
         },
       ]);
@@ -780,7 +777,7 @@ describe("discoverScenarios", () => {
       await writeScenario("scenarios/clash.json", "On Disk Clash");
 
       await expect(
-        discoverScenarios(tmpDir, ["./scenarios", { key: "clash", name: "Inline Clash", prompt: "p", rubric: "r" }]),
+        discoverScenarios(tmpDir, ["./scenarios", { key: "clash", name: "Inline Clash", prompt: "p", judge: "r" }]),
       ).rejects.toThrow("Duplicate scenario key");
     });
   });
@@ -800,7 +797,7 @@ describe("discoverScenarios", () => {
 
     it("discovers .js scenarios with path-derived keys", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile("scenarios/foo.js", `export default { name: "Foo", prompt: "p", rubric: "r" };\n`);
+      await writeFile("scenarios/foo.js", `export default { name: "Foo", prompt: "p", judge: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios).toHaveLength(1);
@@ -812,7 +809,7 @@ describe("discoverScenarios", () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
       await writeFile(
         "scenarios/typed.ts",
-        `const s = { name: "Typed", prompt: "p", rubric: "r" };\nexport default s;\n`,
+        `const s = { name: "Typed", prompt: "p", judge: "r" };\nexport default s;\n`,
       );
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -822,7 +819,7 @@ describe("discoverScenarios", () => {
 
     it("derives keys from nested subdirectories for module files", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile("scenarios/cms/post.ts", `export default { name: "Post", prompt: "p", rubric: "r" };\n`);
+      await writeFile("scenarios/cms/post.ts", `export default { name: "Post", prompt: "p", judge: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key)).toEqual(["cms/post"]);
@@ -830,7 +827,7 @@ describe("discoverScenarios", () => {
 
     it("calls a function default export and uses the resolved object", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile("scenarios/dyn.js", `export default async () => ({ name: "Dyn", prompt: "p", rubric: "r" });\n`);
+      await writeFile("scenarios/dyn.js", `export default async () => ({ name: "Dyn", prompt: "p", judge: "r" });\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios).toHaveLength(1);
@@ -840,7 +837,7 @@ describe("discoverScenarios", () => {
     it("silently skips module files with no default export", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
       await writeFile("scenarios/helper.ts", `export const util = () => 42;\n`);
-      await writeFile("scenarios/real.ts", `export default { name: "Real", prompt: "p", rubric: "r" };\n`);
+      await writeFile("scenarios/real.ts", `export default { name: "Real", prompt: "p", judge: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key)).toEqual(["real"]);
@@ -850,7 +847,7 @@ describe("discoverScenarios", () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
       await writeFile("scenarios/string-default.ts", `export default "not a scenario";\n`);
       await writeFile("scenarios/array-default.ts", `export default [1, 2, 3];\n`);
-      await writeFile("scenarios/real.ts", `export default { name: "Real", prompt: "p", rubric: "r" };\n`);
+      await writeFile("scenarios/real.ts", `export default { name: "Real", prompt: "p", judge: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key)).toEqual(["real"]);
@@ -858,8 +855,8 @@ describe("discoverScenarios", () => {
 
     it("discovers .json and .ts side-by-side in the same directory", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile("scenarios/json-one.json", JSON.stringify({ name: "JSON One", prompt: "p", rubric: "r" }));
-      await writeFile("scenarios/ts-one.ts", `export default { name: "TS One", prompt: "p", rubric: "r" };\n`);
+      await writeFile("scenarios/json-one.json", JSON.stringify({ name: "JSON One", prompt: "p", judge: "r" }));
+      await writeFile("scenarios/ts-one.ts", `export default { name: "TS One", prompt: "p", judge: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
       expect(scenarios.map((s) => s.key).sort()).toEqual(["json-one", "ts-one"]);
@@ -869,7 +866,7 @@ describe("discoverScenarios", () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
       await writeFile(
         "scenarios/has-key.ts",
-        `export default { key: "has-key", name: "X", prompt: "p", rubric: "r" };\n`,
+        `export default { key: "has-key", name: "X", prompt: "p", judge: "r" };\n`,
       );
 
       const scenarios = await discoverScenarios(tmpDir, "./scenarios");
@@ -878,7 +875,7 @@ describe("discoverScenarios", () => {
 
     it("rejects a module scenario whose declared key does not match the path", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile("scenarios/foo.ts", `export default { key: "bar", name: "X", prompt: "p", rubric: "r" };\n`);
+      await writeFile("scenarios/foo.ts", `export default { key: "bar", name: "X", prompt: "p", judge: "r" };\n`);
 
       await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(
         `declared key "bar" does not match path-derived key "foo"`,
@@ -892,7 +889,7 @@ describe("discoverScenarios", () => {
         `export default {
           name: "Variants",
           prompt: "p",
-          rubric: "r",
+          judge: "r",
           variants: [{ name: "a" }, { name: "b" }],
         };\n`,
       );
@@ -903,7 +900,7 @@ describe("discoverScenarios", () => {
 
     it("loads a single .ts file as a string entry (strict — throws on missing default)", async () => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-mod-"));
-      await writeFile("lone.ts", `export default { name: "Lone", prompt: "p", rubric: "r" };\n`);
+      await writeFile("lone.ts", `export default { name: "Lone", prompt: "p", judge: "r" };\n`);
 
       const scenarios = await discoverScenarios(tmpDir, "./lone.ts");
       expect(scenarios).toHaveLength(1);

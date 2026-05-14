@@ -168,7 +168,7 @@ function buildResultEntry(result: RunResult | ScoredRunResult, relPath: string):
   }
 
   entry.prompt = result.prompt;
-  entry.rubric = result.rubric;
+  entry.judge = result.judge;
   entry.agentConfig = result.agentConfig;
   if (result.resolvedConfig) {
     entry.resolvedConfig = result.resolvedConfig;

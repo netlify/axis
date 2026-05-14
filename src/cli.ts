@@ -159,10 +159,7 @@ program
     const scenario = {
       name: "Hello World",
       prompt: "Create a file called hello.txt with the content 'Hello, World!'",
-      rubric: [
-        { check: "A file named hello.txt was created" },
-        { check: "The file contains the text 'Hello, World!'" },
-      ],
+      judge: [{ check: "A file named hello.txt was created" }, { check: "The file contains the text 'Hello, World!'" }],
     };
 
     fs.mkdirSync(scenariosDir, { recursive: true });
