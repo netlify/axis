@@ -41,6 +41,19 @@ export function createGeminiAdapter(): AgentAdapter {
       return args;
     },
 
+    // Gemini ships token usage on a non-standard `_meta.quota.token_count`
+    // extension instead of the experimental ACP `usage` field.
+    extractUsage: (promptResult) => {
+      const quota = (promptResult._meta as { quota?: unknown } | null | undefined)?.quota as
+        | { token_count?: { input_tokens?: number; output_tokens?: number } }
+        | undefined;
+      const tc = quota?.token_count;
+      if (!tc || typeof tc.input_tokens !== "number" || typeof tc.output_tokens !== "number") {
+        return undefined;
+      }
+      return { input: tc.input_tokens, output: tc.output_tokens };
+    },
+
     prepare: (ctx) => {
       const geminiHome = ctx.env?.GEMINI_CLI_HOME;
       if (!geminiHome) return;

@@ -550,6 +550,7 @@ async function executeJob(
       },
       ...(jobLimits?.timeoutMs ? { timeoutMs: jobLimits.timeoutMs } : {}),
       ...(jobAbortController ? { signal: jobAbortController.signal } : {}),
+      debug,
     });
 
     // Rewrite adapter timeout error to scenario-specific message when a

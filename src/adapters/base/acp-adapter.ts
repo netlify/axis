@@ -7,6 +7,7 @@ import {
   PROTOCOL_VERSION,
   type Client,
   type PermissionOption,
+  type PromptResponse,
   type SessionNotification,
   type SessionUpdate,
   type ToolCall,
@@ -79,6 +80,14 @@ export interface AcpAdapterSpec {
    * Runs after env is finalized and before the process is spawned.
    */
   prepare?: (ctx: SetupContext) => void | Promise<void>;
+
+  /**
+   * Extract token usage from a vendor-specific `PromptResponse._meta` payload.
+   * The standard `PromptResponse.usage` field is already consumed; this hook
+   * runs only when `usage` is absent. Return `undefined` if no usage can be
+   * derived.
+   */
+  extractUsage?: (promptResult: PromptResponse) => TokenUsage | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +216,12 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         if (killTimer) clearTimeout(killTimer);
       });
 
+      // The ACP SDK calls `console.error` directly whenever a request handler
+      // returns an error (e.g. agent asks to read a file that doesn't exist).
+      // Outside of debug mode these are noise — the failure is already
+      // communicated to the agent via the JSON-RPC error response.
+      const restoreConsoleError = input.debug ? null : suppressAcpSdkNoise();
+
       try {
         // 9. Wire ACP SDK — convert Node streams to Web Streams for ndJsonStream
         const stdinWeb = Writable.toWeb(child.stdin!) as WritableStream<Uint8Array>;
@@ -285,6 +300,9 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
               ? { cacheReadInput: promptResult.usage.cachedReadTokens }
               : {}),
           };
+        } else if (spec.extractUsage) {
+          const usage = spec.extractUsage(promptResult);
+          if (usage) state.tokenUsage = usage;
         }
 
         // 16. Map stop reason to potential error
@@ -330,6 +348,7 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
           }, SIGTERM_TO_SIGKILL_MS);
           child.on("close", () => clearTimeout(cleanupKillTimer));
         }
+        restoreConsoleError?.();
       }
 
       // 17. Wait for process exit
@@ -461,6 +480,26 @@ function buildClient(
       fs.writeFileSync(params.path, params.content, "utf-8");
       return {};
     },
+  };
+}
+
+/**
+ * Patch `console.error` to drop ACP SDK request/notification error logs.
+ * The SDK logs every JSON-RPC error response with `console.error("Error handling request", ...)`
+ * — useful in debug, but noisy in normal runs (every missed file read shows up).
+ * Returns a restore function to call when the connection scope ends.
+ */
+function suppressAcpSdkNoise(): () => void {
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    const first = args[0];
+    if (typeof first === "string" && (first === "Error handling request" || first === "Error handling notification")) {
+      return;
+    }
+    original(...args);
+  };
+  return () => {
+    console.error = original;
   };
 }
 

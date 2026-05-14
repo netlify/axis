@@ -64,6 +64,8 @@ export interface AgentInput {
   timeoutMs?: number;
   /** Abort signal. When fired, the adapter kills the child process with SIGTERM → SIGKILL. */
   signal?: AbortSignal;
+  /** When true, adapters may surface extra protocol/SDK diagnostics to stderr. */
+  debug?: boolean;
 }
 
 export interface AgentOutput {
