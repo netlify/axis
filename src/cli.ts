@@ -25,6 +25,7 @@ import {
 import { formatError } from "./types/output.js";
 import type { Logger, JobState, RunResult, RunOutput } from "./types/output.js";
 import type { ScoredRunResult, ScoredOutput } from "./types/scoring.js";
+import type { AxisConfig } from "./types/config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf-8"));
@@ -41,7 +42,15 @@ function registerCleanup(fn: () => void): void {
   cleanupHandlers.push(fn);
 }
 
-function handleSignal(signal: NodeJS.Signals): void {
+/**
+ * Active run abort controller, set by `executeRunPipeline` while a run is
+ * in progress. First signal triggers graceful abort so pending/in-flight
+ * jobs land in the report as failed. Second signal hard-exits.
+ */
+let activeRunAbort: AbortController | undefined;
+let signalCount = 0;
+
+function runHardCleanup(): void {
   for (const fn of cleanupHandlers) {
     try {
       fn();
@@ -49,6 +58,19 @@ function handleSignal(signal: NodeJS.Signals): void {
       /* best-effort cleanup */
     }
   }
+}
+
+function handleSignal(signal: NodeJS.Signals): void {
+  signalCount++;
+  if (activeRunAbort && !activeRunAbort.signal.aborted && signalCount === 1) {
+    // First signal during a run: abort gracefully so the report finalizes
+    // with in-flight and pending jobs marked as failed.
+    process.stderr.write(`\n  ${signal} received — aborting run, pending jobs will be marked failed.\n`);
+    process.stderr.write(`  Press ${signal} again to exit immediately.\n\n`);
+    activeRunAbort.abort(`Run cancelled by ${signal}`);
+    return;
+  }
+  runHardCleanup();
   process.exit(signal === "SIGINT" ? 130 : 143);
 }
 
@@ -215,7 +237,33 @@ async function executeRunPipeline(
   const { config, configDir } = await loadConfig(opts.configPath);
   const scoringPromises: Promise<ScoredRunResult>[] = [];
 
+  // Wire up graceful cancel: first Ctrl-C aborts via this controller so the
+  // report still finalizes with in-flight/pending jobs as failed.
+  const runAbort = new AbortController();
+  activeRunAbort = runAbort;
+  try {
+    return await runPipelineBody(opts, logger, config, configDir, runAbort, scoringPromises, onScoringStart, onScoringDone);
+  } finally {
+    activeRunAbort = undefined;
+  }
+}
+
+async function runPipelineBody(
+  opts: RunPipelineOptions,
+  logger: Logger,
+  config: AxisConfig,
+  configDir: string,
+  runAbort: AbortController,
+  scoringPromises: Promise<ScoredRunResult>[],
+  onScoringStart?: (scenarioKey: string, agentName: string) => void,
+  onScoringDone?: (scored: ScoredRunResult) => void,
+): Promise<{ output: ScoredOutput | RunOutput; reportId: string; configDir: string }> {
   const concurrency = opts.concurrency ?? config.settings?.concurrency;
+
+  // After cancel we don't want to block forever on in-flight scoring promises.
+  // Give them a few seconds to finish (judges hitting LLM APIs), then finalize
+  // with whatever results we have so the report lands on disk.
+  const ABORT_SCORING_GRACE_MS = 5000;
 
   if (config.beforeAll && config.beforeAll.length > 0) {
     const env = buildJobEnv(config);
@@ -227,71 +275,100 @@ async function executeRunPipeline(
   // Create report directory early so scoring can write raw data for judges to read
   const { reportId, reportDir } = initReport(new Date().toISOString(), configDir);
 
-  const runOutput = await run({
-    configPath: opts.configPath,
-    scenarioFilter: opts.scenarios,
-    agentFilter: opts.agents,
-    jobFilter: opts.jobFilter,
-    concurrency,
-    logger,
-    registerCleanup,
-    debug: opts.debug,
-    refreshSkills: opts.refreshSkills,
-    reportDir,
-    onResult: opts.score
-      ? (result: RunResult): Promise<void> => {
-          const scoring = scoreRunResult(result, {
-            weights: config.settings?.scoring_weights,
-            logger,
-            reportDir,
-            onProgress: (scenarioKey, agentName, phase) => {
-              if (phase === "start") onScoringStart?.(scenarioKey, agentName);
-            },
-          }).then((scored) => {
-            onScoringDone?.(scored);
-            return scored;
-          });
-          scoringPromises.push(scoring);
-          return scoring.then(() => {});
-        }
-      : undefined,
-  });
+  let runOutput: RunOutput | undefined;
+  let output: ScoredOutput | RunOutput | undefined;
 
-  let output: ScoredOutput | RunOutput;
+  try {
+    runOutput = await run({
+      configPath: opts.configPath,
+      scenarioFilter: opts.scenarios,
+      agentFilter: opts.agents,
+      jobFilter: opts.jobFilter,
+      signal: runAbort.signal,
+      concurrency,
+      logger,
+      registerCleanup,
+      debug: opts.debug,
+      refreshSkills: opts.refreshSkills,
+      reportDir,
+      onResult: opts.score
+        ? (result: RunResult): Promise<void> => {
+            // Don't kick off new scoring work once cancel has been requested —
+            // failed/aborted results would short-circuit to zero score anyway,
+            // and we want the report to finalize quickly.
+            if (runAbort.signal.aborted) return Promise.resolve();
+            const scoring = scoreRunResult(result, {
+              weights: config.settings?.scoring_weights,
+              logger,
+              reportDir,
+              onProgress: (scenarioKey, agentName, phase) => {
+                if (phase === "start") onScoringStart?.(scenarioKey, agentName);
+              },
+            }).then((scored) => {
+              onScoringDone?.(scored);
+              return scored;
+            });
+            scoringPromises.push(scoring);
+            return scoring.then(() => {});
+          }
+        : undefined,
+    });
 
-  if (opts.score && runOutput.results.length > 0) {
-    const scoredResults = await Promise.all(scoringPromises);
-    // Artifacts and teardown notes are captured during cleanup (after scoring) —
-    // propagate them onto the scored results so they appear in the final manifest.
-    for (const scored of scoredResults) {
-      const match = runOutput.results.find(
-        (r) => r.scenarioKey === scored.scenarioKey && r.agentName === scored.agentName,
+    if (opts.score && runOutput.results.length > 0) {
+      // After cancel, bound the wait so a slow LLM judge can't strand the report.
+      const settled = await waitForScoring(scoringPromises, runAbort.signal, ABORT_SCORING_GRACE_MS);
+      const settledKey = (r: { scenarioKey: string; agentName: string }) => `${r.scenarioKey}\x00${r.agentName}`;
+      const scoredByKey = new Map(settled.map((s) => [settledKey(s), s]));
+      // Any result without a scoring entry (pre-aborted jobs that never hit
+      // onResult, or scoring skipped because cancel fired) gets scored now.
+      // Failed runs short-circuit to a zero score — no LLM call — so this is
+      // fast and guarantees every result lands in the manifest.
+      const fillIns = await Promise.all(
+        runOutput.results
+          .filter((r) => !scoredByKey.has(settledKey(r)))
+          .map((r) =>
+            scoreRunResult(r, {
+              weights: config.settings?.scoring_weights,
+              logger,
+              reportDir,
+            }).catch((err) => {
+              logger.error(`Scoring fallback failed for ${r.scenarioKey} (${r.agentName}): ${formatError(err)}`);
+              return undefined;
+            }),
+          ),
       );
-      if (!match) continue;
-      if (match.artifacts && match.artifacts.length > 0) {
-        scored.artifacts = match.artifacts;
+      const allScored = [...settled, ...fillIns.filter((s): s is ScoredRunResult => s !== undefined)];
+      // Propagate artifacts and teardown notes from runOutput onto scored results.
+      for (const scored of allScored) {
+        const match = runOutput.results.find(
+          (r) => r.scenarioKey === scored.scenarioKey && r.agentName === scored.agentName,
+        );
+        if (!match) continue;
+        if (match.artifacts && match.artifacts.length > 0) scored.artifacts = match.artifacts;
+        if (match.setupOutput) scored.setupOutput = match.setupOutput;
+        if (match.teardownOutput) scored.teardownOutput = match.teardownOutput;
       }
-      if (match.setupOutput) {
-        scored.setupOutput = match.setupOutput;
-      }
-      if (match.teardownOutput) {
-        scored.teardownOutput = match.teardownOutput;
-      }
+      output = buildScoredOutput(runOutput, allScored);
+    } else {
+      output = runOutput;
     }
-    output = buildScoredOutput(runOutput, scoredResults);
-  } else {
-    output = runOutput;
+  } finally {
+    // Always finalize SOMETHING to disk so `--failed latest` and report viewers
+    // can find this run, even if scoring or run() blew up mid-flight.
+    const safeOutput = output ?? runOutput ?? buildEmptyRunOutput();
+    try {
+      finalizeReport(reportDir, safeOutput, config.name);
+    } catch (err) {
+      logger.error(`Failed to finalize report: ${formatError(err)}`);
+    }
   }
 
-  // Finalize: write scenario JSON, manifest, and HTML
-  finalizeReport(reportDir, output, config.name);
-
-  if (opts.outputDir) {
+  if (opts.outputDir && output) {
     const reportPath = writeReportFile(output, opts.outputDir);
     logger.info(`Report written to ${reportPath}`);
   }
 
-  if (config.afterAll && config.afterAll.length > 0) {
+  if (output && config.afterAll && config.afterAll.length > 0) {
     const env: Record<string, string> = {
       ...buildJobEnv(config),
       AXIS_REPORT_DIR: reportDir,
@@ -305,7 +382,44 @@ async function executeRunPipeline(
     if (outcome.error) throw outcome.error;
   }
 
-  return { output, reportId, configDir };
+  return { output: output ?? buildEmptyRunOutput(), reportId, configDir };
+}
+
+function buildEmptyRunOutput(): RunOutput {
+  return {
+    version: "0.1.0",
+    timestamp: new Date().toISOString(),
+    durationMs: 0,
+    results: [],
+    summary: { total: 0, completed: 0, failed: 0 },
+  };
+}
+
+/**
+ * Await scoring promises, but bail out after `graceMs` once `signal` aborts.
+ * Promises that haven't resolved by the deadline are excluded from the
+ * returned array — they'll keep running in the background until the process
+ * exits, but we don't block the report finalize on them.
+ */
+async function waitForScoring(
+  promises: Promise<ScoredRunResult>[],
+  signal: AbortSignal,
+  graceMs: number,
+): Promise<ScoredRunResult[]> {
+  if (!signal.aborted) {
+    return Promise.all(promises);
+  }
+  // Cancel already requested — give in-flight scoring a short window.
+  const deadline = new Promise<"deadline">((resolve) => setTimeout(() => resolve("deadline"), graceMs));
+  const wrapped = promises.map((p) =>
+    p.then(
+      (r) => ({ ok: true as const, value: r }),
+      (err) => ({ ok: false as const, err }),
+    ),
+  );
+  const settled = await Promise.race([Promise.all(wrapped), deadline]);
+  if (settled === "deadline") return [];
+  return settled.filter((s) => s.ok).map((s) => s.value);
 }
 
 // --- axis run command ---

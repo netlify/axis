@@ -324,6 +324,72 @@ describe("run", () => {
     expect(output.results[0].agentName).toBe(target.agentName);
   });
 
+  it("external signal aborted before run returns all jobs as failed", async () => {
+    const mockAdapter = createMockAdapter();
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    const realisticDir = path.resolve(import.meta.dirname, "../../e2e/realistic-tasks");
+    const ac = new AbortController();
+    ac.abort("Run cancelled by SIGINT");
+
+    const output = await run({
+      configPath: path.join(realisticDir, "axis.config.json"),
+      logger: silentLogger,
+      signal: ac.signal,
+    });
+
+    expect(output.results.length).toBeGreaterThan(0);
+    expect(output.summary.completed).toBe(0);
+    expect(output.summary.failed).toBe(output.results.length);
+    for (const r of output.results) {
+      expect(r.output.metadata.exitCode).not.toBe(0);
+      expect(r.output.metadata.error).toContain("SIGINT");
+    }
+    // Adapter must not have been invoked — all jobs short-circuited
+    expect(mockAdapter.run).not.toHaveBeenCalled();
+  });
+
+  it("external signal aborted mid-run still finalizes with failures", async () => {
+    // Slow adapter so we can abort while jobs are in flight
+    const slowAdapter = {
+      name: "mock-agent",
+      run: vi.fn().mockImplementation(async (input) => {
+        await new Promise<void>((resolve) => {
+          if (input.signal?.aborted) return resolve();
+          input.signal?.addEventListener("abort", () => resolve(), { once: true });
+          setTimeout(resolve, 200);
+        });
+        const aborted = input.signal?.aborted;
+        return {
+          transcript: [],
+          result: aborted ? null : "done",
+          metadata: {
+            startTime: new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            durationMs: 10,
+            exitCode: aborted ? 1 : 0,
+            ...(aborted ? { error: "aborted" } : {}),
+          },
+        };
+      }),
+    };
+    mockGetAdapter.mockReturnValue(slowAdapter);
+
+    const realisticDir = path.resolve(import.meta.dirname, "../../e2e/realistic-tasks");
+    const ac = new AbortController();
+    setTimeout(() => ac.abort("Run cancelled by SIGINT"), 20);
+
+    const output = await run({
+      configPath: path.join(realisticDir, "axis.config.json"),
+      logger: silentLogger,
+      signal: ac.signal,
+      concurrency: 1, // sequential so some jobs remain pending when abort fires
+    });
+
+    expect(output.results.length).toBeGreaterThan(0);
+    expect(output.summary.failed).toBe(output.results.length);
+  });
+
   it("jobFilter silently drops pairs no longer in the config", async () => {
     const mockAdapter = createMockAdapter();
     mockGetAdapter.mockReturnValue(mockAdapter);

@@ -122,6 +122,11 @@ export interface RunOptions {
    * (scenario removed, agent removed) are silently dropped.
    */
   jobFilter?: Array<{ scenarioKey: string; agentName: string }>;
+  /**
+   * External cancel signal (e.g. Ctrl-C). When aborted, in-flight jobs receive
+   * SIGTERM and pending jobs are marked as failed so the report still finalizes.
+   */
+  signal?: AbortSignal;
 }
 
 interface Job {
@@ -331,6 +336,39 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
 
   const runAbortController = new AbortController();
   let runTimeLimitTimer: NodeJS.Timeout | undefined;
+
+  // External cancel (e.g. CLI SIGINT) — propagate to the run-level controller
+  // so pending jobs short-circuit to failure and in-flight jobs get SIGTERMed.
+  // Existing finalize/report flow then runs to completion.
+  if (options.signal) {
+    const external = options.signal;
+    const onExternalAbort = () => {
+      if (!runAbortController.signal.aborted) {
+        runAbortController.abort(external.reason ?? "Run aborted by signal");
+      }
+    };
+    if (external.aborted) {
+      onExternalAbort();
+    } else {
+      external.addEventListener("abort", onExternalAbort, { once: true });
+    }
+  }
+
+  // When the run is aborted, eagerly flip every still-pending job to "failed"
+  // so the live display reflects the cancel immediately — workers will iterate
+  // through them anyway, but in the meantime the UI would otherwise show them
+  // as "pending" while in-flight jobs are still winding down.
+  runAbortController.signal.addEventListener(
+    "abort",
+    () => {
+      for (let i = 0; i < jobStates.length; i++) {
+        if (jobStates[i].status === "pending") {
+          updateStatus(i, "failed", 0);
+        }
+      }
+    },
+    { once: true },
+  );
 
   // Start overall time limit timer
   if (runLimits?.time_minutes) {
