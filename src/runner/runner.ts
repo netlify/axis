@@ -115,6 +115,13 @@ export interface RunOptions {
    * `{reportDir}/scenarios/{scenarioKey}/{agentName}/artifacts/...` after teardown.
    */
   reportDir?: string;
+  /**
+   * Explicit allowlist of scenario/agent pairs. When set, only jobs whose
+   * (scenarioKey, agentName) appears in this list survive discovery — applied
+   * AFTER `scenarioFilter` and `agentFilter`. Pairs not currently configured
+   * (scenario removed, agent removed) are silently dropped.
+   */
+  jobFilter?: Array<{ scenarioKey: string; agentName: string }>;
 }
 
 interface Job {
@@ -191,6 +198,22 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
         continue;
       }
       jobs.push({ index: jobs.length, agentName, agentConfig, scenario, configDir, axisConfig: config });
+    }
+  }
+
+  // Apply explicit job allowlist (e.g. --retry). Jobs not in the list are
+  // dropped silently — handles the case where a previously-failed scenario
+  // or agent has since been removed from the config.
+  if (options.jobFilter?.length) {
+    const allow = new Set(options.jobFilter.map((p) => `${p.scenarioKey} ${p.agentName}`));
+    const before = jobs.length;
+    const filtered = jobs.filter((j) => allow.has(`${j.scenario.key} ${j.agentName}`));
+    // Reindex so JobState[].index aligns with array position
+    filtered.forEach((j, i) => (j.index = i));
+    jobs.length = 0;
+    jobs.push(...filtered);
+    if (jobs.length < before) {
+      logger.verbose?.(`jobFilter: kept ${jobs.length} of ${before} discovered jobs`);
     }
   }
 

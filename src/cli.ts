@@ -184,6 +184,7 @@ interface RunPipelineOptions {
   outputDir?: string;
   json: boolean;
   refreshSkills: boolean;
+  jobFilter?: Array<{ scenarioKey: string; agentName: string }>;
 }
 
 /**
@@ -230,6 +231,7 @@ async function executeRunPipeline(
     configPath: opts.configPath,
     scenarioFilter: opts.scenarios,
     agentFilter: opts.agents,
+    jobFilter: opts.jobFilter,
     concurrency,
     logger,
     registerCleanup,
@@ -322,6 +324,10 @@ program
   .option("-o, --output-dir <dir>", "also write axis-report-[timestamp].json to this directory")
   .option("--concurrency <n>", "max parallel jobs (default: 15)", parseInt)
   .option("--debug", "show debug output (workspace paths, env, lifecycle)", false)
+  .option(
+    "--failed [reportId]",
+    "re-run only the failed scenario/agent pairs from a previous report (default: latest)",
+  )
   .option("--no-score", "skip scoring (raw results only)")
   .option("--refresh-skills", "force re-clone of cached remote skills", false)
   .option(
@@ -340,6 +346,30 @@ program
     const scenarios = splitCsv(opts.scenario);
     const agents = splitCsv(opts.agent)?.map((a) => a.toLowerCase());
 
+    // --- --failed: resolve failed jobs from a previous report ---
+    let jobFilter: Array<{ scenarioKey: string; agentName: string }> | undefined;
+    if (opts.failed !== undefined) {
+      if (scenarios || agents) {
+        process.stderr.write("\n  Error: --failed cannot be combined with --scenario or --agent\n\n");
+        process.exit(1);
+      }
+      const requestedId = opts.failed === true ? "latest" : String(opts.failed);
+      const { configDir } = await loadConfig(opts.config);
+      const manifest = readReport(configDir, requestedId);
+      if (!manifest) {
+        process.stderr.write(`\n  Error: report "${requestedId}" not found\n\n`);
+        process.exit(1);
+      }
+      jobFilter = manifest.results
+        .filter((r) => r.exitCode !== 0 || r.error)
+        .map((r) => ({ scenarioKey: r.scenarioKey, agentName: r.agentName }));
+      if (jobFilter.length === 0) {
+        process.stderr.write(`\n  No failed jobs in report ${manifest.reportId}. Nothing to retry.\n\n`);
+        process.exit(0);
+      }
+      process.stderr.write(`\n  Retrying ${jobFilter.length} failed job(s) from report ${manifest.reportId}\n`);
+    }
+
     const pipelineOpts: RunPipelineOptions = {
       configPath: opts.config,
       scenarios,
@@ -351,6 +381,7 @@ program
       outputDir: opts.outputDir,
       json: opts.json,
       refreshSkills: opts.refreshSkills,
+      jobFilter,
     };
 
     // JSON mode: no UI, just run and output

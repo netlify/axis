@@ -301,6 +301,52 @@ describe("run", () => {
     expect(lastStartIndex).toBeLessThan(firstEndIndex);
   });
 
+  it("jobFilter restricts execution to specific scenario/agent pairs", async () => {
+    const mockAdapter = createMockAdapter();
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    const realisticDir = path.resolve(import.meta.dirname, "../../e2e/realistic-tasks");
+    const baseline = await run({
+      configPath: path.join(realisticDir, "axis.config.json"),
+      logger: silentLogger,
+    });
+    expect(baseline.results.length).toBeGreaterThan(1);
+
+    const target = baseline.results[0];
+    const output = await run({
+      configPath: path.join(realisticDir, "axis.config.json"),
+      logger: silentLogger,
+      jobFilter: [{ scenarioKey: target.scenarioKey, agentName: target.agentName }],
+    });
+
+    expect(output.results).toHaveLength(1);
+    expect(output.results[0].scenarioKey).toBe(target.scenarioKey);
+    expect(output.results[0].agentName).toBe(target.agentName);
+  });
+
+  it("jobFilter silently drops pairs no longer in the config", async () => {
+    const mockAdapter = createMockAdapter();
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    const realisticDir = path.resolve(import.meta.dirname, "../../e2e/realistic-tasks");
+    const baseline = await run({
+      configPath: path.join(realisticDir, "axis.config.json"),
+      logger: silentLogger,
+    });
+
+    const target = baseline.results[0];
+    const output = await run({
+      configPath: path.join(realisticDir, "axis.config.json"),
+      logger: silentLogger,
+      jobFilter: [
+        { scenarioKey: target.scenarioKey, agentName: target.agentName },
+        { scenarioKey: "scenario-that-no-longer-exists", agentName: "ghost-agent" },
+      ],
+    });
+
+    expect(output.results).toHaveLength(1);
+  });
+
   it("skips scenarios with agents override that excludes the agent", async () => {
     const mockAdapter = createMockAdapter();
     mockGetAdapter.mockReturnValue(mockAdapter);
