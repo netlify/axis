@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.9.0](https://github.com/netlify/axis/compare/v1.8.1...v1.9.0) (2026-05-15)
+
+
+### Features
+
+* rubric -&gt; judge ([b15377c](https://github.com/netlify/axis/commit/b15377c67ad38cc680f3e05c7a82a11e477f7ecc))
+
+
+### Bug Fixes
+
+* make it clear that things are in teardown mode ([a54de01](https://github.com/netlify/axis/commit/a54de01ea36db4ed96fc04090501eef7a5e7b92e))
+* show scenario key on report ([6d4a5bf](https://github.com/netlify/axis/commit/6d4a5bffc3d00eab2f5e9d3e029f50d9b61bea26))
+* update default concurrency to 15 ([38526fb](https://github.com/netlify/axis/commit/38526fb8c07e8877eca7489972708a7b528144c1))
+
 ## [1.8.1](https://github.com/netlify/axis/compare/v1.8.0...v1.8.1) (2026-05-14)
 
 
