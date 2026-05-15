@@ -1012,6 +1012,7 @@ function renderModals(results: ResultEntry[]): string {
 
 function renderModal(entry: ResultEntry, index: number): string {
   const variant = getVariantName(entry.scenarioKey);
+  const baseKey = getBaseKey(entry.scenarioKey);
   const baseName = getBaseScenarioName(entry.scenarioName);
   const resolved = entry.resolvedConfig;
   return `
@@ -1020,6 +1021,7 @@ function renderModal(entry: ResultEntry, index: number): string {
         <div class="modal-header">
           <div>
             <h3>${escapeHtml(baseName)}</h3>
+            <span class="modal-subtitle">${escapeHtml(baseKey)}</span>
             ${variant ? `<span class="modal-subtitle">Variant: ${escapeHtml(variant)}</span>` : ""}
           </div>
           <button class="modal-close">&times;</button>

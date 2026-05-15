@@ -1642,6 +1642,7 @@ a.wf-id.interaction-link {
 }
 
 .modal-subtitle {
+  display: block;
   font-size: 0.75rem;
   font-family: var(--font-mono);
   color: var(--text-muted);
