@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.0](https://github.com/netlify/axis/compare/v1.9.0...v1.10.0) (2026-05-15)
+
+
+### Features
+
+* add --failed support for targeting only tests that fail ([2cdbc7a](https://github.com/netlify/axis/commit/2cdbc7a56b001a91d0e301456ef2975e72d58be5))
+* allow canceling in-flight evals and retain data ([9b79de6](https://github.com/netlify/axis/commit/9b79de6f1a54bebc082b1407c06f372170d8530b))
+
 ## [1.9.0](https://github.com/netlify/axis/compare/v1.8.1...v1.9.0) (2026-05-15)
 
 
