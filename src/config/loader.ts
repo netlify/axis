@@ -435,14 +435,19 @@ export function matchesScenarioFilter(key: string, filter: string[]): boolean {
 
 /**
  * Match an agent name against a list of filter patterns. A pattern matches if:
- *   - it equals the agent name (e.g. `claude-code|opus`)
- *   - it is a glob and matches the agent name
+ *   - it equals the full agent name (e.g. `claude-code|opus`)
+ *   - it equals the base agent (e.g. `claude-code`, matches all model variants)
+ *   - it is a glob and matches either the full name or the base agent
  */
 export function matchesAgentFilter(agentName: string, filter: string[]): boolean {
+  const baseAgent = agentName.includes("|") ? agentName.split("|")[0] : agentName;
+
   return filter.some((pattern) => {
     if (pattern === agentName) return true;
+    if (pattern === baseAgent) return true;
     if (isGlobPattern(pattern)) {
-      return globToRegExp(pattern).test(agentName);
+      const re = globToRegExp(pattern);
+      return re.test(agentName) || re.test(baseAgent);
     }
     return false;
   });

@@ -976,4 +976,11 @@ describe("matchesAgentFilter", () => {
   it("matches any pattern in the list", () => {
     expect(matchesAgentFilter("codex|gpt", ["claude-code|*", "codex*"])).toBe(true);
   });
+
+  it("matches base agent name across all model variants", () => {
+    expect(matchesAgentFilter("codex|gpt-5.5", ["codex"])).toBe(true);
+    expect(matchesAgentFilter("codex|gpt-4", ["codex"])).toBe(true);
+    expect(matchesAgentFilter("codex", ["codex"])).toBe(true);
+    expect(matchesAgentFilter("claude-code|opus", ["codex"])).toBe(false);
+  });
 });
