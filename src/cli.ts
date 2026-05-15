@@ -320,7 +320,7 @@ program
   .option("--json", "output results as JSON to stdout", false)
   .option("-v, --verbose", "show detailed per-step logging", false)
   .option("-o, --output-dir <dir>", "also write axis-report-[timestamp].json to this directory")
-  .option("--concurrency <n>", "max parallel jobs (default: unlimited)", parseInt)
+  .option("--concurrency <n>", "max parallel jobs (default: 15)", parseInt)
   .option("--debug", "show debug output (workspace paths, env, lifecycle)", false)
   .option("--no-score", "skip scoring (raw results only)")
   .option("--refresh-skills", "force re-clone of cached remote skills", false)

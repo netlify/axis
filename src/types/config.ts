@@ -78,7 +78,7 @@ export interface AgentConfig {
 
 export interface SettingsConfig {
   scoring_weights?: ScoringWeights;
-  /** Maximum number of parallel jobs. Defaults to unlimited (all jobs run simultaneously). */
+  /** Maximum number of parallel jobs. Defaults to 15. */
   concurrency?: number;
   /** Time and token spend limits for the run and individual scenarios. */
   limits?: LimitsConfig;

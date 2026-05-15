@@ -18,6 +18,9 @@ import { resolveSkills } from "../skills/resolver.js";
 /** Default per-scenario time limit when none is configured (15 minutes). */
 const DEFAULT_SCENARIO_TIME_MINUTES = 15;
 
+/** Default max parallel jobs when none is configured. */
+const DEFAULT_CONCURRENCY = 15;
+
 interface ResolvedJobLimits {
   timeoutMs?: number;
   tokenLimit?: number;
@@ -84,7 +87,7 @@ export interface RunOptions {
   logger?: Logger;
   /**
    * Maximum number of jobs to run in parallel.
-   * Defaults to unlimited (all jobs start simultaneously).
+   * Defaults to 15.
    */
   concurrency?: number;
   /**
@@ -327,7 +330,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   };
 
   // --- Execute jobs with concurrency control ---
-  const concurrency = options.concurrency ?? Infinity;
+  const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
   const tasks = jobs.map((job) => async () => {
     // If overall abort already fired, fail immediately
     if (runAbortController.signal.aborted) {
