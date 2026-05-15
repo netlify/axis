@@ -92,6 +92,13 @@ export interface JobState {
    * finished, `durationMs` takes over as the authoritative value).
    */
   runStartedAt?: number;
+  /**
+   * True while the scenario's teardown scripts (and artifact capture) are
+   * running. Set after `status` has already moved to `done`/`failed` so the
+   * score remains visible — this is a separate flag rather than a status so
+   * the row doesn't visually regress.
+   */
+  inTeardown?: boolean;
 }
 
 export interface Logger {

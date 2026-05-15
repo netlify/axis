@@ -13,6 +13,7 @@ export function LiveStatus({ jobs, skippedCount = 0 }: LiveStatusProps) {
   const done = jobs.filter((j) => j.status === "done").length;
   const failed = jobs.filter((j) => j.status === "failed").length;
   const scoring = jobs.filter((j) => j.status === "scoring").length;
+  const tearingDown = jobs.filter((j) => j.inTeardown).length;
   const total = jobs.length;
 
   const scenarios = groupByScenario(jobs);
@@ -38,13 +39,13 @@ export function LiveStatus({ jobs, skippedCount = 0 }: LiveStatusProps) {
       <Text>{"─".repeat(50)}</Text>
       {allFinished && avgScore !== null ? (
         <Text bold>Average AXIS Result: {avgScore} / 100</Text>
-      ) : scoring > 0 ? (
-        <Text>
-          {done + failed}/{total} complete · scoring {scoring} result{scoring !== 1 ? "s" : ""}…
-        </Text>
       ) : (
         <Text>
           {done + failed}/{total} complete
+          {scoring > 0 ? ` · scoring ${scoring} result${scoring !== 1 ? "s" : ""}…` : ""}
+          {tearingDown > 0
+            ? ` · tearing down ${tearingDown} scenario${tearingDown !== 1 ? "s" : ""}…`
+            : ""}
         </Text>
       )}
       {skippedCount > 0 ? <Text dimColor>{skippedCount} marked to be skipped</Text> : null}

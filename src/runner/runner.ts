@@ -217,6 +217,12 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
     logger.onJobUpdate?.(jobStates, jobMeta);
   };
 
+  const setTeardown = (index: number, inTeardown: boolean) => {
+    if (Boolean(jobStates[index].inTeardown) === inTeardown) return;
+    jobStates[index] = { ...jobStates[index], inTeardown };
+    logger.onJobUpdate?.(jobStates, jobMeta);
+  };
+
   /**
    * Monotonic live-token bump — drops any non-increasing estimates. Setting
    * `final` true stamps `tokensFinal` so the UI knows the number is now the
@@ -363,7 +369,12 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
           await options.onResult(result);
         }
       } finally {
-        await cleanup();
+        setTeardown(job.index, true);
+        try {
+          await cleanup();
+        } finally {
+          setTeardown(job.index, false);
+        }
       }
       return result;
     } finally {
