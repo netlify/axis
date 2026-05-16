@@ -198,6 +198,11 @@ export function initInteractions(): void {
   document.querySelectorAll<HTMLElement>(".sparse-line-expandable").forEach((line) => {
     line.addEventListener("click", (e) => {
       e.stopPropagation();
+      // Don't collapse when clicking inside the expanded body — users click
+      // there to place a caret or copy text.
+      if ((e.target as HTMLElement).closest(".sparse-line-content")) return;
+      // Don't toggle if the click ended a text selection.
+      if ((window.getSelection()?.toString().length ?? 0) > 0) return;
       line.classList.toggle("expanded");
     });
   });
