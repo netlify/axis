@@ -39,13 +39,13 @@ function skillsWithPath(): ResolvedSkill[] {
 }
 
 describe("writeClaudeSkills", () => {
-  it("copies SKILL.md and supporting files to .claude/skills/{name}/", () => {
-    const workspace = path.join(tmpDir, "claude-workspace");
-    fs.mkdirSync(workspace);
+  it("copies SKILL.md and supporting files to {configDir}/skills/{name}/", () => {
+    const configDir = path.join(tmpDir, "claude-config");
+    fs.mkdirSync(configDir);
 
-    writeClaudeSkills(workspace, skillsWithPath());
+    writeClaudeSkills(configDir, skillsWithPath());
 
-    const target = path.join(workspace, ".claude", "skills", "deploy-skill");
+    const target = path.join(configDir, "skills", "deploy-skill");
     expect(fs.existsSync(path.join(target, "SKILL.md"))).toBe(true);
     expect(fs.readFileSync(path.join(target, "SKILL.md"), "utf-8")).toContain("Deploy Skill");
     expect(fs.existsSync(path.join(target, "scripts", "deploy.sh"))).toBe(true);
@@ -53,33 +53,33 @@ describe("writeClaudeSkills", () => {
   });
 
   it("excludes .git, .github, and node_modules", () => {
-    const workspace = path.join(tmpDir, "claude-workspace-2");
-    fs.mkdirSync(workspace);
+    const configDir = path.join(tmpDir, "claude-config-2");
+    fs.mkdirSync(configDir);
 
-    writeClaudeSkills(workspace, skillsWithPath());
+    writeClaudeSkills(configDir, skillsWithPath());
 
-    const target = path.join(workspace, ".claude", "skills", "deploy-skill");
+    const target = path.join(configDir, "skills", "deploy-skill");
     expect(fs.existsSync(path.join(target, ".git"))).toBe(false);
     expect(fs.existsSync(path.join(target, ".github"))).toBe(false);
     expect(fs.existsSync(path.join(target, "node_modules"))).toBe(false);
   });
 
   it("handles multiple skills", () => {
-    const workspace = path.join(tmpDir, "claude-workspace-multi");
-    fs.mkdirSync(workspace);
+    const configDir = path.join(tmpDir, "claude-config-multi");
+    fs.mkdirSync(configDir);
 
     // Create a second skill source
     const skill2 = path.join(tmpDir, "source-skill-2");
     fs.mkdirSync(skill2);
     fs.writeFileSync(path.join(skill2, "SKILL.md"), "# Lint Skill");
 
-    writeClaudeSkills(workspace, [
+    writeClaudeSkills(configDir, [
       { name: "deploy-skill", path: skillSource },
       { name: "lint-skill", path: skill2 },
     ]);
 
-    expect(fs.existsSync(path.join(workspace, ".claude", "skills", "deploy-skill", "SKILL.md"))).toBe(true);
-    expect(fs.existsSync(path.join(workspace, ".claude", "skills", "lint-skill", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(configDir, "skills", "deploy-skill", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(configDir, "skills", "lint-skill", "SKILL.md"))).toBe(true);
   });
 });
 

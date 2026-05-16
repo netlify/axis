@@ -104,9 +104,15 @@ describe("Skills e2e — Claude Code", () => {
     capturedSkillMd = null;
 
     mockSpawn.mockImplementation(((_cmd: string, _args: string[], opts: any) => {
-      const skillPath = path.join(opts.cwd, ".claude", "skills", "test-skill", "SKILL.md");
-      if (fs.existsSync(skillPath)) {
-        capturedSkillMd = fs.readFileSync(skillPath, "utf-8");
+      // Skills land in CLAUDE_CONFIG_DIR/skills/ (which lives under HOME, not the workspace).
+      const configDir = opts.env?.CLAUDE_CONFIG_DIR;
+      if (configDir) {
+        const skillPath = path.join(configDir, "skills", "test-skill", "SKILL.md");
+        if (fs.existsSync(skillPath)) {
+          capturedSkillMd = fs.readFileSync(skillPath, "utf-8");
+        }
+        // Skills must NOT appear in the workspace the agent scans.
+        expect(fs.existsSync(path.join(opts.cwd, ".claude"))).toBe(false);
       }
       return createMockProcess(CLAUDE_EVENTS);
     }) as any);
@@ -117,7 +123,7 @@ describe("Skills e2e — Claude Code", () => {
     else delete process.env.ANTHROPIC_API_KEY;
   });
 
-  it("writes SKILL.md to .claude/skills/ before spawning agent", async () => {
+  it("writes SKILL.md to {CLAUDE_CONFIG_DIR}/skills/ (in HOME, not workspace) before spawning agent", async () => {
     await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
 
     expect(capturedSkillMd).not.toBeNull();

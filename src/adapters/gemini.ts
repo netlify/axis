@@ -19,8 +19,8 @@ export function createGeminiAdapter(): AgentAdapter {
 
     requiredEnv: () => ["GEMINI_API_KEY"],
 
-    isolationEnv: (workspace) => ({
-      GEMINI_CLI_HOME: path.join(workspace, ".gemini"),
+    isolationEnv: ({ home }) => ({
+      GEMINI_CLI_HOME: path.join(home, ".gemini"),
       GEMINI_TELEMETRY_ENABLED: "false",
       // Unset GOOGLE_CLOUD_PROJECT to prevent interactive auth prompts in ACP mode
       GOOGLE_CLOUD_PROJECT: "",

@@ -140,9 +140,11 @@ describe("createAcpBasedAdapter", () => {
   it("exposes isolationEnv from spec", () => {
     const a = createAcpBasedAdapter({
       name: "test",
-      isolationEnv: (ws) => ({ TEST_HOME: `${ws}/.test` }),
+      isolationEnv: ({ home }) => ({ TEST_HOME: `${home}/.test` }),
     });
-    expect(a.isolationEnv!("/tmp/ws")).toEqual({ TEST_HOME: "/tmp/ws/.test" });
+    expect(a.isolationEnv!({ workspace: "/tmp/ws", home: "/tmp/home" })).toEqual({
+      TEST_HOME: "/tmp/home/.test",
+    });
   });
 
   it("spawns the resolved CLI command with args", async () => {

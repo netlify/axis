@@ -477,12 +477,15 @@ async function executeJob(
   const label = `${scenario.key} (${agentName})`;
   const jobStart = Date.now();
 
-  // Create isolated workspace and point HOME there so agents
-  // don't pick up the user's global settings (e.g. ~/.claude/).
-  const workspace = createWorkspace();
+  // Create isolated workspace + home as siblings under one parent. The agent's
+  // cwd is `workspace/` (pristine) while HOME and adapter config dirs
+  // (CLAUDE_CONFIG_DIR, CODEX_HOME, GEMINI_CLI_HOME, QWEN_CODE_HOME) live under
+  // `home/`. Keeping them separate means the agent never sees its own config
+  // files when scanning the project.
+  const { workspace, home, parent: workspaceParent } = createWorkspace();
   const adapter = getAdapter(agentConfig.agent);
-  const adapterIsolation = adapter.isolationEnv?.(workspace) ?? {};
-  const jobEnv = { ...adapterIsolation, ...env, HOME: workspace, AXIS_CONFIG_DIR: configDir };
+  const adapterIsolation = adapter.isolationEnv?.({ workspace, home }) ?? {};
+  const jobEnv = { ...adapterIsolation, ...env, HOME: home, AXIS_CONFIG_DIR: configDir };
 
   // Lifecycle scripts get scenario/agent context as AXIS_* env vars so they
   // can branch on what's running without encoding it into the command string.
@@ -495,11 +498,13 @@ async function executeJob(
     ...(atIndex >= 0 ? { variant: scenario.key.slice(atIndex + 1) } : {}),
   };
   logger.verbose?.(`[${label}] Workspace: ${workspace}`);
+  logger.verbose?.(`[${label}] Home: ${home}`);
 
-  // Register workspace for cleanup on process signal (Ctrl-C)
+  // Register the parent dir for cleanup on process signal (Ctrl-C) — removing
+  // it covers both `workspace/` and `home/` in one shot.
   registerCleanup?.(() => {
     try {
-      fs.rmSync(workspace, { recursive: true, force: true });
+      fs.rmSync(workspaceParent, { recursive: true, force: true });
     } catch {
       /* best-effort */
     }
@@ -539,10 +544,10 @@ async function executeJob(
       }
     }
     try {
-      fs.rmSync(workspace, { recursive: true, force: true });
-      logger.verbose?.(`[${label}] Cleaned up workspace: ${workspace}`);
+      fs.rmSync(workspaceParent, { recursive: true, force: true });
+      logger.verbose?.(`[${label}] Cleaned up workspace: ${workspaceParent}`);
     } catch {
-      logger.verbose?.(`[${label}] Failed to clean up workspace: ${workspace}`);
+      logger.verbose?.(`[${label}] Failed to clean up workspace: ${workspaceParent}`);
     }
   };
 
@@ -605,6 +610,7 @@ async function executeJob(
       config: agentConfig,
       scenario,
       workingDirectory: workspace,
+      homeDirectory: home,
       env: jobEnv,
       registerCleanup,
       captureRawOutput: true,
@@ -709,8 +715,22 @@ async function runWithConcurrency<T>(tasks: Array<() => Promise<T>>, limit: numb
   return results;
 }
 
-function createWorkspace(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "axis-"));
+/**
+ * Create the per-job temp layout:
+ *
+ *   parent/
+ *     ├── work/   — agent cwd
+ *     └── home/   — agent HOME (config dirs, MCP, user-scoped skills)
+ *
+ * Returning the parent path lets the caller wipe both children in one rmSync.
+ */
+function createWorkspace(): { workspace: string; home: string; parent: string } {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "axis-"));
+  const workspace = path.join(parent, "work");
+  const home = path.join(parent, "home");
+  fs.mkdirSync(workspace);
+  fs.mkdirSync(home);
+  return { workspace, home, parent };
 }
 
 export function buildJobEnv(config: AxisConfig): Record<string, string> {

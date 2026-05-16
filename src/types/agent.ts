@@ -3,15 +3,29 @@ import type { AgentConfig, McpServerConfig, ResolvedSkill } from "./config.js";
 import type { Logger } from "./output.js";
 import type { TranscriptAnalysis } from "../transcript/types.js";
 
+/**
+ * Paths the runner provides to an adapter for isolation. The agent's working
+ * directory (`workspace`) is kept separate from its HOME (`home`) so that
+ * adapter config dirs (`.codex`, `.claude`, `.gemini`, `.qwen`), MCP config
+ * files, and user-scoped skill trees never appear when the agent scans its cwd.
+ */
+export interface IsolationPaths {
+  /** Agent's `cwd` — should only contain scenario-provided files. */
+  workspace: string;
+  /** Agent's HOME — adapter `*_HOME` env vars point under here. */
+  home: string;
+}
+
 export interface AgentAdapter {
   readonly name: string;
   run(input: AgentInput): Promise<AgentOutput>;
   /**
    * Returns adapter-specific environment overrides for workspace isolation.
    * Called by the runner and merged into the job env after universal isolation
-   * (HOME, env filtering) is applied.
+   * (HOME, env filtering) is applied. Adapters should point `*_HOME`-style env
+   * vars under `paths.home` so config dirs never appear in `paths.workspace`.
    */
-  isolationEnv?(workspace: string): Record<string, string>;
+  isolationEnv?(paths: IsolationPaths): Record<string, string>;
   /**
    * Returns environment variable names required for the adapter to function
    * (e.g. API keys). The runner validates these are present before launching
@@ -30,7 +44,10 @@ export interface AgentInput {
   prompt: string;
   config: AgentConfig;
   scenario: Scenario;
+  /** Agent's `cwd` — pristine, contains only scenario-provided files. */
   workingDirectory: string;
+  /** Agent's HOME directory — adapter config dirs (`.codex`, `.claude`, …) live here, never in `workingDirectory`. */
+  homeDirectory: string;
   /** Filtered environment variables for the agent process. If omitted, inherits parent env. */
   env?: Record<string, string>;
   /** Register a cleanup function to be called on process signal (SIGINT/SIGTERM). */

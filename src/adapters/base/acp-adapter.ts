@@ -21,6 +21,7 @@ import type {
   AgentInput,
   AgentMetadata,
   AgentOutput,
+  IsolationPaths,
   TokenUsage,
   TranscriptEntry,
 } from "../../types/agent.js";
@@ -73,7 +74,7 @@ export interface AcpAdapterSpec {
   requiredEnv?: () => string[];
 
   /** Workspace isolation env vars (merged into child env by runner). */
-  isolationEnv?: (workspace: string) => Record<string, string>;
+  isolationEnv?: (paths: IsolationPaths) => Record<string, string>;
 
   /**
    * Pre-spawn side effects: mkdir, config writers, etc.
@@ -158,6 +159,7 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       await spec.prepare?.({
         input,
         workingDirectory: input.workingDirectory,
+        homeDirectory: input.homeDirectory,
         env: input.env,
       });
 

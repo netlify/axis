@@ -1,6 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
-import type { AgentAdapter, AgentInput, AgentMetadata, AgentOutput, TranscriptEntry } from "../../types/agent.js";
+import type {
+  AgentAdapter,
+  AgentInput,
+  AgentMetadata,
+  AgentOutput,
+  IsolationPaths,
+  TranscriptEntry,
+} from "../../types/agent.js";
 import { resolveCommand, type ResolvedCommand } from "../utils/resolve.js";
 import { createTokenEstimator } from "../utils/token-estimator.js";
 
@@ -20,11 +27,15 @@ export const SIGTERM_TO_SIGKILL_MS = 5_000;
 /** Context handed to `prepare` before the agent process is spawned. */
 export interface SetupContext {
   readonly input: AgentInput;
+  /** Agent's `cwd` — pristine, only scenario-provided files. */
   readonly workingDirectory: string;
+  /** Agent's HOME — adapter config dirs (`.codex`, `.claude`, …) live here. */
+  readonly homeDirectory: string;
   /**
    * Authoritative env the child will actually receive. The runner merges
-   * `isolationEnv(workspace)` into `input.env` before calling `run`, so this
-   * already contains e.g. `CODEX_HOME` / `GEMINI_CLI_HOME`.
+   * `isolationEnv({ workspace, home })` into `input.env` before calling `run`,
+   * so this already contains e.g. `CODEX_HOME` / `GEMINI_CLI_HOME` pointing
+   * under `homeDirectory`.
    */
   readonly env: Record<string, string> | undefined;
 }
@@ -98,7 +109,7 @@ export type AgentAdapterSpec<State> = {
   requiredEnv?: () => string[];
 
   /** Workspace isolation env vars (merged into child env by runner). */
-  isolationEnv?: (workspace: string) => Record<string, string>;
+  isolationEnv?: (paths: IsolationPaths) => Record<string, string>;
 
   /**
    * Pre-spawn side effects: mkdir, MCP config writers, skills writers, etc.
@@ -202,6 +213,7 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       await spec.prepare?.({
         input,
         workingDirectory: input.workingDirectory,
+        homeDirectory: input.homeDirectory,
         env: input.env,
       });
 

@@ -74,11 +74,18 @@ describe("MCP e2e — Claude Code", () => {
     process.env.ANTHROPIC_API_KEY = "test-key";
     capturedMcpConfig = null;
 
-    mockSpawn.mockImplementation(((_cmd: string, _args: string[], opts: any) => {
-      // At spawn time, .mcp.json should already be written to the workspace
-      const mcpPath = path.join(opts.cwd, ".mcp.json");
-      if (fs.existsSync(mcpPath)) {
-        capturedMcpConfig = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
+    mockSpawn.mockImplementation(((_cmd: string, args: string[], opts: any) => {
+      // At spawn time, MCP config should already be written into the home dir
+      // (CLAUDE_CONFIG_DIR/mcp.json) — NOT into the workspace — and Claude Code
+      // should be invoked with `--mcp-config <path>` pointing at it.
+      const idx = args.indexOf("--mcp-config");
+      if (idx !== -1) {
+        const mcpPath = args[idx + 1];
+        if (fs.existsSync(mcpPath)) {
+          capturedMcpConfig = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
+        }
+        // The workspace (cwd) MUST NOT contain a .mcp.json — that's the whole point.
+        expect(fs.existsSync(path.join(opts.cwd, ".mcp.json"))).toBe(false);
       }
       return createMockProcess(CLAUDE_EVENTS);
     }) as any);
@@ -89,7 +96,7 @@ describe("MCP e2e — Claude Code", () => {
     else delete process.env.ANTHROPIC_API_KEY;
   });
 
-  it("writes .mcp.json with correct MCP config before spawning agent", async () => {
+  it("writes mcp.json into HOME (not workspace) and wires --mcp-config", async () => {
     await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
 
     expect(capturedMcpConfig).not.toBeNull();

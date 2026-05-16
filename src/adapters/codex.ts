@@ -17,8 +17,8 @@ export function createCodexAdapter(): AgentAdapter {
 
     requiredEnv: () => ["CODEX_API_KEY"],
 
-    isolationEnv: (workspace) => ({
-      CODEX_HOME: path.join(workspace, ".codex"),
+    isolationEnv: ({ home }) => ({
+      CODEX_HOME: path.join(home, ".codex"),
       CODEX_DISABLE_TELEMETRY: "1",
     }),
 
@@ -31,7 +31,9 @@ export function createCodexAdapter(): AgentAdapter {
           writeCodexMcpConfig(codexHome, ctx.input.mcpServers);
         }
       }
-      // Codex discovers .agents/skills/ in the working directory
+      // Codex only discovers skills under `.agents/skills/` in the working
+      // directory, so this is the one piece of adapter config we can't relocate
+      // to HOME. Scenarios that opt into skills accept this visibility.
       if (ctx.input.resolvedSkills?.length) {
         writeCodexSkills(ctx.workingDirectory, ctx.input.resolvedSkills);
       }

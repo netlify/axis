@@ -51,7 +51,7 @@ Call `createAgentAdapter(spec)` with an `AgentAdapterSpec<State>`. The spec is a
 | `cliCommand?`     | CLI binary for `resolveCommand`; omit if user-supplied                                                                            |
 | `timeoutMs?`      | Execution timeout (default 10 min)                                                                                                |
 | `requiredEnv?`    | Env vars validated by the runner pre-flight (e.g. `ANTHROPIC_API_KEY`)                                                            |
-| `isolationEnv?`   | Workspace isolation vars (e.g. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`)                                                                 |
+| `isolationEnv?`   | Isolation vars (e.g. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`). Signature: `({ workspace, home }) => Record<string, string>`. Point `*_HOME`-style paths under `home`, never `workspace` |
 | `prepare?`        | Side effects (mkdir, MCP / skills writers) before spawn                                                                           |
 | `resolveCommand?` | Override how the CLI command is resolved                                                                                          |
 | `buildArgs`       | Build CLI arguments (prefix args from command resolution prepended automatically)                                                 |
@@ -101,6 +101,23 @@ User-facing documentation lives in `src/docs-site/` (Astro), published at https:
 rm -rf dist && npm run build   # Always clean build -stale dist/ causes subtle issues
 npm test                       # vitest, all unit tests
 ```
+
+## Workspace / Home isolation
+
+Per-job temp layout (see `createWorkspace` in `runner.ts`):
+
+```
+/tmp/axis-<rand>/
+  ├── work/   ← agent cwd (only scenario-provided files; what the agent scans)
+  └── home/   ← agent HOME — .codex/, .claude/, .gemini/, .qwen/, user-scoped skills, MCP config
+```
+
+- Adapter `isolationEnv` MUST place `*_HOME`-style paths under `home`, never `workspace`, so the agent doesn't see its own config when scanning files
+- `HOME` is set to `home`. `AXIS_WORKSPACE` is `workspace`. Lifecycle scripts can read both
+- Claude Code's MCP config is written to `home/.claude/mcp.json` and wired with `--mcp-config <path>` (no `.mcp.json` in cwd)
+- Claude/Claude-SDK skills go to `CLAUDE_CONFIG_DIR/skills/` (under `home`); Gemini skills go to `GEMINI_CLI_HOME/skills/` (under `home`)
+- **Codex skills are the one exception**: Codex only discovers skills under `.agents/skills/` in cwd, so they live in `workspace`. Scenarios opting into Codex skills accept this limited visibility
+- Artifact capture walks `workspace` only — agent config never leaks into report artifacts
 
 ## Gotchas
 

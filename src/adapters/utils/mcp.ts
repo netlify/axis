@@ -3,10 +3,13 @@ import * as path from "node:path";
 import type { McpServerConfig } from "../../types/config.js";
 
 /**
- * Write .mcp.json for Claude Code (project-scoped, placed in workspace root).
- * Claude Code auto-discovers this file when it starts in the workspace directory.
+ * Write Claude Code's MCP config to an explicit file path. Caller is
+ * responsible for ensuring the parent directory exists and for wiring
+ * `--mcp-config <path>` into the CLI invocation — we deliberately avoid
+ * writing `.mcp.json` into the workspace so the agent doesn't see its own
+ * config when scanning files.
  */
-export function writeClaudeMcpConfig(workspace: string, servers: Record<string, McpServerConfig>): void {
+export function writeClaudeMcpConfig(targetPath: string, servers: Record<string, McpServerConfig>): void {
   const mcpServers: Record<string, unknown> = {};
 
   for (const [name, server] of Object.entries(servers)) {
@@ -22,7 +25,8 @@ export function writeClaudeMcpConfig(workspace: string, servers: Record<string, 
     }
   }
 
-  fs.writeFileSync(path.join(workspace, ".mcp.json"), JSON.stringify({ mcpServers }, null, 2) + "\n");
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.writeFileSync(targetPath, JSON.stringify({ mcpServers }, null, 2) + "\n");
 }
 
 /**

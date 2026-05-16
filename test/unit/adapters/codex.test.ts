@@ -62,9 +62,9 @@ describe("CodexAdapter", () => {
     expect(adapter.name).toBe("codex");
   });
 
-  it("provides isolation env with CODEX_HOME", () => {
-    const env = adapter.isolationEnv!("/tmp/workspace");
-    expect(env.CODEX_HOME).toBe("/tmp/workspace/.codex");
+  it("provides isolation env with CODEX_HOME under home, not workspace", () => {
+    const env = adapter.isolationEnv!({ workspace: "/tmp/work", home: "/tmp/home" });
+    expect(env.CODEX_HOME).toBe("/tmp/home/.codex");
     expect(env.CODEX_DISABLE_TELEMETRY).toBe("1");
   });
 

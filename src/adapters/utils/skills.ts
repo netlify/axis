@@ -6,12 +6,14 @@ import type { ResolvedSkill } from "../../types/config.js";
 const SKIP_DIRS = new Set([".git", ".github", "node_modules"]);
 
 /**
- * Write skills for Claude Code.
- * Copies each skill directory to {workspace}/.claude/skills/{name}/
+ * Write skills for Claude Code into the user-scoped config dir
+ * (`CLAUDE_CONFIG_DIR/skills/{name}/`). Claude Code discovers user-scoped
+ * skills there. The runner points CLAUDE_CONFIG_DIR at the agent's HOME so
+ * skills never appear in the workspace the agent scans.
  */
-export function writeClaudeSkills(workspace: string, skills: ResolvedSkill[]): void {
+export function writeClaudeSkills(claudeConfigDir: string, skills: ResolvedSkill[]): void {
   for (const skill of skills) {
-    const target = path.join(workspace, ".claude", "skills", skill.name);
+    const target = path.join(claudeConfigDir, "skills", skill.name);
     copyDirRecursive(skill.path, target);
   }
 }

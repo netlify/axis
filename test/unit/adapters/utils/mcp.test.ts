@@ -40,9 +40,9 @@ const minimalHttp: McpServerConfig = {
 
 describe("writeClaudeMcpConfig", () => {
   it("writes .mcp.json with a stdio server", () => {
-    writeClaudeMcpConfig(tmpDir, { myServer: stdioServer });
+    writeClaudeMcpConfig(path.join(tmpDir, "mcp.json"), { myServer: stdioServer });
 
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, ".mcp.json"), "utf-8"));
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "mcp.json"), "utf-8"));
     expect(content.mcpServers.myServer).toEqual({
       command: "npx",
       args: ["-y", "@example/mcp-server"],
@@ -51,9 +51,9 @@ describe("writeClaudeMcpConfig", () => {
   });
 
   it("writes .mcp.json with an http server", () => {
-    writeClaudeMcpConfig(tmpDir, { remote: httpServer });
+    writeClaudeMcpConfig(path.join(tmpDir, "mcp.json"), { remote: httpServer });
 
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, ".mcp.json"), "utf-8"));
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "mcp.json"), "utf-8"));
     expect(content.mcpServers.remote).toEqual({
       type: "http",
       url: "https://mcp.example.com/tools",
@@ -62,18 +62,18 @@ describe("writeClaudeMcpConfig", () => {
   });
 
   it("writes .mcp.json with mixed servers", () => {
-    writeClaudeMcpConfig(tmpDir, { local: stdioServer, remote: httpServer });
+    writeClaudeMcpConfig(path.join(tmpDir, "mcp.json"), { local: stdioServer, remote: httpServer });
 
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, ".mcp.json"), "utf-8"));
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "mcp.json"), "utf-8"));
     expect(Object.keys(content.mcpServers)).toEqual(["local", "remote"]);
     expect(content.mcpServers.local.command).toBe("npx");
     expect(content.mcpServers.remote.url).toBe("https://mcp.example.com/tools");
   });
 
   it("omits empty optional fields", () => {
-    writeClaudeMcpConfig(tmpDir, { min: minimalStdio });
+    writeClaudeMcpConfig(path.join(tmpDir, "mcp.json"), { min: minimalStdio });
 
-    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, ".mcp.json"), "utf-8"));
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, "mcp.json"), "utf-8"));
     expect(content.mcpServers.min).toEqual({ command: "echo" });
     expect(content.mcpServers.min.args).toBeUndefined();
     expect(content.mcpServers.min.env).toBeUndefined();

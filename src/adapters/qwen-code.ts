@@ -20,8 +20,8 @@ export function createQwenCodeAdapter(): AgentAdapter {
     name: "qwen-code",
     cliCommand: "qwen",
 
-    isolationEnv: (workspace) => ({
-      QWEN_CODE_HOME: path.join(workspace, ".qwen"),
+    isolationEnv: ({ home }) => ({
+      QWEN_CODE_HOME: path.join(home, ".qwen"),
       QWEN_TELEMETRY_ENABLED: "false",
     }),
 

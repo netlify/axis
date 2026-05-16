@@ -67,7 +67,7 @@ describe("ACP-based built-in adapters", () => {
       if (expectIsolationKeys) {
         it("provides expected isolationEnv keys", () => {
           const adapter = getAdapter(name);
-          const env = adapter.isolationEnv?.("/tmp/ws") ?? {};
+          const env = adapter.isolationEnv?.({ workspace: "/tmp/ws", home: "/tmp/home" }) ?? {};
           for (const key of expectIsolationKeys) {
             expect(env, `${name} isolationEnv missing ${key}`).toHaveProperty(key);
           }

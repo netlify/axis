@@ -25,6 +25,10 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
 
   const workspace = originalWorkspace ?? fs.mkdtempSync(path.join(os.tmpdir(), `axis-${options.scenarioKey}-`));
   const shouldCleanup = !originalWorkspace;
+  // Always give the judge a fresh, isolated HOME — it doesn't need (and
+  // shouldn't see) the agent's session state, and adapter `*_HOME` env vars
+  // must point at a writable dir distinct from `workspace`.
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), `axis-judge-home-`));
 
   try {
     const output = await adapter.run({
@@ -37,9 +41,15 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
         judge: [],
       },
       workingDirectory: workspace,
+      homeDirectory: home,
     });
     return output.result ?? "";
   } finally {
+    try {
+      fs.rmSync(home, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
     if (shouldCleanup) {
       try {
         fs.rmSync(workspace, { recursive: true, force: true });

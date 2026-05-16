@@ -15,21 +15,23 @@ export function createClaudeCodeAdapter(): AgentAdapter {
 
     requiredEnv: () => ["ANTHROPIC_API_KEY"],
 
-    isolationEnv: (workspace) => ({
-      CLAUDE_CONFIG_DIR: path.join(workspace, ".claude"),
+    isolationEnv: ({ home }) => ({
+      CLAUDE_CONFIG_DIR: path.join(home, ".claude"),
       CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
       DISABLE_AUTOUPDATER: "1",
       DISABLE_TELEMETRY: "1",
     }),
 
     prepare: (ctx) => {
-      // Claude Code discovers .mcp.json in the workspace root
-      if (ctx.input.mcpServers && Object.keys(ctx.input.mcpServers).length > 0) {
-        writeClaudeMcpConfig(ctx.workingDirectory, ctx.input.mcpServers);
+      const configDir = ctx.env?.CLAUDE_CONFIG_DIR;
+      // MCP config goes into HOME (and is wired via --mcp-config below) so the
+      // workspace never contains a `.mcp.json` the agent could scan.
+      if (configDir && ctx.input.mcpServers && Object.keys(ctx.input.mcpServers).length > 0) {
+        writeClaudeMcpConfig(path.join(configDir, "mcp.json"), ctx.input.mcpServers);
       }
-      // Claude Code discovers .claude/skills/ in the workspace
-      if (ctx.input.resolvedSkills?.length) {
-        writeClaudeSkills(ctx.workingDirectory, ctx.input.resolvedSkills);
+      // Skills go to CLAUDE_CONFIG_DIR/skills/ (user-scoped), which is under HOME.
+      if (configDir && ctx.input.resolvedSkills?.length) {
+        writeClaudeSkills(configDir, ctx.input.resolvedSkills);
       }
     },
 
@@ -42,6 +44,12 @@ export function createClaudeCodeAdapter(): AgentAdapter {
 
       if (skipPermissions) args.push("--dangerously-skip-permissions");
       if (input.config.model) args.push("--model", input.config.model);
+
+      // Point Claude Code at the MCP config we wrote into HOME (if any). The
+      // file is only created when the scenario configured MCP servers.
+      if (input.mcpServers && Object.keys(input.mcpServers).length > 0) {
+        args.push("--mcp-config", path.join(input.homeDirectory, ".claude", "mcp.json"));
+      }
 
       for (const [key, value] of Object.entries(flags)) {
         if (key === "dangerously-skip-permissions") continue;

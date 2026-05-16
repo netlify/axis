@@ -18,8 +18,8 @@ export function createClaudeSdkAdapter(): AgentAdapter {
 
     requiredEnv: () => ["ANTHROPIC_API_KEY"],
 
-    isolationEnv: (workspace) => ({
-      CLAUDE_CONFIG_DIR: path.join(workspace, ".claude"),
+    isolationEnv: ({ home }) => ({
+      CLAUDE_CONFIG_DIR: path.join(home, ".claude"),
       CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
       DISABLE_AUTOUPDATER: "1",
       DISABLE_TELEMETRY: "1",
@@ -41,9 +41,11 @@ export function createClaudeSdkAdapter(): AgentAdapter {
     },
 
     prepare: (ctx) => {
-      // Skills are file-based — write them so the agent SDK discovers them
-      if (ctx.input.resolvedSkills?.length) {
-        writeClaudeSkills(ctx.workingDirectory, ctx.input.resolvedSkills);
+      // Skills go into CLAUDE_CONFIG_DIR (which lives in HOME) so the agent
+      // doesn't see them when scanning the workspace.
+      const configDir = ctx.env?.CLAUDE_CONFIG_DIR;
+      if (configDir && ctx.input.resolvedSkills?.length) {
+        writeClaudeSkills(configDir, ctx.input.resolvedSkills);
       }
     },
   });
