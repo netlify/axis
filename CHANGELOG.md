@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.0](https://github.com/netlify/axis/compare/v1.10.0...v1.11.0) (2026-05-16)
+
+
+### Features
+
+* isolate the home dir from working dir ([5aaf474](https://github.com/netlify/axis/commit/5aaf474eefe9d29b1e5971c619913b98490d80dd))
+
+
+### Bug Fixes
+
+* agent selection when you have models too ([341faa2](https://github.com/netlify/axis/commit/341faa28d5a39a023e5ec534ce07e4411e77bb33))
+* report interaction expansions ([78a8955](https://github.com/netlify/axis/commit/78a8955dc37045f8c0cb29b607a8efb2a3e61dce))
+
 ## [1.10.0](https://github.com/netlify/axis/compare/v1.9.0...v1.10.0) (2026-05-15)
 
 
