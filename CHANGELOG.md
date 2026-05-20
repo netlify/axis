@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/netlify/axis/compare/v1.11.0...v1.12.0) (2026-05-20)
+
+
+### Features
+
+* support scoring via different agents ([2c76fec](https://github.com/netlify/axis/commit/2c76fec03edfb14ab43a5e9baea897093c2378ba))
+
 ## [1.11.0](https://github.com/netlify/axis/compare/v1.10.0...v1.11.0) (2026-05-16)
 
 
