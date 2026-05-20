@@ -63,6 +63,9 @@ const mcpExample = `{
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
     }
   },
+  "judging": {
+    "agents": ["claude-code", "codex"]
+  },
   "skills": ["./skills/deploy"],
   "adapters": {
     "my-agent": "./adapters/my-agent.ts"
@@ -209,6 +212,15 @@ export default async () => {
         <td><code>object</code></td>
         <td><span class="req-no">No</span></td>
         <td>MCP servers available to all agents.</td>
+      </tr>
+      <tr>
+        <td><code>judging</code></td>
+        <td><code>object</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Precedence-ordered list of judge agents for scoring. See <a href="#judging">Judging
+          Agents</a>. When omitted, each run is judged by its own agent.
+        </td>
       </tr>
       <tr>
         <td><code>skills</code></td>
@@ -630,6 +642,41 @@ curl -X POST "$SLACK_WEBHOOK" \\
       </tr>
     </tbody>
   </table>
+
+  <h2 id="judging">Judging Agents</h2>
+  <p>
+    By default, every run is judged by the same agent that produced it &mdash; the agent under
+    test scores its own work. Set <code>judging.agents</code> to a precedence-ordered list of
+    judge candidates. For each run, AXIS picks the first entry whose adapter name differs from
+    the run's own agent so a fresh perspective evaluates the work. If every entry matches the
+    run's own agent, the first entry is used.
+  </p>
+  <p>
+    Each entry accepts the same shorthand as <code>agents</code>: a string (agent name) or a full
+    <code>AgentConfig</code> object with <code>model</code> and adapter <code>flags</code>. Every
+    candidate judge must be installed and have any required environment variables set &mdash;
+    AXIS validates this during pre-flight before any jobs run.
+  </p>
+  <pre><code>{`{
+  "agents": ["claude-code", "codex", "gemini"],
+  "judging": {
+    "agents": ["claude-code", "codex"]
+  }
+}`}</code></pre>
+  <p>
+    With the config above, runs by <code>claude-code</code> are judged by <code>codex</code>
+    (first entry whose adapter differs), and runs by <code>codex</code> or <code>gemini</code>
+    are judged by <code>claude-code</code>. Pin a specific model on any candidate by passing the
+    full <code>AgentConfig</code> form:
+  </p>
+  <pre><code>{`{
+  "judging": {
+    "agents": [
+      { "agent": "claude-code", "model": "opus" },
+      "codex"
+    ]
+  }
+}`}</code></pre>
 
   <h2>Skills</h2>
   <p>

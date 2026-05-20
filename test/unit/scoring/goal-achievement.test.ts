@@ -174,4 +174,39 @@ describe("scoreGoalAchievement", () => {
     expect(call.prompt).toContain("Visit the target URL");
     expect(call.scenario.key).toBe("__judge__");
   });
+
+  it("uses the first judging agent that differs from the run's own agent", async () => {
+    const adapter = createMockAdapter(JSON.stringify({ grades: [{ criterion_index: 0, score: 5, rationale: "OK" }] }));
+    mockGetAdapter.mockReturnValue(adapter);
+
+    const runResult = makeRunResult([{ check: "Test criterion", weight: 1.0 }]);
+    // Run agent is claude-code; first non-matching entry is codex.
+    const judging = [{ agent: "claude-code" }, { agent: "codex", model: "gpt-5" }, { agent: "gemini" }];
+    await scoreGoalAchievement(runResult, getNormalizedEntries(runResult), judging);
+
+    expect(mockGetAdapter).toHaveBeenCalledWith("codex");
+    expect(adapter.run.mock.calls[0][0].config).toEqual({ agent: "codex", model: "gpt-5" });
+  });
+
+  it("falls back to the first judging entry when every entry matches the run's agent", async () => {
+    const adapter = createMockAdapter(JSON.stringify({ grades: [{ criterion_index: 0, score: 5, rationale: "OK" }] }));
+    mockGetAdapter.mockReturnValue(adapter);
+
+    const runResult = makeRunResult([{ check: "Test criterion", weight: 1.0 }]);
+    const judging = [{ agent: "claude-code", model: "opus" }, { agent: "claude-code", model: "sonnet" }];
+    await scoreGoalAchievement(runResult, getNormalizedEntries(runResult), judging);
+
+    expect(mockGetAdapter).toHaveBeenCalledWith("claude-code");
+    expect(adapter.run.mock.calls[0][0].config).toEqual({ agent: "claude-code", model: "opus" });
+  });
+
+  it("falls back to the run's agent when no judging is configured", async () => {
+    const adapter = createMockAdapter(JSON.stringify({ grades: [{ criterion_index: 0, score: 5, rationale: "OK" }] }));
+    mockGetAdapter.mockReturnValue(adapter);
+
+    const runResult = makeRunResult([{ check: "Test criterion", weight: 1.0 }]);
+    await scoreGoalAchievement(runResult, getNormalizedEntries(runResult));
+
+    expect(adapter.run.mock.calls[0][0].config).toEqual(runResult.agentConfig);
+  });
 });

@@ -408,6 +408,45 @@ describe("validateConfig", () => {
     const config = { scenarios: "./s", agents: ["x"], artifacts: "*.log" };
     expect(() => validateConfig(config, "test.json")).toThrow(`"artifacts" must be an array of non-empty glob strings`);
   });
+
+  it("accepts judging.agents as string entries", () => {
+    const config = { scenarios: "./s", agents: ["claude-code"], judging: { agents: ["claude-code", "codex"] } };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("accepts judging.agents with AgentConfig entries", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["claude-code"],
+      judging: { agents: [{ agent: "claude-code", model: "opus" }, "codex"] },
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("rejects judging that is not an object", () => {
+    const config = { scenarios: "./s", agents: ["x"], judging: "claude-code" };
+    expect(() => validateConfig(config, "test.json")).toThrow(`"judging" must be an object`);
+  });
+
+  it("rejects judging without an agents array", () => {
+    const config = { scenarios: "./s", agents: ["x"], judging: {} };
+    expect(() => validateConfig(config, "test.json")).toThrow(`"judging" must include an "agents" array`);
+  });
+
+  it("rejects judging.agents that is empty", () => {
+    const config = { scenarios: "./s", agents: ["x"], judging: { agents: [] } };
+    expect(() => validateConfig(config, "test.json")).toThrow(`"judging.agents" must be a non-empty array`);
+  });
+
+  it("rejects judging.agents entries that are empty strings", () => {
+    const config = { scenarios: "./s", agents: ["x"], judging: { agents: [""] } };
+    expect(() => validateConfig(config, "test.json")).toThrow(`"judging.agents[0]" must be a non-empty string`);
+  });
+
+  it("rejects judging.agents object entries missing inner agent name", () => {
+    const config = { scenarios: "./s", agents: ["x"], judging: { agents: [{ model: "opus" }] } };
+    expect(() => validateConfig(config, "test.json")).toThrow(`"judging.agents[0].agent" must be a non-empty string`);
+  });
 });
 
 describe("validateScenario", () => {

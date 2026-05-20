@@ -1,4 +1,4 @@
-import type { ScoringWeights } from "./config.js";
+import type { AgentConfig, ScoringWeights } from "./config.js";
 import type { BaseRunResult, Logger, RunSummary } from "./output.js";
 
 // --- Per-criterion judge output ---
@@ -174,6 +174,12 @@ export interface ScoreResult {
   weights: ScoringWeights;
   /** The sparse index generated for this run (included in debug mode). */
   sparseIndex?: SparseIndex;
+  /**
+   * Resolved agent configuration that actually scored this run. Set even when
+   * the run was judged by its own agent (in which case it matches
+   * `BaseRunResult.agentConfig`) so the report can always show who scored what.
+   */
+  judging?: AgentConfig;
 }
 
 // --- Scored run result ---
@@ -205,4 +211,11 @@ export interface ScoringOptions {
   onProgress?: (scenarioKey: string, agentName: string, phase: "start" | "done") => void;
   /** Report directory for writing raw data before judges run. */
   reportDir?: string;
+  /**
+   * Resolved judge agents in precedence order. For each run, the judge is the
+   * first entry whose adapter name differs from the run's own agent; if every
+   * entry matches the run's own agent, the first entry is used. When omitted,
+   * each run is judged by its own agent (the agent under test scores itself).
+   */
+  judging?: AgentConfig[];
 }

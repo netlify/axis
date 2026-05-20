@@ -5,5 +5,8 @@
     { "agent": "claude-code", "model": "claude-opus-4-6" },
     "codex"
   ],
+  "judging": {
+    "agents": [{ "agent": "claude-code", "model": "claude-opus-4-7" }, "codex"]
+  },
   "artifacts": ["./*.md"]
 }

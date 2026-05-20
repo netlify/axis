@@ -1,6 +1,6 @@
 import type { NormalizedEntry, NormalizedTranscript } from "../transcript/types.js";
 import type { RunResult } from "../types/output.js";
-import type { ScoringWeights } from "../types/config.js";
+import type { AgentConfig, ScoringWeights } from "../types/config.js";
 import type {
   CategoryEvalResult,
   DeepEvalResult,
@@ -31,6 +31,11 @@ export interface DeepEvalOptions {
   weights?: ScoringWeights;
   /** Report directory containing raw data files for judges. */
   reportDir?: string;
+  /**
+   * Judge agents in precedence order. The runner picks the first whose adapter
+   * name differs from the run's own agent (or falls back to the first entry).
+   */
+  judging?: AgentConfig[];
 }
 
 /**
@@ -66,7 +71,7 @@ export async function runDeepEval(
         return buildDefaultCategoryResult(category);
       }
 
-      return runCategoryEval(result, sparseIndex, normalized, category, options?.reportDir);
+      return runCategoryEval(result, sparseIndex, normalized, category, options?.reportDir, options?.judging);
     }),
   );
 
@@ -133,11 +138,13 @@ async function runCategoryEval(
   normalized: NormalizedTranscript,
   category: InteractionCategory,
   reportDir?: string,
+  judging?: AgentConfig[],
 ): Promise<CategoryEvalResult> {
   const prompt = buildCategoryEvalPrompt(result, sparseIndex, normalized, category, reportDir);
   const responseText = await callJudge(result, prompt, {
     scenarioKey: `__${category}_eval__`,
     scenarioName: `AXIS ${category} Evaluation`,
+    judging,
   });
 
   return parseCategoryEvalResponse(responseText, category, sparseIndex);

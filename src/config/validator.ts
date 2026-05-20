@@ -71,6 +71,40 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
   if (obj.artifacts !== undefined) {
     validateArtifactPatterns(obj.artifacts, filePath, "artifacts");
   }
+
+  if (obj.judging !== undefined) {
+    validateJudging(obj.judging, filePath);
+  }
+}
+
+function validateJudging(data: unknown, filePath: string): void {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new Error(`Invalid config at ${filePath}: "judging" must be an object`);
+  }
+  const obj = data as Record<string, unknown>;
+  if (obj.agents === undefined) {
+    throw new Error(`Invalid config at ${filePath}: "judging" must include an "agents" array`);
+  }
+  if (!Array.isArray(obj.agents) || obj.agents.length === 0) {
+    throw new Error(`Invalid config at ${filePath}: "judging.agents" must be a non-empty array`);
+  }
+  for (let i = 0; i < obj.agents.length; i++) {
+    const entry = obj.agents[i];
+    if (typeof entry === "string") {
+      if (entry.length === 0) {
+        throw new Error(`Invalid config at ${filePath}: "judging.agents[${i}]" must be a non-empty string`);
+      }
+      continue;
+    }
+    if (typeof entry === "object" && entry !== null && !Array.isArray(entry)) {
+      const agentObj = entry as Record<string, unknown>;
+      if (typeof agentObj.agent !== "string" || agentObj.agent.length === 0) {
+        throw new Error(`Invalid config at ${filePath}: "judging.agents[${i}].agent" must be a non-empty string`);
+      }
+      continue;
+    }
+    throw new Error(`Invalid config at ${filePath}: "judging.agents[${i}]" must be a string or an AgentConfig object`);
+  }
 }
 
 function validateScenariosField(data: unknown, filePath: string): void {

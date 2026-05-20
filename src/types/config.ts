@@ -33,6 +33,15 @@ export interface AxisConfig {
   env?: string[];
   /** MCP servers available to all agents during execution. */
   mcp_servers?: Record<string, McpServerConfig>;
+  /**
+   * Agents used to evaluate runs (judge LLM calls in scoring). When omitted,
+   * each run is judged by its own agent (the agent under test scores itself).
+   *
+   * For each run, the judge is the first entry in `agents` whose adapter name
+   * differs from the agent being scored. If every entry matches the run's own
+   * agent, the first entry is used. Order is precedence.
+   */
+  judging?: JudgingConfig;
   /** Skills available to all agents. Merged with per-agent skills. Each entry is a local path, GitHub shorthand (owner/repo), or GitHub URL. */
   skills?: string[];
   /**
@@ -62,6 +71,22 @@ export interface ResolvedSkill {
   name: string;
   /** Absolute path to the skill directory containing SKILL.md. */
   path: string;
+}
+
+/**
+ * Configures the agents used to evaluate runs. After {@link loadConfig}
+ * normalization, every entry of `agents` is an {@link AgentConfig}; string
+ * entries (e.g. `"claude-code"`) are expanded into `{ agent: "claude-code" }`.
+ */
+export interface JudgingConfig {
+  /**
+   * Judge agents in precedence order. For each run, the judge is the first
+   * entry whose adapter name differs from the run's own agent; if every
+   * entry matches the run's own agent, the first entry is used. Each entry
+   * is a string (agent name) or a full {@link AgentConfig} with model and
+   * adapter flags.
+   */
+  agents: (string | AgentConfig)[];
 }
 
 export interface AgentConfig {

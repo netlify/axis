@@ -280,16 +280,24 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   // from ensureInstalled (e.g. npx fallback messages) don't interfere with
   // ink's cursor tracking when it starts rendering the live display.
   const checkedAdapters = new Set<string>();
-  for (const job of jobs) {
-    if (checkedAdapters.has(job.agentConfig.agent)) continue;
-    checkedAdapters.add(job.agentConfig.agent);
+  const adapterNames = jobs.map((j) => j.agentConfig.agent);
+  // Every configured judge runs as an LLM via its adapter too, so each one
+  // needs the same env/binary checks. Surfacing missing creds here keeps
+  // scoring failures from showing up only after every run has executed.
+  for (const entry of config.judging?.agents ?? []) {
+    if (typeof entry === "object") adapterNames.push(entry.agent);
+  }
 
-    const adapter = getAdapter(job.agentConfig.agent);
+  for (const agentName of adapterNames) {
+    if (checkedAdapters.has(agentName)) continue;
+    checkedAdapters.add(agentName);
+
+    const adapter = getAdapter(agentName);
     const required = adapter.requiredEnv?.() ?? [];
     const missing = required.filter((key) => !jobEnv[key]);
     if (missing.length > 0) {
       throw new Error(
-        `The "${job.agentConfig.agent}" agent requires environment variable${missing.length > 1 ? "s" : ""} ${missing.join(", ")} ` +
+        `The "${agentName}" agent requires environment variable${missing.length > 1 ? "s" : ""} ${missing.join(", ")} ` +
           `but ${missing.length > 1 ? "they are" : "it is"} not set. ` +
           `Add ${missing.length > 1 ? "them" : "it"} to your shell environment or to the "env" array in axis.config.json.`,
       );

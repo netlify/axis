@@ -13,6 +13,7 @@ import type {
 import { normalizeTranscript, toTranscriptAnalysis } from "../transcript/normalize.js";
 import { writeScenarioRawData } from "../reports/writer.js";
 import { scoreGoalAchievement } from "./goal-achievement.js";
+import { resolveJudgeAgent, formatJudgeLabel } from "./judge.js";
 import { buildSparseIndex, populateInteractionContent } from "./sparse-index.js";
 import { runDeepEval } from "./deep-eval.js";
 import { computeCategoryScore } from "./category-score.js";
@@ -32,9 +33,13 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
 export async function scoreRunResult(result: RunResult, options?: ScoringOptions): Promise<ScoredRunResult> {
   const weights = options?.weights ?? DEFAULT_WEIGHTS;
   const logger = options?.logger;
+  // Resolve once so every judge call for this run uses the same agent and the
+  // report can record exactly which agent did the scoring.
+  const judgeAgent = resolveJudgeAgent(result, options?.judging);
+  const resolvedJudging = [judgeAgent];
   const label = `${result.scenarioKey} (${result.agentName})`;
 
-  logger?.verbose?.(`Scoring ${label}...`);
+  logger?.verbose?.(`Scoring ${label} — judge: ${formatJudgeLabel(judgeAgent)}`);
   options?.onProgress?.(result.scenarioKey, result.agentName, "start");
 
   // Step 1: Normalize transcript (existing, unchanged)
@@ -56,7 +61,7 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   // quality — there's no process to grade. Without this, empty-transcript runs
   // get perfect-score defaults in env/service/agent because nothing was audited.
   if (isFailedRun(result)) {
-    const score = buildZeroScore(result, weights, sparseIndex.lines.length > 0 ? sparseIndex : undefined);
+    const score = buildZeroScore(result, weights, sparseIndex.lines.length > 0 ? sparseIndex : undefined, judgeAgent);
     options?.onProgress?.(result.scenarioKey, result.agentName, "done");
     result.output.transcriptAnalysis = toTranscriptAnalysis(normalized);
     return {
@@ -79,8 +84,9 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
     runDeepEval(result, sparseIndex, normalized, {
       weights,
       reportDir: options?.reportDir,
+      judging: resolvedJudging,
     }),
-    scoreGoalAchievement(result, normalized.entries),
+    scoreGoalAchievement(result, normalized.entries, resolvedJudging),
   ]);
 
   // Step 5: Compute category scores
@@ -124,6 +130,7 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
     agent,
     weights,
     sparseIndex,
+    judging: judgeAgent,
   };
 
   options?.onProgress?.(result.scenarioKey, result.agentName, "done");
@@ -188,7 +195,8 @@ function isFailedRun(result: RunResult): boolean {
 function buildZeroScore(
   result: RunResult,
   weights: ScoringWeights,
-  sparseIndex?: ScoreResult["sparseIndex"],
+  sparseIndex: ScoreResult["sparseIndex"] | undefined,
+  judging: ScoreResult["judging"],
 ): ScoreResult {
   const reason = result.output.metadata.error
     ? `Run failed: ${result.output.metadata.error}`
@@ -202,6 +210,7 @@ function buildZeroScore(
     agent: buildZeroCategoryScore("agent"),
     weights,
     ...(sparseIndex ? { sparseIndex } : {}),
+    ...(judging ? { judging } : {}),
   };
 }
 

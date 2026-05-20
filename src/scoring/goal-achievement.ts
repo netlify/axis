@@ -2,6 +2,7 @@ import type { NormalizedEntry } from "../transcript/types.js";
 import type { JudgeCriterion } from "../types/scenario.js";
 import type { RunResult } from "../types/output.js";
 import type { AgentMetadata } from "../types/agent.js";
+import type { AgentConfig } from "../types/config.js";
 import type { GoalAchievementScore, CriterionGrade } from "../types/scoring.js";
 import { callJudge } from "./judge.js";
 import { parseJsonFromText } from "./parse-json.js";
@@ -10,19 +11,20 @@ import { getPromptTemplates, interpolate } from "./prompt-templates.js";
 export async function scoreGoalAchievement(
   result: RunResult,
   normalizedEntries: NormalizedEntry[],
+  judging?: AgentConfig[],
 ): Promise<GoalAchievementScore> {
   const { judge } = result;
   const { result: finalResult } = result.output;
 
   if (typeof judge === "string") {
-    return scoreStringJudge(result, judge, normalizedEntries, finalResult);
+    return scoreStringJudge(result, judge, normalizedEntries, finalResult, judging);
   }
 
   if (!judge || judge.length === 0) {
     return { score: 0, criteria: [] };
   }
 
-  return scoreArrayJudge(result, judge, normalizedEntries, finalResult);
+  return scoreArrayJudge(result, judge, normalizedEntries, finalResult, judging);
 }
 
 async function scoreStringJudge(
@@ -30,11 +32,13 @@ async function scoreStringJudge(
   judge: string,
   entries: NormalizedEntry[],
   finalResult: string | null,
+  judging: AgentConfig[] | undefined,
 ): Promise<GoalAchievementScore> {
   const prompt = buildStringJudgePrompt(runResult, entries, finalResult, judge);
   const responseText = await callJudge(runResult, prompt, {
     scenarioKey: "__judge__",
     scenarioName: "AXIS Judge",
+    judging,
   });
 
   const parsed = parseJsonFromText(responseText);
@@ -71,11 +75,13 @@ async function scoreArrayJudge(
   judge: JudgeCriterion[],
   entries: NormalizedEntry[],
   finalResult: string | null,
+  judging: AgentConfig[] | undefined,
 ): Promise<GoalAchievementScore> {
   const prompt = buildArrayJudgePrompt(runResult, entries, finalResult, judge);
   const responseText = await callJudge(runResult, prompt, {
     scenarioKey: "__judge__",
     scenarioName: "AXIS Judge",
+    judging,
   });
 
   const criteria = parseArrayJudgeResponse(responseText, judge);

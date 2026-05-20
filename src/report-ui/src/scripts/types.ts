@@ -88,6 +88,8 @@ export interface ScoreResult {
   agent: CategoryScore;
   weights: ScoringWeights;
   sparseIndex?: SparseIndex;
+  /** Agent configuration that produced this score. */
+  judging?: { agent: string; model?: string; command?: string; flags?: Record<string, unknown> };
 }
 
 export interface ScoringWeights {

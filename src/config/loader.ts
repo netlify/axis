@@ -35,6 +35,7 @@ export async function loadConfig(configPath?: string): Promise<{ config: AxisCon
 
   validateConfig(parsed, resolvedPath);
   normalizeConfigAgents(parsed);
+  normalizeJudging(parsed);
 
   // Default the scenarios source when omitted; downstream code can assume it is set.
   if (parsed.scenarios === undefined) {
@@ -119,6 +120,21 @@ async function importModule(filePath: string): Promise<{ default?: unknown }> {
     return (await jiti.import(filePath)) as { default?: unknown };
   }
   throw new Error(`Unsupported module extension "${ext}" at ${filePath}`);
+}
+
+/**
+ * Normalize `judging.agents` so downstream code can rely on every entry being
+ * a full {@link AgentConfig} with a lowercase adapter name.
+ */
+function normalizeJudging(config: AxisConfig): void {
+  if (!config.judging) return;
+  config.judging.agents = config.judging.agents.map((entry) => {
+    if (typeof entry === "string") {
+      return { agent: entry.toLowerCase() };
+    }
+    entry.agent = entry.agent.toLowerCase();
+    return entry;
+  });
 }
 
 /** Lowercase all agent names in a validated config (mutates in place). */

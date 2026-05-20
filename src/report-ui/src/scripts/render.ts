@@ -1033,6 +1033,7 @@ function renderModal(entry: ResultEntry, index: number): string {
           ${resolved?.mcpServers && Object.keys(resolved.mcpServers).length ? renderModalMcp(resolved.mcpServers) : ""}
           ${entry.prompt ? renderModalPrompt(entry.prompt) : ""}
           ${(entry.judge ?? entry.rubric) ? renderModalJudge((entry.judge ?? entry.rubric)!) : ""}
+          ${entry.score?.judging ? renderModalJudgeAgent(entry.score.judging) : ""}
           ${resolved?.setup?.length ? renderModalLifecycle("Setup", resolved.setup) : ""}
           ${resolved?.teardown?.length ? renderModalLifecycle("Teardown", resolved.teardown) : ""}
         </div>
@@ -1144,6 +1145,16 @@ function renderModalPrompt(prompt: string): string {
     <div class="modal-section">
       <h4>Prompt</h4>
       <pre class="modal-prompt">${escapeHtml(prompt)}</pre>
+    </div>`;
+}
+
+function renderModalJudgeAgent(judging: NonNullable<ResultEntry["score"]>["judging"]): string {
+  if (!judging) return "";
+  const label = judging.model ? `${judging.agent}|${judging.model}` : judging.agent;
+  return `
+    <div class="modal-section">
+      <h4>Agent used for judging:</h4>
+      <p class="modal-judge-agent"><code>${escapeHtml(label)}</code></p>
     </div>`;
 }
 

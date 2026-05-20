@@ -25,7 +25,7 @@ import {
 import { formatError } from "./types/output.js";
 import type { Logger, JobState, RunResult, RunOutput } from "./types/output.js";
 import type { ScoredRunResult, ScoredOutput } from "./types/scoring.js";
-import type { AxisConfig } from "./types/config.js";
+import type { AgentConfig, AxisConfig } from "./types/config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf-8"));
@@ -242,7 +242,16 @@ async function executeRunPipeline(
   const runAbort = new AbortController();
   activeRunAbort = runAbort;
   try {
-    return await runPipelineBody(opts, logger, config, configDir, runAbort, scoringPromises, onScoringStart, onScoringDone);
+    return await runPipelineBody(
+      opts,
+      logger,
+      config,
+      configDir,
+      runAbort,
+      scoringPromises,
+      onScoringStart,
+      onScoringDone,
+    );
   } finally {
     activeRunAbort = undefined;
   }
@@ -275,6 +284,11 @@ async function runPipelineBody(
   // Create report directory early so scoring can write raw data for judges to read
   const { reportId, reportDir } = initReport(new Date().toISOString(), configDir);
 
+  // After loadConfig() normalization, every entry in `judging.agents` is an
+  // AgentConfig. The list is preserved so the scoring layer can pick the
+  // best-matching judge per run (skip the run's own agent when possible).
+  const judging = config.judging?.agents.filter((a): a is AgentConfig => typeof a === "object");
+
   let runOutput: RunOutput | undefined;
   let output: ScoredOutput | RunOutput | undefined;
 
@@ -301,6 +315,7 @@ async function runPipelineBody(
               weights: config.settings?.scoring_weights,
               logger,
               reportDir,
+              judging,
               onProgress: (scenarioKey, agentName, phase) => {
                 if (phase === "start") onScoringStart?.(scenarioKey, agentName);
               },
@@ -331,6 +346,7 @@ async function runPipelineBody(
               weights: config.settings?.scoring_weights,
               logger,
               reportDir,
+              judging,
             }).catch((err) => {
               logger.error(`Scoring fallback failed for ${r.scenarioKey} (${r.agentName}): ${formatError(err)}`);
               return undefined;
@@ -395,6 +411,31 @@ function buildEmptyRunOutput(): RunOutput {
   };
 }
 
+interface JudgePickRow {
+  scenarioKey: string;
+  agentName: string;
+  judgeLabel: string;
+}
+
+/**
+ * Gather the resolved judge agent for every scored run so the CLI can print
+ * a per-scenario summary alongside the report links. Returns an empty array
+ * when no run carries a `score.judging` field (unscored output or pre-judging
+ * report).
+ */
+function collectJudgePicks(output: ScoredOutput | RunOutput): JudgePickRow[] {
+  if (!("results" in output) || !output.results) return [];
+  const picks: JudgePickRow[] = [];
+  for (const r of output.results) {
+    if (!("score" in r) || !r.score?.judging) continue;
+    const j = r.score.judging;
+    const label = j.model ? `${j.agent}|${j.model}` : j.agent;
+    picks.push({ scenarioKey: r.scenarioKey, agentName: r.agentName, judgeLabel: label });
+  }
+  picks.sort((a, b) => a.scenarioKey.localeCompare(b.scenarioKey) || a.agentName.localeCompare(b.agentName));
+  return picks;
+}
+
 /**
  * Await scoring promises, but bail out after `graceMs` once `signal` aborts.
  * Promises that haven't resolved by the deadline are excluded from the
@@ -438,10 +479,7 @@ program
   .option("-o, --output-dir <dir>", "also write axis-report-[timestamp].json to this directory")
   .option("--concurrency <n>", "max parallel jobs (default: 15)", parseInt)
   .option("--debug", "show debug output (workspace paths, env, lifecycle)", false)
-  .option(
-    "--failed [reportId]",
-    "re-run only the failed scenario/agent pairs from a previous report (default: latest)",
-  )
+  .option("--failed [reportId]", "re-run only the failed scenario/agent pairs from a previous report (default: latest)")
   .option("--no-score", "skip scoring (raw results only)")
   .option("--refresh-skills", "force re-clone of cached remote skills", false)
   .option(
@@ -595,6 +633,19 @@ program
       // Let ink render the final "done" state before unmounting
       if (unmountInk) await new Promise((r) => setTimeout(r, 100));
       unmountInk?.();
+
+      // Summarize judge picks before the report links so users can see at a
+      // glance which agent scored each run.
+      if (opts.score) {
+        const judgePicks = collectJudgePicks(output);
+        if (judgePicks.length > 0) {
+          process.stderr.write(`  Scoring judges:\n`);
+          for (const pick of judgePicks) {
+            process.stderr.write(`    ${pick.scenarioKey} (${pick.agentName}) → ${pick.judgeLabel}\n`);
+          }
+          process.stderr.write(`\n`);
+        }
+      }
 
       process.stderr.write(`  Report saved: .axis/reports/${reportId}\n`);
       process.stderr.write(`  View details: axis reports ${reportId}\n`);

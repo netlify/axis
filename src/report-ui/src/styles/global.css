@@ -518,6 +518,7 @@ h3 {
   flex-shrink: 0;
 }
 
+
 .category-bars {
   flex: 1;
   display: flex;
@@ -1695,6 +1696,18 @@ a.wf-id.interaction-link {
   word-break: break-word;
   max-height: 240px;
   overflow-y: auto;
+}
+
+.modal-judge-agent {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.modal-judge-agent code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-primary);
 }
 
 .modal-judge-table {

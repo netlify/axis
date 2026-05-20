@@ -150,6 +150,19 @@ describe("scoreResults", () => {
     expect(scored.results[0].score.agent).toBeDefined();
   });
 
+  it("stamps the resolved judging agent onto score (self-judge default)", async () => {
+    const scored = await scoreResults(makeRunOutput());
+    expect(scored.results[0].score.judging).toEqual({ agent: "claude-code" });
+  });
+
+  it("stamps the picked judging agent when a list is configured", async () => {
+    const scored = await scoreResults(makeRunOutput(), {
+      judging: [{ agent: "claude-code", model: "opus" }, { agent: "codex" }],
+    });
+    // Run agent is claude-code; first non-matching entry is codex.
+    expect(scored.results[0].score.judging).toEqual({ agent: "codex" });
+  });
+
   it("calls the scoring pipeline in order", async () => {
     await scoreResults(makeRunOutput());
 

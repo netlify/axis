@@ -293,6 +293,10 @@ function renderScoredResult(result: ScoredRunResult, verbose: boolean): string {
   lines.push(`  ${sep}`);
   lines.push("");
   lines.push(`  AXIS Result         ${score.axisScore} / 100`);
+  if (score.judging) {
+    const judgeLabel = score.judging.model ? `${score.judging.agent}|${score.judging.model}` : score.judging.agent;
+    lines.push(`  Agent used for judging:           ${judgeLabel}`);
+  }
   lines.push("");
 
   // Goal Achievement

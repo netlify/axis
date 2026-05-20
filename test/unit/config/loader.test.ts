@@ -128,6 +128,45 @@ describe("loadConfig", () => {
       await expect(loadConfig()).rejects.toThrow(/Could not read config file.*axis\.config\.json/);
     });
   });
+
+  describe("judging normalization", () => {
+    let tmpDir: string;
+    afterEach(async () => {
+      if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("expands string judging.agents into AgentConfig entries", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-judging-"));
+      const configPath = path.join(tmpDir, "axis.config.json");
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          scenarios: "./scenarios",
+          agents: ["mock-agent"],
+          judging: { agents: ["Claude-Code", "CODEX"] },
+        }),
+      );
+
+      const { config } = await loadConfig(configPath);
+      expect(config.judging).toEqual({ agents: [{ agent: "claude-code" }, { agent: "codex" }] });
+    });
+
+    it("lowercases AgentConfig judging.agents in place", async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-judging-"));
+      const configPath = path.join(tmpDir, "axis.config.json");
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          scenarios: "./scenarios",
+          agents: ["mock-agent"],
+          judging: { agents: [{ agent: "Claude-Code", model: "opus" }] },
+        }),
+      );
+
+      const { config } = await loadConfig(configPath);
+      expect(config.judging).toEqual({ agents: [{ agent: "claude-code", model: "opus" }] });
+    });
+  });
 });
 
 describe("discoverScenarios", () => {
