@@ -160,8 +160,10 @@ function buildCategoryEvalPrompt(
   const { stats } = sparseIndex;
   const sparseLines = truncateSparseLines(sparseIndex.lines);
 
-  // Filter interactions to this category and build content
-  const categoryInteractions = sparseIndex.interactions.filter((i) => i.categories.includes(category));
+  // The agent judge audits EVERY interaction (every tool call is an agent decision).
+  // Env/service judges audit only their own category's interactions.
+  const categoryInteractions =
+    category === "agent" ? sparseIndex.interactions : sparseIndex.interactions.filter((i) => i.categories.includes(category));
   const interactionContent = buildCategoryInteractionContent(categoryInteractions, normalized);
 
   // Build data dir reference
@@ -188,20 +190,21 @@ function buildCategoryEvalPrompt(
 // --- Per-category prompt content ---
 
 /**
- * Env/service: only evaluate execution success.
- * Agent: evaluate success + decision quality (weight, contextRelevance).
+ * Env/service: only evaluate execution success (errors/crashes/timeouts).
+ * Agent: evaluate decision quality (weight, contextRelevance) for every interaction
+ * across all categories, plus success for the agent's own reasoning steps.
  */
 function getEvaluationDimensions(category: InteractionCategory): string {
   if (category === "agent") {
-    return `- success: Was the reasoning productive and focused? Did it lead to progress on the task?
+    return `- success: For agent-only steps (assistant reasoning, planning, todo updates), was the step productive and focused? For tool invocations, score 1.0 if the tool ran — execution success is judged separately under env/service.
 - weight: Were tool invocations right-sized for the operation? Evaluate whether the agent sent an appropriate amount of data to the tool and received a proportionate response. (1.0 = right-sized, 0.3 = bloated/wasteful)
-- contextRelevance: Was the tool's output relevant and usable for the task? If the tool succeeded and the agent used the output to make progress, score 1.0. Only reduce this score if the output was genuinely irrelevant noise that the agent could not use. (1.0 = all useful/necessary, 0.0 = all noise)`;
+- contextRelevance: Was the tool's output relevant and usable for the task? If the tool succeeded and the agent used the output to make progress, score 1.0. Only reduce this score if the output was genuinely irrelevant noise that the agent could not use. (1.0 = all useful/necessary, 0.0 = all noise)
+
+You MUST audit every interaction listed above, including environment and service tool calls — the agent CHOSE each of them, and that choice is what you are evaluating.`;
   }
 
-  // Environment and service: execution quality only
-  return `- success: Did the interaction complete without errors? Were the results correct and usable? Evaluate based on the actual content returned, not assumptions about what a "complete" result should look like.
-
-NOTE: Only evaluate whether the tool/service EXECUTED correctly. The agent's choice of what to invoke and with what parameters is evaluated separately under the agent dimension.`;
+  // Environment and service: execution reliability only — no judgment on choice or relevance.
+  return `- success: Did the underlying environment/service execute the call without error? Score 1.0 if the call completed and returned a well-formed response (regardless of whether the agent should have made the call or whether the response helped the task). Lower the score ONLY for actual failures: non-zero exit codes, missing files, permission errors, syntax errors, crashes, network timeouts, 5xx responses, malformed payloads, rate-limit/auth errors that prevented completion. Do NOT lower it because the result was unrelated to the task or "not useful" — that is the agent's decision and is scored separately.`;
 }
 
 /**
@@ -325,6 +328,11 @@ function formatFullEntry(entry: NormalizedEntry): string {
 /**
  * Parse a per-category judge response into a CategoryEvalResult.
  * Fills in default audits for interactions the LLM missed.
+ *
+ * The agent judge audits EVERY interaction (every tool call is an agent decision);
+ * env/service judges audit only their own category. Each judge's audits are tagged
+ * with that judge's category in `audit.categories`, so downstream filters in
+ * `computeCategoryScore` route them to the right category-score.
  */
 export function parseCategoryEvalResponse(
   responseText: string,
@@ -333,7 +341,8 @@ export function parseCategoryEvalResponse(
 ): CategoryEvalResult {
   const parsed = parseJsonFromText(responseText);
 
-  const categoryInteractions = sparseIndex.interactions.filter((i) => i.categories.includes(category));
+  const categoryInteractions =
+    category === "agent" ? sparseIndex.interactions : sparseIndex.interactions.filter((i) => i.categories.includes(category));
 
   if (!parsed) {
     return buildDefaultCategoryResult(category, categoryInteractions);
@@ -348,7 +357,7 @@ export function parseCategoryEvalResponse(
     if (existing) return existing;
     return {
       id: interaction.id,
-      categories: interaction.categories,
+      categories: [category],
       success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
       speed: DEFAULT_AUDIT_SCORES.speed,
       weight: DEFAULT_AUDIT_SCORES.weight,
@@ -425,35 +434,46 @@ export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseI
 
 /**
  * Merge per-category results into a single DeepEvalResult.
- * Interactions that appear in multiple categories get the audit from the first
- * category that evaluated them (multi-category interactions are rare).
+ *
+ * Audits are kept per-judge — an interaction can have multiple audits (e.g. env
+ * judge scored execution success, agent judge scored decision quality). Each
+ * audit carries its judging category in `audit.categories`, so downstream
+ * filters in `computeCategoryScore` route them correctly.
+ *
+ * Interactions never audited by any judge get a synthetic default tagged to
+ * whichever category they belong to (or "agent" if uncategorized).
  */
 export function mergeCategoryResults(categoryResults: CategoryEvalResult[], sparseIndex: SparseIndex): DeepEvalResult {
-  const auditMap = new Map<number, InteractionAudit>();
-
-  // Collect all audits, first-write-wins for multi-category interactions
+  const allAudits: InteractionAudit[] = [];
+  // Track which (interaction id, category) pairs we've already audited so we
+  // can fill defaults for any interaction that fell through every judge.
+  const auditedKeys = new Set<string>();
   for (const catResult of categoryResults) {
     for (const audit of catResult.audits) {
-      if (!auditMap.has(audit.id)) {
-        auditMap.set(audit.id, audit);
+      allAudits.push(audit);
+      for (const cat of audit.categories) {
+        auditedKeys.add(`${audit.id}:${cat}`);
       }
     }
   }
 
-  // Ensure every interaction has an audit (some may be uncategorized or missed)
-  const allAudits: InteractionAudit[] = sparseIndex.interactions.map((interaction) => {
-    const existing = auditMap.get(interaction.id);
-    if (existing) return existing;
-    return {
-      id: interaction.id,
-      categories: interaction.categories,
-      success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
-      speed: DEFAULT_AUDIT_SCORES.speed,
-      weight: DEFAULT_AUDIT_SCORES.weight,
-      contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
-      rationale: "default",
-    };
-  });
+  // Backfill: any interaction that no judge audited gets a default audit so the
+  // category-score has something to aggregate. Agent judge covers every
+  // interaction, so this normally only fires when an LLM call failed entirely.
+  for (const interaction of sparseIndex.interactions) {
+    const fallbackCategory: InteractionCategory = interaction.categories[0] ?? "agent";
+    if (!auditedKeys.has(`${interaction.id}:${fallbackCategory}`)) {
+      allAudits.push({
+        id: interaction.id,
+        categories: [fallbackCategory],
+        success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
+        speed: DEFAULT_AUDIT_SCORES.speed,
+        weight: DEFAULT_AUDIT_SCORES.weight,
+        contextRelevance: DEFAULT_AUDIT_SCORES.contextRelevance,
+        rationale: "default",
+      });
+    }
+  }
 
   // Collect necessity and patterns from each category
   const necessity: NecessityJudgment[] = categoryResults.map((r) => r.necessity);
@@ -492,7 +512,7 @@ export function buildDefaultCategoryResult(
 ): CategoryEvalResult {
   const audits: InteractionAudit[] = (interactions ?? []).map((interaction) => ({
     id: interaction.id,
-    categories: interaction.categories,
+    categories: [category],
     success: interaction.hasError ? 0.3 : DEFAULT_AUDIT_SCORES.success,
     speed: DEFAULT_AUDIT_SCORES.speed,
     weight: DEFAULT_AUDIT_SCORES.weight,
@@ -522,8 +542,11 @@ function parseCategoryAudits(
 ): InteractionAudit[] {
   if (!Array.isArray(raw)) return [];
 
-  const categoryInteractions = sparseIndex.interactions.filter((i) => i.categories.includes(category));
-  const interactionMap = new Map(categoryInteractions.map((i) => [i.id, i]));
+  // Agent judge can audit ANY interaction (it's auditing decisions across all categories).
+  // Env/service judges only audit their own category.
+  const candidateInteractions =
+    category === "agent" ? sparseIndex.interactions : sparseIndex.interactions.filter((i) => i.categories.includes(category));
+  const interactionMap = new Map(candidateInteractions.map((i) => [i.id, i]));
   const audits: InteractionAudit[] = [];
 
   for (const item of raw) {
@@ -537,7 +560,10 @@ function parseCategoryAudits(
 
     audits.push({
       id: obj.id,
-      categories: interaction.categories,
+      // Tag the audit with the JUDGING category, not the interaction's category.
+      // This lets the agent judge contribute weight/relevance for env/service tool
+      // choices without those audits also feeding the env/service score.
+      categories: [category],
       success: clamp01(obj.success),
       speed: DEFAULT_AUDIT_SCORES.speed, // placeholder — overridden by heuristic
       // weight/contextRelevance may be absent for env/service (success-only responses)

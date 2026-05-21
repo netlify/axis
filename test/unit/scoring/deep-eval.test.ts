@@ -996,15 +996,18 @@ describe("mergeCategoryResults", () => {
     expect(result.audits[1].rationale).toBe("default");
   });
 
-  it("handles multi-category interactions with first-write-wins", () => {
+  it("keeps per-judge audits for multi-category interactions", () => {
     const sparseIndex = makeSparseIndex([{ id: 1, categories: ["service", "environment"] }]);
 
+    // Each judge audits the interaction from its own perspective and tags the
+    // audit with just its category. Both audits coexist in the merged result;
+    // the per-category filter in computeCategoryScore routes them correctly.
     const envResult: CategoryEvalResult = {
       category: "environment",
       audits: [
         {
           id: 1,
-          categories: ["service", "environment"],
+          categories: ["environment"],
           success: 0.5,
           speed: 1.0,
           weight: 0.5,
@@ -1021,7 +1024,7 @@ describe("mergeCategoryResults", () => {
       audits: [
         {
           id: 1,
-          categories: ["service", "environment"],
+          categories: ["service"],
           success: 0.9,
           speed: 1.0,
           weight: 0.9,
@@ -1033,11 +1036,14 @@ describe("mergeCategoryResults", () => {
       patterns: [],
     };
 
-    // environment comes first in the array → first-write-wins
     const result = mergeCategoryResults([envResult, svcResult], sparseIndex);
-    expect(result.audits).toHaveLength(1);
-    expect(result.audits[0].success).toBe(0.5); // env view wins
-    expect(result.audits[0].rationale).toBe("env view");
+    expect(result.audits).toHaveLength(2);
+    const envAudit = result.audits.find((a) => a.categories.includes("environment"));
+    const svcAudit = result.audits.find((a) => a.categories.includes("service"));
+    expect(envAudit?.success).toBe(0.5);
+    expect(envAudit?.rationale).toBe("env view");
+    expect(svcAudit?.success).toBe(0.9);
+    expect(svcAudit?.rationale).toBe("svc view");
   });
 });
 

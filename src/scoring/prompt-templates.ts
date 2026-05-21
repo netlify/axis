@@ -70,32 +70,41 @@ export function interpolate(template: string, vars: Record<string, string | numb
 export const CATEGORY_GUIDANCE: Record<string, string> = {
   environment: `You are evaluating ENVIRONMENT interactions — file system operations, shell commands, code edits, and local workspace manipulation.
 
-Focus on EXECUTION QUALITY — did the tools work correctly? The agent's choice of what tools to invoke and with what parameters is evaluated separately under the agent dimension.
+Evaluate ONLY whether the environment itself executed reliably. You are NOT judging whether the agent picked the right command or whether the output was useful for the task — those are the agent's decisions, evaluated separately under the agent dimension. If the agent ran \`ls\` and got back a list of files, that is a SUCCESS for the environment regardless of whether \`ls\` was a smart move.
 
 Key considerations:
-- Execution success: Did operations complete without errors? Were results correct?
-- Error handling: Were file-not-found, permission errors, or failed commands surfaced clearly?
-- Result correctness: Did tools return valid, usable results for what was requested?
-- System reliability: Were there unexpected failures, crashes, or timeouts?`,
+- Did commands run to completion, or did the shell/filesystem/tool error out (file-not-found, permission denied, syntax errors, exit code != 0, crashes, timeouts)?
+- Were error messages surfaced clearly, or did they obscure what went wrong?
+- Were there unexpected failures or flakiness from the environment itself (not from the agent's choice of input)?
+
+Do NOT lower scores because:
+- The output was unrelated to the task (that's the agent's tool choice — judged elsewhere)
+- The agent could have used a better command (that's the agent's decision — judged elsewhere)
+- The result wasn't what the agent "needed" (that's relevance — judged elsewhere)`,
 
   service: `You are evaluating SERVICE interactions — API calls, web fetches, external service requests, and network operations.
 
-Focus on EXECUTION QUALITY — did the services respond correctly? The agent's choice of what APIs to call is evaluated separately under the agent dimension.
+Evaluate ONLY whether the services themselves responded reliably. You are NOT judging whether the agent picked the right API or whether the response was useful for the task — those are the agent's decisions, evaluated separately under the agent dimension. A successful API call that returned valid data is a SUCCESS for the service even if the agent didn't need to make the call.
 
 Key considerations:
-- API success: Did calls return valid responses?
-- Error handling: Were rate limits, auth errors, and timeouts surfaced clearly?
-- Response quality: Did services return correct, complete data for what was requested?
-- Reliability: Were there unexpected service failures or degraded responses?`,
+- Did API calls complete and return well-formed responses?
+- Were rate limits, auth errors, 5xx responses, network timeouts, or malformed payloads surfaced clearly?
+- Were there unexpected service failures or degraded responses from the service itself?
 
-  agent: `You are evaluating AGENT interactions — the agent's reasoning, planning, and decision-making quality.
+Do NOT lower scores because:
+- The agent didn't need to call this service (that's necessity — judged elsewhere)
+- The response wasn't relevant to the task (that's the agent's choice — judged elsewhere)`,
+
+  agent: `You are evaluating AGENT decisions — every tool invocation across ALL categories (environment, service, and agent-internal) is an agent decision, plus the agent's own reasoning and planning.
+
+You audit EVERY interaction in the run, not just the ones tagged "agent". For each one ask: was this the right call to make, was it right-sized, did the result help the task?
 
 Key considerations:
-- Planning: Did the agent form a clear plan before acting, or did it thrash?
-- Tool selection: Did the agent choose appropriate tools and parameters? Were invocations right-sized (not reading entire files when sections suffice, not using verbose flags unnecessarily)?
+- Tool selection: Did the agent choose appropriate tools and parameters for what it was trying to accomplish? Even a shell \`ls\` is the agent's choice — was it warranted?
+- Right-sizing (weight): Were invocations proportionate? Reading an entire file when a section suffices, running a verbose command when a focused one would do, fetching all records when one was needed, etc. score worse.
+- Information use (contextRelevance): Did the output of the tool actually serve the task? If the agent invoked something whose output it ignored or that returned noise, mark it down. If the agent productively used the result, score 1.0.
 - Necessity: Were ALL interactions across ALL categories necessary? Did the agent invoke tools it didn't need?
-- Information use: Did the agent effectively use the information it retrieved?
-- Self-correction: When the agent detected errors, did it adjust efficiently?
+- Planning and self-correction: Did the agent form a coherent plan, and when something errored, did it adjust efficiently?
 - Tool discovery: Was tool/capability lookup necessary, or redundant exploration?`,
 };
 

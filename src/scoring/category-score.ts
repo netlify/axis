@@ -173,7 +173,10 @@ export function computeCategoryScore(
   interactions: Interaction[],
   calibration?: CalibrationParams,
 ): CategoryScore {
-  const categoryInteractions = interactions.filter((i) => i.categories.includes(category));
+  // The agent dimension owns every decision the agent made, so its interaction
+  // pool is the full transcript. Env/service only cover their own tagged tools.
+  const categoryInteractions =
+    category === "agent" ? interactions : interactions.filter((i) => i.categories.includes(category));
   const categoryAudits = audits.filter((a) => a.categories.includes(category));
   const auditedCount = categoryAudits.filter((a) => a.rationale !== "default").length;
 
