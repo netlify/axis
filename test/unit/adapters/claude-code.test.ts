@@ -2,12 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createClaudeCodeAdapter } from "../../../src/adapters/claude-code.js";
 import type { AgentAdapter } from "../../../src/types/agent.js";
 import type { AgentInput } from "../../../src/types/agent.js";
+import type * as ChildProcess from "node:child_process";
 import { EventEmitter, Readable } from "node:stream";
 
-// Mock child_process.spawn
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-}));
+// Mock child_process.spawn while preserving other exports (execFile, etc.
+// used by sibling utility modules like local-session)
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof ChildProcess>();
+  return { ...actual, spawn: vi.fn() };
+});
 
 // Mock resolve so adapters skip the real CLI check
 vi.mock("../../../src/adapters/utils/resolve.js", () => ({
@@ -63,6 +66,14 @@ describe("ClaudeCodeAdapter", () => {
 
   it("has name 'claude-code'", () => {
     expect(adapter.name).toBe("claude-code");
+  });
+
+  it("requires ANTHROPIC_API_KEY environment variable", () => {
+    expect(adapter.requiredEnv!()).toEqual(["ANTHROPIC_API_KEY"]);
+  });
+
+  it("exposes hasLocalSession for `claude login` fallback", () => {
+    expect(typeof adapter.hasLocalSession).toBe("function");
   });
 
   it("parses assistant messages from NDJSON stream", async () => {

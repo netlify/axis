@@ -296,10 +296,19 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
     const required = adapter.requiredEnv?.() ?? [];
     const missing = required.filter((key) => !jobEnv[key]);
     if (missing.length > 0) {
-      throw new Error(
-        `The "${agentName}" agent requires environment variable${missing.length > 1 ? "s" : ""} ${missing.join(", ")} ` +
-          `but ${missing.length > 1 ? "they are" : "it is"} not set. ` +
-          `Add ${missing.length > 1 ? "them" : "it"} to your shell environment or to the "env" array in axis.config.json.`,
+      // No API key — fall back to a local CLI login if the adapter supports
+      // detecting one (e.g. `claude login`, `codex login`). Explicit env vars
+      // always win, so this only runs when they're missing.
+      const hasLocal = (await adapter.hasLocalSession?.()) ?? false;
+      if (!hasLocal) {
+        throw new Error(
+          `The "${agentName}" agent requires environment variable${missing.length > 1 ? "s" : ""} ${missing.join(", ")} ` +
+            `but ${missing.length > 1 ? "they are" : "it is"} not set, and no local CLI session was detected. ` +
+            `Either log in (e.g. \`${agentName} login\`) or add ${missing.length > 1 ? "them" : "it"} to your shell environment or the "env" array in axis.config.json.`,
+        );
+      }
+      logger.verbose?.(
+        `[${agentName}] No ${missing.join(", ")} found — using local CLI session.`,
       );
     }
 

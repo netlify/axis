@@ -73,6 +73,12 @@ export interface AcpAdapterSpec {
   /** Env vars the adapter requires (validated by runner pre-flight). */
   requiredEnv?: () => string[];
 
+  /**
+   * Detect a usable local CLI login. Runner calls this only when
+   * `requiredEnv` is missing — API keys always take precedence.
+   */
+  hasLocalSession?: () => boolean | Promise<boolean>;
+
   /** Workspace isolation env vars (merged into child env by runner). */
   isolationEnv?: (paths: IsolationPaths) => Record<string, string>;
 
@@ -137,6 +143,7 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
   return {
     name: spec.name,
     requiredEnv: spec.requiredEnv,
+    hasLocalSession: spec.hasLocalSession,
     isolationEnv: spec.isolationEnv,
 
     async ensureInstalled(_logger) {

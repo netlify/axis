@@ -12,7 +12,13 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <h2>Prerequisites</h2>
   <ul>
     <li>Node.js 18 or later.</li>
-    <li>An API key for at least one supported agent (for example, <code>ANTHROPIC_API_KEY</code> for Claude Code).</li>
+    <li>
+      An API key for at least one supported agent (for example, <code>ANTHROPIC_API_KEY</code> for
+      Claude Code). API keys are the preferred way to authenticate — for local development,
+      <code>claude-code</code> and <code>codex</code> will fall back to an existing
+      <code>claude login</code> / <code>codex login</code> session if no key is set. See
+      <a href="/agents#local-cli-sessions">Local CLI sessions</a>.
+    </li>
   </ul>
 
   <h2>1. Install the CLI</h2>

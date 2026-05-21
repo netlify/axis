@@ -40,12 +40,18 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       <tr>
         <td><code>claude-code</code></td>
         <td>yes</td>
-        <td><code>ANTHROPIC_API_KEY</code></td>
+        <td>
+          <code>ANTHROPIC_API_KEY</code>
+          <br /><small>or fall back to a local <code>claude login</code> session — see <a href="#local-cli-sessions">below</a></small>
+        </td>
       </tr>
       <tr>
         <td><code>codex</code></td>
         <td>yes</td>
-        <td><code>CODEX_API_KEY</code></td>
+        <td>
+          <code>CODEX_API_KEY</code>
+          <br /><small>or fall back to a local <code>codex login</code> session — see <a href="#local-cli-sessions">below</a></small>
+        </td>
       </tr>
       <tr>
         <td><code>claude-sdk</code></td>
@@ -159,6 +165,44 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       </tr>
     </tbody>
   </table>
+
+  <h2 id="local-cli-sessions">Local CLI sessions</h2>
+  <p>
+    <strong>Setting an API key is the preferred way to authenticate.</strong> API keys make runs
+    reproducible across machines, deterministic in CI, and unambiguous about which account is
+    being billed. Set <code>ANTHROPIC_API_KEY</code> for <code>claude-code</code>, <code>CODEX_API_KEY</code>
+    for <code>codex</code>, and so on.
+  </p>
+  <p>
+    When no API key is set, <code>claude-code</code> and <code>codex</code> will fall back to a
+    local CLI login (<code>claude login</code> / <code>codex login</code>) if one is available
+    on the machine running AXIS. This is convenient for local exploration on a laptop where you
+    already use these CLIs — you don't have to mint and export an API key just to try a scenario.
+  </p>
+  <p>
+    Things to know about the fallback:
+  </p>
+  <ul>
+    <li>
+      <strong>API key always wins.</strong> If the required env var is set, AXIS uses it and never
+      touches your local session. The fallback only triggers when the env var is missing.
+    </li>
+    <li>
+      <strong>Usage bills against your subscription</strong>, not against an API key. That's the
+      whole point — but it does mean a CI environment that happens to have a logged-in CLI session
+      would silently consume seats from a personal plan. Always set the API key in CI.
+    </li>
+    <li>
+      <strong>macOS users may see a Keychain prompt</strong> the first time AXIS reads the
+      <code>"Claude Code-credentials"</code> entry, since the lookup runs through
+      <code>/usr/bin/security</code> rather than the <code>claude</code> binary that created it.
+      Click <em>Always Allow</em> to authorize subsequent runs.
+    </li>
+    <li>
+      <strong>Only <code>claude-code</code> and <code>codex</code> support this fallback today.</strong>
+      Other agents still require their configured env var.
+    </li>
+  </ul>
 
   <h2>Custom Agents</h2>
   <p>

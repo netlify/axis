@@ -51,6 +51,7 @@ Call `createAgentAdapter(spec)` with an `AgentAdapterSpec<State>`. The spec is a
 | `cliCommand?`     | CLI binary for `resolveCommand`; omit if user-supplied                                                                            |
 | `timeoutMs?`      | Execution timeout (default 10 min)                                                                                                |
 | `requiredEnv?`    | Env vars validated by the runner pre-flight (e.g. `ANTHROPIC_API_KEY`)                                                            |
+| `hasLocalSession?`| Detect a usable local CLI login (e.g. `claude login`, `codex login`). Runner calls this only when `requiredEnv` is missing — explicit API keys always win |
 | `isolationEnv?`   | Isolation vars (e.g. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`). Signature: `({ workspace, home }) => Record<string, string>`. Point `*_HOME`-style paths under `home`, never `workspace` |
 | `prepare?`        | Side effects (mkdir, MCP / skills writers) before spawn                                                                           |
 | `resolveCommand?` | Override how the CLI command is resolved                                                                                          |
@@ -62,6 +63,10 @@ Call `createAgentAdapter(spec)` with an `AgentAdapterSpec<State>`. The spec is a
 The `streamConfig` field uses a discriminated union so the mode and its handler can never get out of sync -no runtime assertions needed. `getResult` returns `null` for "no result" (never `""`). Metadata overrides (e.g. upstream `durationMs`) are spread on top of base-computed fields.
 
 For built-in adapters, register the factory in `src/adapters/registry.ts`. External custom adapters are loaded via the `adapters` field in `axis.config.json` -the runner dynamically imports the module and calls `registerAdapter()` before running any jobs.
+
+#### Authentication: API key preferred, local CLI session as fallback
+
+`claude-code` and `codex` declare `requiredEnv` (`ANTHROPIC_API_KEY`, `CODEX_API_KEY`) AND implement `hasLocalSession`. Pre-flight in `runner.ts` checks env vars first; if missing, it calls `hasLocalSession` and only throws if both signals are absent. **API keys are the preferred path** — they're explicit, work in CI, and don't bill against an individual subscription. The local-session fallback exists for laptop ergonomics: when a developer already has `claude login` / `codex login` set up, they shouldn't have to mint an API key just to try a scenario. The `prepare` hooks in those adapters materialize `~/.claude.json` / `~/.codex/auth.json` (and on macOS, the Keychain entry for Claude Code) into the isolated `CLAUDE_CONFIG_DIR` / `CODEX_HOME` so the CLI authenticates as if it were running normally. New adapters that wrap a CLI with both API-key and login flows should follow the same pattern.
 
 ### Error Handling
 

@@ -1,6 +1,13 @@
+import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AgentAdapter, TranscriptEntry } from "../types/agent.js";
 import { createAgentAdapter } from "./base/agent-adapter.js";
+import {
+  copyHomeFile,
+  extractKeychainSecretToFile,
+  hasHomeFile,
+  homeJsonHasValue,
+} from "./utils/local-session.js";
 import { writeClaudeMcpConfig } from "./utils/mcp.js";
 import { writeClaudeSkills } from "./utils/skills.js";
 
@@ -15,6 +22,18 @@ export function createClaudeCodeAdapter(): AgentAdapter {
 
     requiredEnv: () => ["ANTHROPIC_API_KEY"],
 
+    // `claude login` stores OAuth credentials in:
+    //   - macOS: Keychain (service `"Claude Code-credentials"`) — keyed by OS user, accessible regardless of CLAUDE_CONFIG_DIR
+    //   - Linux/Windows: `~/.claude/.credentials.json`
+    // AND writes an `oauthAccount` block to `~/.claude.json` (at $HOME root,
+    // sibling to `.claude/`). The agent reads `oauthAccount` to know which
+    // Keychain entry / API server to use — without it, even a valid Keychain
+    // token won't authenticate. Detection requires both: the JSON anchor and
+    // the actual creds (Keychain on Darwin, file elsewhere).
+    hasLocalSession: () =>
+      homeJsonHasValue(".claude.json", ["oauthAccount.emailAddress", "oauthAccount.accountUuid"]) ||
+      hasHomeFile(path.join(".claude", ".credentials.json")),
+
     isolationEnv: ({ home }) => ({
       CLAUDE_CONFIG_DIR: path.join(home, ".claude"),
       CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
@@ -22,8 +41,26 @@ export function createClaudeCodeAdapter(): AgentAdapter {
       DISABLE_TELEMETRY: "1",
     }),
 
-    prepare: (ctx) => {
+    prepare: async (ctx) => {
       const configDir = ctx.env?.CLAUDE_CONFIG_DIR;
+      // When no API key is set, propagate the user's local OAuth session into
+      // the isolated CLAUDE_CONFIG_DIR. Setting CLAUDE_CONFIG_DIR to a non-
+      // default path tells claude to treat that dir as a self-contained home
+      // — it bypasses both `$HOME/.claude.json` AND the macOS Keychain. So we
+      // must materialize both pieces inside CLAUDE_CONFIG_DIR:
+      //   - `.claude.json` — `oauthAccount` block (the account anchor)
+      //   - `.credentials.json` — the actual OAuth token blob (Linux/Windows
+      //     have it as a file already; macOS keeps it in Keychain — we
+      //     extract via `security find-generic-password -w`)
+      if (configDir && !ctx.env?.ANTHROPIC_API_KEY) {
+        fs.mkdirSync(configDir, { recursive: true });
+        copyHomeFile(".claude.json", configDir);
+        const credsDest = path.join(configDir, ".credentials.json");
+        copyHomeFile(path.join(".claude", ".credentials.json"), configDir);
+        if (!fs.existsSync(credsDest)) {
+          await extractKeychainSecretToFile("Claude Code-credentials", credsDest);
+        }
+      }
       // MCP config goes into HOME (and is wired via --mcp-config below) so the
       // workspace never contains a `.mcp.json` the agent could scan.
       if (configDir && ctx.input.mcpServers && Object.keys(ctx.input.mcpServers).length > 0) {

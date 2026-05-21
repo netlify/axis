@@ -527,6 +527,49 @@ describe("run", () => {
     expect(mockAdapter.run).not.toHaveBeenCalled();
   });
 
+  it("falls back to local CLI session when env missing but hasLocalSession is true", async () => {
+    const hasLocalSession = vi.fn().mockResolvedValue(true);
+    const mockAdapter = {
+      ...createMockAdapter(),
+      requiredEnv: () => ["SOME_MISSING_KEY"],
+      hasLocalSession,
+    };
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    const output = await run(baseOptions);
+
+    expect(hasLocalSession).toHaveBeenCalledTimes(1);
+    expect(mockAdapter.run).toHaveBeenCalled();
+    expect(output.summary.completed).toBe(1);
+  });
+
+  it("does not call hasLocalSession when requiredEnv is satisfied", async () => {
+    const hasLocalSession = vi.fn();
+    const mockAdapter = {
+      ...createMockAdapter(),
+      requiredEnv: () => ["PATH"], // PATH is always set
+      hasLocalSession,
+    };
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    await run(baseOptions);
+
+    expect(hasLocalSession).not.toHaveBeenCalled();
+    expect(mockAdapter.run).toHaveBeenCalled();
+  });
+
+  it("throws with login hint when env missing and hasLocalSession is false", async () => {
+    const mockAdapter = {
+      ...createMockAdapter(),
+      requiredEnv: () => ["SOME_MISSING_KEY"],
+      hasLocalSession: vi.fn().mockResolvedValue(false),
+    };
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    await expect(run(baseOptions)).rejects.toThrow(/local CLI session|mock-agent login/);
+    expect(mockAdapter.run).not.toHaveBeenCalled();
+  });
+
   it("stamps runStartedAt when the job transitions to running", async () => {
     const mockAdapter = createMockAdapter();
     mockGetAdapter.mockReturnValue(mockAdapter);

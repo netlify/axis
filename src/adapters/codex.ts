@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AgentAdapter, TokenUsage, TranscriptEntry } from "../types/agent.js";
 import { createAgentAdapter, type StreamContext } from "./base/agent-adapter.js";
+import { copyHomeFile, hasHomeFile } from "./utils/local-session.js";
 import { writeCodexMcpConfig } from "./utils/mcp.js";
 import { writeCodexSkills } from "./utils/skills.js";
 
@@ -17,6 +18,9 @@ export function createCodexAdapter(): AgentAdapter {
 
     requiredEnv: () => ["CODEX_API_KEY"],
 
+    // `codex login` (ChatGPT account auth) writes `~/.codex/auth.json`.
+    hasLocalSession: () => hasHomeFile(path.join(".codex", "auth.json")),
+
     isolationEnv: ({ home }) => ({
       CODEX_HOME: path.join(home, ".codex"),
       CODEX_DISABLE_TELEMETRY: "1",
@@ -27,6 +31,12 @@ export function createCodexAdapter(): AgentAdapter {
       const codexHome = ctx.env?.CODEX_HOME;
       if (codexHome) {
         fs.mkdirSync(codexHome, { recursive: true });
+        // When no API key is set, propagate the user's local ChatGPT login
+        // into CODEX_HOME so `codex` can authenticate via the existing
+        // `codex login` session.
+        if (!ctx.env?.CODEX_API_KEY) {
+          copyHomeFile(path.join(".codex", "auth.json"), codexHome);
+        }
         if (ctx.input.mcpServers && Object.keys(ctx.input.mcpServers).length > 0) {
           writeCodexMcpConfig(codexHome, ctx.input.mcpServers);
         }

@@ -162,7 +162,10 @@ npx @netlify/axis baseline delete v1.0`}</code></pre>
     </li>
     <li>
       <strong>API keys via environment</strong> -Pass <code>ANTHROPIC_API_KEY</code>,
-      <code>CODEX_API_KEY</code>, or <code>GEMINI_API_KEY</code> as CI secrets.
+      <code>CODEX_API_KEY</code>, or <code>GEMINI_API_KEY</code> as CI secrets. In CI you should
+      always set explicit API keys: <code>claude-code</code> and <code>codex</code> have a
+      local-login fallback for laptop use, but that path is unsuitable for CI because it bills
+      against an individual subscription rather than a service account.
     </li>
   </ul>
 

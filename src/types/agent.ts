@@ -33,6 +33,15 @@ export interface AgentAdapter {
    */
   requiredEnv?(): string[];
   /**
+   * Returns true if the CLI has a usable local login on this machine (e.g.
+   * `claude login` / `codex login`). When `requiredEnv` is missing, the
+   * runner calls this and skips the env-var error if it resolves true,
+   * allowing local users to run without setting an API key. If
+   * `requiredEnv` is satisfied, this is not called — explicit credentials
+   * always win.
+   */
+  hasLocalSession?(): boolean | Promise<boolean>;
+  /**
    * Resolves and validates the CLI binary for this adapter.
    * Called once during runner pre-flight before any jobs run.
    * If the CLI is not globally installed, falls back to npx.

@@ -2,12 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createCodexAdapter } from "../../../src/adapters/codex.js";
 import type { AgentAdapter } from "../../../src/types/agent.js";
 import type { AgentInput } from "../../../src/types/agent.js";
+import type * as ChildProcess from "node:child_process";
 import { EventEmitter, Readable } from "node:stream";
 
-// Mock child_process.spawn
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-}));
+// Mock child_process.spawn while preserving other exports (execFile, etc.
+// used by sibling utility modules like local-session)
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof ChildProcess>();
+  return { ...actual, spawn: vi.fn() };
+});
 
 // Mock resolve so adapters skip the real CLI check
 vi.mock("../../../src/adapters/utils/resolve.js", () => ({
@@ -294,6 +297,10 @@ describe("CodexAdapter", () => {
 
   it("requires CODEX_API_KEY environment variable", () => {
     expect(adapter.requiredEnv!()).toEqual(["CODEX_API_KEY"]);
+  });
+
+  it("exposes hasLocalSession for `codex login` fallback", () => {
+    expect(typeof adapter.hasLocalSession).toBe("function");
   });
 
   it("maps file_changes and web_search to tool entries", async () => {
