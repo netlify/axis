@@ -1,0 +1,23 @@
+# AXIS
+
+> AXIS (Agent eXperience Index Score) is an open-source synthetic testing framework for measuring how well systems support AI agent interaction. Think Lighthouse, but instead of scoring user experience, AXIS scores agent experience.
+
+Given a scenario, an agent, and a prompt, AXIS runs the agent in an isolated workspace, captures the full interaction transcript, and produces a graded score across four dimensions: Goal Achievement, Environment, Service, and Agent.
+
+AXIS is maintained by Netlify and available as `@netlify/axis` on npm.
+
+## Docs
+
+- [Quick Start](https://axis.run/quickstart): Install and run your first scored scenario
+- [Scoring Framework](https://axis.run/scoring): The four scoring dimensions, signals, and calibration
+- [Writing Scenarios](https://axis.run/scenarios): Scenario file format, judge checks, weights
+- [Execution & Agents](https://axis.run/running): Workspace isolation, concurrency, lifecycle hooks, CI integration
+- [Built-in Agents](https://axis.run/agents): claude-code, codex, and gemini adapters
+- [Reports & Baselines](https://axis.run/reports): Viewing reports, regression detection, baseline comparison
+- [CLI Reference](https://axis.run/cli): axis run, axis reports, axis baseline, axis init
+- [Configuration](https://axis.run/configuration): axis.config.json schema, MCP servers, skills, scoring weights
+
+## Resources
+
+- [GitHub](https://github.com/netlify/axis): Source code, issues, contributing
+- [npm](https://www.npmjs.com/package/@netlify/axis): Package releases
