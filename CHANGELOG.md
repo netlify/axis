@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.13.0](https://github.com/netlify/axis/compare/v1.12.0...v1.13.0) (2026-05-21)
+
+
+### Features
+
+* add fallback support for agent auth using local sessions ([b1b5fec](https://github.com/netlify/axis/commit/b1b5feccbf63b3b7f0632633c699b1757816bf06))
+
+
+### Bug Fixes
+
+* add favicon ([d3b241c](https://github.com/netlify/axis/commit/d3b241c3b8f4e5276a082723b23369852ca4c453))
+
 ## [1.12.0](https://github.com/netlify/axis/compare/v1.11.0...v1.12.0) (2026-05-20)
 
 
