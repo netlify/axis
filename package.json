@@ -1,5 +1,8 @@
 {
   "name": "@netlify/axis",
+  "workspaces": [
+    "src/docs-site"
+  ],
   "version": "1.12.0",
   "description": "Agent Experience Index Score — synthetic testing for AI agent interaction",
   "type": "module",

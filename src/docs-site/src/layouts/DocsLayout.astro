@@ -3,11 +3,19 @@ import "../styles/docs.css";
 
 interface Props {
   title: string;
+  description?: string;
   active: "overview" | "quickstart" | "scoring" | "scenarios" | "running" | "agents" | "reports" | "cli" | "configuration";
   landing?: boolean;
 }
 
-const { title, active, landing = false } = Astro.props;
+const {
+  title,
+  description = "Documentation for AXIS, the Agent eXperience Index Score synthetic testing framework for AI agents.",
+  active,
+  landing = false,
+} = Astro.props;
+
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site).href;
 ---
 
 <html lang="en">
@@ -15,7 +23,16 @@ const { title, active, landing = false } = Astro.props;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} - AXIS Docs</title>
-    <meta name="description" content="Documentation for AXIS, the Agent eXperience Index Score synthetic testing framework for AI agents." />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={`${title} - AXIS Docs`} />
+    <meta property="og:description" content={description} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={`${title} - AXIS Docs`} />
+    <meta name="twitter:description" content={description} />
   </head>
   <body class:list={{ "body-landing": landing }}>
     <header class="site-header">
