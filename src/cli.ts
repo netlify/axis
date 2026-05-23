@@ -411,31 +411,6 @@ function buildEmptyRunOutput(): RunOutput {
   };
 }
 
-interface JudgePickRow {
-  scenarioKey: string;
-  agentName: string;
-  judgeLabel: string;
-}
-
-/**
- * Gather the resolved judge agent for every scored run so the CLI can print
- * a per-scenario summary alongside the report links. Returns an empty array
- * when no run carries a `score.judging` field (unscored output or pre-judging
- * report).
- */
-function collectJudgePicks(output: ScoredOutput | RunOutput): JudgePickRow[] {
-  if (!("results" in output) || !output.results) return [];
-  const picks: JudgePickRow[] = [];
-  for (const r of output.results) {
-    if (!("score" in r) || !r.score?.judging) continue;
-    const j = r.score.judging;
-    const label = j.model ? `${j.agent}|${j.model}` : j.agent;
-    picks.push({ scenarioKey: r.scenarioKey, agentName: r.agentName, judgeLabel: label });
-  }
-  picks.sort((a, b) => a.scenarioKey.localeCompare(b.scenarioKey) || a.agentName.localeCompare(b.agentName));
-  return picks;
-}
-
 /**
  * Await scoring promises, but bail out after `graceMs` once `signal` aborts.
  * Promises that haven't resolved by the deadline are excluded from the
@@ -633,19 +608,6 @@ program
       // Let ink render the final "done" state before unmounting
       if (unmountInk) await new Promise((r) => setTimeout(r, 100));
       unmountInk?.();
-
-      // Summarize judge picks before the report links so users can see at a
-      // glance which agent scored each run.
-      if (opts.score) {
-        const judgePicks = collectJudgePicks(output);
-        if (judgePicks.length > 0) {
-          process.stderr.write(`  Scoring judges:\n`);
-          for (const pick of judgePicks) {
-            process.stderr.write(`    ${pick.scenarioKey} (${pick.agentName}) → ${pick.judgeLabel}\n`);
-          }
-          process.stderr.write(`\n`);
-        }
-      }
 
       process.stderr.write(`  Report saved: .axis/reports/${reportId}\n`);
       process.stderr.write(`  View details: axis reports ${reportId}\n`);
