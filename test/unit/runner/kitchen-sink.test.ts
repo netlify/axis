@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as path from "node:path";
+import * as fs from "node:fs";
+import * as fsp from "node:fs/promises";
+import * as os from "node:os";
 import { silentLogger } from "../../../src/types/output.js";
 
 // Mock the adapter registry and lifecycle executor
@@ -14,10 +17,11 @@ vi.mock("../../../src/runner/lifecycle.js", () => ({
 
 import { run } from "../../../src/runner/runner.js";
 import { getAdapter } from "../../../src/adapters/registry.js";
+import { setCloneImplForTests } from "../../../src/config/remote-scenarios.js";
 
 const mockGetAdapter = vi.mocked(getAdapter);
 
-const KITCHEN_SINK_DIR = path.resolve(import.meta.dirname, "../../e2e/kitchen-sink");
+const KITCHEN_SINK_FIXTURE = path.resolve(import.meta.dirname, "../../e2e/kitchen-sink");
 
 function createMockAdapter(name: string) {
   return {
@@ -48,24 +52,54 @@ function setupAdapters() {
 
 describe("kitchen-sink (all adapters)", () => {
   const origCodexKey = process.env.CODEX_API_KEY;
+  let restoreClone: () => void;
+  let tmpFixtureDir: string;
+  let configPath: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     process.env.CODEX_API_KEY = "test-key";
     setupAdapters();
+
+    // Copy the kitchen-sink fixture to a tempdir so the remote-scenarios
+    // writes to `<configDir>/.axis/remotes/` don't leak back into the
+    // repo-tracked fixture. (A stale stub clone there would be picked up by
+    // subsequent real `axis run` invocations from the fixture and show 0
+    // remote scenarios.)
+    tmpFixtureDir = await fsp.mkdtemp(path.join(os.tmpdir(), "axis-kitchen-"));
+    await fsp.cp(KITCHEN_SINK_FIXTURE, tmpFixtureDir, {
+      recursive: true,
+      filter: (src) => !src.includes(`${path.sep}.axis${path.sep}`),
+    });
+    configPath = path.join(tmpFixtureDir, "axis.config.json");
+
+    // Stub the clone to inject a minimal config that contributes 0 scenarios
+    // so this test stays hermetic.
+    restoreClone = setCloneImplForTests((_url, target) => {
+      fs.mkdirSync(path.join(target, ".git"), { recursive: true });
+      fs.writeFileSync(path.join(target, ".git", "HEAD"), "ref: refs/heads/main\n");
+      fs.writeFileSync(
+        path.join(target, "axis.config.json"),
+        JSON.stringify({ scenarios: [], agents: ["mock-agent"] }),
+      );
+    });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    restoreClone();
     if (origCodexKey !== undefined) {
       process.env.CODEX_API_KEY = origCodexKey;
     } else {
       delete process.env.CODEX_API_KEY;
     }
+    if (tmpFixtureDir) {
+      await fsp.rm(tmpFixtureDir, { recursive: true, force: true });
+    }
   });
 
   it("runs active scenarios across all agent instances (skipped excluded)", async () => {
     const output = await run({
-      configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
+      configPath,
       logger: silentLogger,
     });
 
@@ -80,7 +114,7 @@ describe("kitchen-sink (all adapters)", () => {
 
   it("produces results with correct agent names", async () => {
     const output = await run({
-      configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
+      configPath,
       logger: silentLogger,
     });
 
@@ -90,7 +124,7 @@ describe("kitchen-sink (all adapters)", () => {
 
   it("includes only active scenario keys", async () => {
     const output = await run({
-      configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
+      configPath,
       logger: silentLogger,
     });
 
@@ -100,7 +134,7 @@ describe("kitchen-sink (all adapters)", () => {
 
   it("echo-test scenario has correct prompt and judge", async () => {
     const output = await run({
-      configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
+      configPath,
       logger: silentLogger,
     });
 
@@ -116,7 +150,7 @@ describe("kitchen-sink (all adapters)", () => {
 
   it("preserves agent type in agentConfig", async () => {
     const output = await run({
-      configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
+      configPath,
       logger: silentLogger,
     });
 
@@ -130,7 +164,7 @@ describe("kitchen-sink (all adapters)", () => {
 
   it("filters to single agent from mixed config", async () => {
     const output = await run({
-      configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
+      configPath,
       logger: silentLogger,
       agentFilter: ["codex"],
     });
@@ -144,7 +178,7 @@ describe("kitchen-sink (all adapters)", () => {
     const adapters = setupAdapters();
 
     await run({
-      configPath: path.join(KITCHEN_SINK_DIR, "axis.config.json"),
+      configPath,
       logger: silentLogger,
     });
 

@@ -186,7 +186,9 @@ export default async () => {
           A path to the scenarios directory, or an array of paths and/or inline scenario objects.
           Inline entries must include a <code>key</code>; entries loaded from files take their
           <code>key</code> from the file path. Defaults to <code>"./scenarios"</code> when
-          omitted. See <a href="/scenarios#authoring">Authoring scenarios</a> for the full schema.
+          omitted. Array entries may also be git repo URLs; see
+          <a href="#remote-scenarios">Remote scenarios</a>. See
+          <a href="/scenarios#authoring">Authoring scenarios</a> for the full schema.
         </td>
       </tr>
       <tr>
@@ -297,7 +299,7 @@ curl -X POST "$SLACK_WEBHOOK" \\
     <div class="callout-title">Run-Level Lifecycle Details</div>
     <ul>
       <li>
-        Hooks fire from the <code>axis</code> CLI only &mdash; the programmatic <code>run()</code>
+        Hooks fire from the <code>axis</code> CLI only; the programmatic <code>run()</code>
         API does not invoke them. Library users own their own orchestration.
       </li>
       <li>
@@ -310,7 +312,7 @@ curl -X POST "$SLACK_WEBHOOK" \\
         causes a non-zero CLI exit but does not erase the report.
       </li>
       <li>
-        Both hooks honour the per-action 3-minute timeout. Each action runs sequentially &mdash;
+        Both hooks honour the per-action 3-minute timeout. Each action runs sequentially;
         the first non-zero exit aborts the phase.
       </li>
     </ul>
@@ -481,9 +483,9 @@ curl -X POST "$SLACK_WEBHOOK" \\
     runaway agents from consuming unbounded resources. Limits can be configured at three levels:
   </p>
   <ul>
-    <li><strong>Overall run limits</strong> (<code>settings.limits.run</code>) &mdash; when hit, all remaining and in-progress jobs are aborted.</li>
-    <li><strong>Default scenario limits</strong> (<code>settings.limits.scenario</code>) &mdash; default budget for each individual job. Only that job fails when exceeded.</li>
-    <li><strong>Per-scenario limits</strong> (<code>limits</code> in the scenario JSON) &mdash; override the defaults for a specific scenario. Only that job fails when exceeded.</li>
+    <li><strong>Overall run limits</strong> (<code>settings.limits.run</code>): when hit, all remaining and in-progress jobs are aborted.</li>
+    <li><strong>Default scenario limits</strong> (<code>settings.limits.scenario</code>): default budget for each individual job. Only that job fails when exceeded.</li>
+    <li><strong>Per-scenario limits</strong> (<code>limits</code> in the scenario JSON): override the defaults for a specific scenario. Only that job fails when exceeded.</li>
   </ul>
 
   <h3>Default behavior</h3>
@@ -535,7 +537,7 @@ curl -X POST "$SLACK_WEBHOOK" \\
     Set <code>settings.limits.scenario</code> to define default per-job budgets. These can be
     overridden by adding a <code>limits</code> field directly in a scenario file.
   </p>
-  <pre><code>{`// axis.config.json — default for all scenarios
+  <pre><code>{`// axis.config.json: default for all scenarios
 {
   "settings": {
     "limits": {
@@ -544,7 +546,7 @@ curl -X POST "$SLACK_WEBHOOK" \\
   }
 }
 
-// scenarios/expensive-task.json — override for one scenario
+// scenarios/expensive-task.json: override for one scenario
 {
   "name": "Expensive task",
   "prompt": "...",
@@ -645,8 +647,8 @@ curl -X POST "$SLACK_WEBHOOK" \\
 
   <h2 id="judging">Judging Agents</h2>
   <p>
-    By default, every run is judged by the same agent that produced it &mdash; the agent under
-    test scores its own work. Set <code>judging.agents</code> to a precedence-ordered list of
+    By default, every run is judged by the same agent that produced it, so the agent under test
+    scores its own work. Set <code>judging.agents</code> to a precedence-ordered list of
     judge candidates. For each run, AXIS picks the first entry whose adapter name differs from
     the run's own agent so a fresh perspective evaluates the work. If every entry matches the
     run's own agent, the first entry is used.
@@ -654,8 +656,8 @@ curl -X POST "$SLACK_WEBHOOK" \\
   <p>
     Each entry accepts the same shorthand as <code>agents</code>: a string (agent name) or a full
     <code>AgentConfig</code> object with <code>model</code> and adapter <code>flags</code>. Every
-    candidate judge must be installed and have any required environment variables set &mdash;
-    AXIS validates this during pre-flight before any jobs run.
+    candidate judge must be installed and have any required environment variables set; AXIS
+    validates this during pre-flight before any jobs run.
   </p>
   <pre><code>{`{
   "agents": ["claude-code", "codex", "gemini"],
@@ -766,4 +768,142 @@ curl -X POST "$SLACK_WEBHOOK" \\
     <a href="/scenarios#authoring">authoring formats</a>, rubric design
     guidance, and examples.
   </p>
+
+  <h2 id="remote-scenarios">Remote Scenarios</h2>
+  <p>
+    Remote scenarios let one AXIS project pull a scenario library straight out of another git
+    repository, instead of vendoring or copy-pasting scenario files. A team can publish a
+    canonical set of scenarios (with their setup scripts, fixtures, MCP servers, and skills)
+    once, and every downstream project consumes it by listing the repo URL in its
+    <code>scenarios</code> array. When the upstream library changes, the next AXIS run picks it
+    up automatically; there's no version to bump and no files to re-sync.
+  </p>
+  <p>
+    This is especially useful for:
+  </p>
+  <ul>
+    <li>
+      <strong>Org-wide scenario libraries.</strong> A platform team curates the scenarios that
+      represent "what agents on our stack actually need to do," and every product team's config
+      references that library to benchmark their own agent against the same yardstick.
+    </li>
+    <li>
+      <strong>Sharing a benchmark across forks.</strong> A reference repo defines the agreed-on
+      scenarios; multiple agent implementations point at it to publish comparable AXIS Results.
+    </li>
+    <li>
+      <strong>Decoupling scenario authoring from agent testing.</strong> The team that knows the
+      product writes the scenarios in their repo; the team running the agent only owns its
+      <code>axis.config.*</code> and the agent it's testing.
+    </li>
+  </ul>
+
+  <h3 id="remote-scenarios-usage">Using a remote scenarios repo</h3>
+  <p>
+    Add a git repository URL to the <code>scenarios</code> array. Local paths and remote URLs
+    can be mixed freely.
+  </p>
+  <pre><code>{`{
+  "scenarios": [
+    "./scenarios",
+    "https://github.com/netlify/all-scenarios"
+  ],
+  "agents": ["claude-code"]
+}`}</code></pre>
+  <p>
+    On each run AXIS clones the repo into
+    <code>.axis/remotes/&lt;reversed-host&gt;/&lt;owner&gt;/&lt;repo&gt;/</code>, reads
+    <em>that</em> repo's <code>axis.config.*</code>, and inlines its <code>scenarios</code> entries
+    into the parent, resolved to absolute paths inside the clone. Inline scenario objects
+    from a remote repo are passed through unchanged. If the cloned repo has no
+    <code>axis.config.*</code> at its root, the whole repo is walked as a scenarios directory
+    (equivalent to listing the clone path directly).
+  </p>
+  <p>
+    From here on, the runner behaves as if every scenario had been local from the start:
+    discovery, filtering, lifecycle, scoring, and reporting are all unchanged.
+  </p>
+
+  <h3 id="remote-scenarios-merged-fields">Supporting config that comes with the scenarios</h3>
+  <p>
+    Remote scenarios usually depend on more than just their own files. Their setup scripts need
+    certain env vars exported, they expect specific MCP servers to be configured, they rely on
+    shared skills, and so on. To avoid forcing every parent project to re-declare all of that,
+    AXIS folds a few supporting fields from the remote repo's <code>axis.config.*</code> into the
+    parent config. The parent always wins on collisions.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Merge semantics</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>env</code></td>
+        <td>Set union of var names; parent first then remote.</td>
+      </tr>
+      <tr>
+        <td><code>mcp_servers</code></td>
+        <td>Keyed merge; the parent's value wins when both declare the same server name.</td>
+      </tr>
+      <tr>
+        <td><code>skills</code></td>
+        <td>
+          Ordered union with dedup, parent first. Local-path entries from the remote
+          (<code>./...</code>) are rewritten to absolute paths inside the clone directory; URL
+          and <code>owner/repo</code> shorthand entries pass through unchanged.
+        </td>
+      </tr>
+      <tr>
+        <td><code>artifacts</code></td>
+        <td>Glob patterns concatenated and deduped, parent first.</td>
+      </tr>
+      <tr>
+        <td><code>adapters</code></td>
+        <td>
+          Keyed merge with parent precedence; remote module paths are rewritten to absolute paths
+          inside the clone directory so the remote adapter loads correctly.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Other top-level fields from the remote repo are ignored: <code>agents</code>,
+    <code>settings</code>, <code>judging</code>, <code>beforeAll</code>, <code>afterAll</code>, and
+    <code>name</code>. These belong to the parent project: it decides which agents to test, how
+    to score them, and what run-level lifecycle to fire.
+  </p>
+
+  <h3 id="remote-scenarios-freshness">Freshness and caching</h3>
+  <p>
+    AXIS always runs <code>git pull --ff-only</code> on each invocation when the clone already
+    exists, and does a shallow <code>git clone</code> the first time. There is no opt-in caching
+    flag. The trade-off favours always-fresh scenario libraries over offline runs.
+  </p>
+
+  <h3 id="remote-scenarios-deps">Dependencies</h3>
+  <p>
+    Remote scenarios authored as <code>.ts</code>/<code>.js</code> modules often import workspace
+    helpers and external packages. If the cloned repo has a <code>package.json</code> and no
+    <code>node_modules/</code>, AXIS runs <code>npm install</code> (or <code>pnpm install</code> /
+    <code>yarn install</code> based on the lockfile) automatically before walking. Install failures
+    are logged but do not abort the run; modules whose imports fail are reported and skipped.
+  </p>
+
+  <h3 id="remote-scenarios-nesting">Nested remote references</h3>
+  <p>
+    By default, a remote repo's <code>scenarios</code> may <em>not</em> itself list further
+    remote URLs; AXIS errors out with the offending URL named. Increase
+    <code>settings.remotes.maxDepth</code> to allow nesting. Cycles
+    (<em>A &rarr; B &rarr; A</em>) are always rejected regardless of depth.
+  </p>
+  <pre><code>{`{
+  "scenarios": ["./scenarios", "https://github.com/netlify/all-scenarios"],
+  "agents": ["claude-code"],
+  "settings": {
+    "remotes": { "maxDepth": 2 }
+  }
+}`}</code></pre>
 </DocsLayout>

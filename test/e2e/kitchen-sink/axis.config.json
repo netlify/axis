@@ -1,5 +1,5 @@
 {
-  "scenarios": "./scenarios",
+  "scenarios": ["./scenarios", "https://github.com/netlify/agent-runner-orchestrator"],
   "agents": [
     { "agent": "claude-code", "model": "claude-sonnet-4-6" },
     { "agent": "claude-code", "model": "claude-opus-4-6" },

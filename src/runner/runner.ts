@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { loadConfig, discoverScenarios, matchesScenarioFilter, matchesAgentFilter } from "../config/loader.js";
+import { mergeRemoteConfig } from "../config/remote-scenarios.js";
 import { getAdapter, registerAdapter } from "../adapters/registry.js";
 import { runLifecyclePhase } from "./lifecycle.js";
 import { captureArtifacts, resolveArtifactPatterns } from "./artifacts.js";
@@ -152,6 +153,17 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   const logger = options.logger ?? defaultLogger;
   const runStart = Date.now();
   const { config, configDir } = await loadConfig(options.configPath);
+
+  // Remote scenarios: clone any remote URL entries once up front so the
+  // per-agent discoverScenarios() calls below don't re-pull each time. Also
+  // folds each remote repo's env/mcp_servers/skills/artifacts/adapters into
+  // this config (parent wins on collisions) so remote scenarios bring their
+  // supporting config with them. Runs BEFORE adapter loading so remote
+  // adapters get registered too.
+  await mergeRemoteConfig(config, configDir, {
+    logger,
+    maxDepth: config.settings?.remotes?.maxDepth,
+  });
 
   // --- Load custom adapters from config ---
   if (config.adapters) {
@@ -307,9 +319,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
             `Either log in (e.g. \`${agentName} login\`) or add ${missing.length > 1 ? "them" : "it"} to your shell environment or the "env" array in axis.config.json.`,
         );
       }
-      logger.verbose?.(
-        `[${agentName}] No ${missing.join(", ")} found — using local CLI session.`,
-      );
+      logger.verbose?.(`[${agentName}] No ${missing.join(", ")} found — using local CLI session.`);
     }
 
     // Resolve CLI binary (direct or npx fallback)

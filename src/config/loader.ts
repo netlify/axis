@@ -6,7 +6,9 @@ import type { AxisConfig, InlineScenario } from "../types/config.js";
 import type { Scenario, ScenarioVariant } from "../types/scenario.js";
 import { validateConfig, validateScenario } from "./validator.js";
 import { formatError } from "../types/output.js";
+import type { Logger } from "../types/output.js";
 import { globToRegExp } from "../runner/artifacts.js";
+import { expandRemoteScenarios } from "./remote-scenarios.js";
 
 /** Extensions probed when no explicit config path is given, in priority order. */
 const DEFAULT_CONFIG_EXTENSIONS = [".ts", ".js", ".mjs", ".json"] as const;
@@ -149,19 +151,34 @@ function normalizeConfigAgents(config: AxisConfig): void {
   }
 }
 
+export interface DiscoverScenariosOptions {
+  /** Logger for remote clone/pull progress. Defaults to silent. */
+  logger?: Logger;
+  /** How many levels of remote-to-remote references to follow. Defaults to 1. */
+  maxRemotesDepth?: number;
+}
+
 export async function discoverScenarios(
   configDir: string,
   scenariosInput: string | (string | InlineScenario)[] | undefined,
   filter?: string[],
+  options?: DiscoverScenariosOptions,
 ): Promise<Scenario[]> {
   // When omitted, fall back to the default scenarios directory.
   const resolvedInput = scenariosInput ?? "./scenarios";
-  const entries = Array.isArray(resolvedInput) ? resolvedInput : [resolvedInput];
+  // Expand any remote URL entries (clone the repos, inline their scenarios as
+  // absolute paths). Non-URL entries pass through unchanged.
+  const expanded = await expandRemoteScenarios(resolvedInput, {
+    configDir,
+    logger: options?.logger,
+    maxDepth: options?.maxRemotesDepth,
+  });
+  const entries = Array.isArray(expanded) ? expanded : [expanded ?? "./scenarios"];
   const scenarios: Scenario[] = [];
 
   for (const entry of entries) {
     if (typeof entry === "string") {
-      await collectFromPath(path.resolve(configDir, entry), scenarios);
+      await collectFromPath(path.resolve(configDir, entry), scenarios, options?.logger);
     } else {
       // Inline scenarios are validated by validateConfig; here we just normalize and expand.
       scenarios.push(...expandInline(entry));
@@ -193,7 +210,7 @@ export async function discoverScenarios(
 const SCENARIO_EXTENSIONS = new Set([".json", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"]);
 const SCENARIO_EXT_RE = /\.(json|js|mjs|cjs|ts|mts|cts)$/;
 
-async function collectFromPath(absolutePath: string, scenarios: Scenario[]): Promise<void> {
+async function collectFromPath(absolutePath: string, scenarios: Scenario[], logger?: Logger): Promise<void> {
   let stat;
   try {
     stat = await fs.stat(absolutePath);
@@ -202,7 +219,7 @@ async function collectFromPath(absolutePath: string, scenarios: Scenario[]): Pro
   }
 
   if (stat.isDirectory()) {
-    await walkDir(absolutePath, absolutePath, scenarios);
+    await walkDir(absolutePath, absolutePath, scenarios, logger);
     return;
   }
   if (!stat.isFile()) {
@@ -226,7 +243,7 @@ async function collectFromPath(absolutePath: string, scenarios: Scenario[]): Pro
  */
 const WALK_SKIP_DIRS = new Set(["node_modules"]);
 
-async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Promise<void> {
+async function walkDir(dir: string, rootDir: string, scenarios: Scenario[], logger?: Logger): Promise<void> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
 
   for (const entry of entries) {
@@ -237,7 +254,7 @@ async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Pro
       // non-source dirs so we don't crawl into tool state or vendored code
       // when a scenario directory contains fixture codebases.
       if (entry.name.startsWith(".") || WALK_SKIP_DIRS.has(entry.name)) continue;
-      await walkDir(fullPath, rootDir, scenarios);
+      await walkDir(fullPath, rootDir, scenarios, logger);
       continue;
     }
     if (!entry.isFile()) continue;
@@ -250,7 +267,7 @@ async function walkDir(dir: string, rootDir: string, scenarios: Scenario[]): Pro
     // Walking a directory: silently skip files that don't look like a scenario
     // (e.g. fixture JSON, helper TS modules) so authors can keep them alongside
     // real scenarios without special handling.
-    const loaded = await loadScenarioFromPath(fullPath, baseKey, true);
+    const loaded = await loadScenarioFromPath(fullPath, baseKey, true, logger);
     if (loaded) scenarios.push(...loaded);
   }
 }
@@ -268,6 +285,7 @@ async function loadScenarioFromPath(
   filePath: string,
   baseKey: string,
   silentSkip: boolean,
+  logger?: Logger,
 ): Promise<Scenario[] | null> {
   const ext = path.extname(filePath).toLowerCase();
 
@@ -276,7 +294,7 @@ async function loadScenarioFromPath(
   }
 
   if (JS_EXTENSIONS.has(ext) || TS_EXTENSIONS.has(ext)) {
-    return loadModuleScenario(filePath, baseKey, silentSkip);
+    return loadModuleScenario(filePath, baseKey, silentSkip, logger);
   }
 
   if (silentSkip) return null;
@@ -316,12 +334,24 @@ function looksLikeScenario(parsed: unknown): boolean {
   return SCENARIO_MARKER_FIELDS.some((field) => field in obj);
 }
 
-async function loadModuleScenario(filePath: string, baseKey: string, silentSkip: boolean): Promise<Scenario[] | null> {
+async function loadModuleScenario(
+  filePath: string,
+  baseKey: string,
+  silentSkip: boolean,
+  logger?: Logger,
+): Promise<Scenario[] | null> {
   let mod: { default?: unknown };
   try {
     mod = await importModule(filePath);
   } catch (err) {
-    if (silentSkip) return null;
+    if (silentSkip) {
+      // Failed imports during a walk are usually missing dependencies (e.g.
+      // remote repos whose deps haven't been installed) or fixture modules
+      // that can't load standalone. Surface them as warnings so users can
+      // tell why a scenario went missing without halting the walk.
+      logger?.error(`Skipping ${filePath}: ${formatError(err)}`);
+      return null;
+    }
     throw new Error(`Failed to load scenario module at ${filePath}: ${formatError(err)}`);
   }
 

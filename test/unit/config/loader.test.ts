@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
+import * as fsSync from "node:fs";
 import * as os from "node:os";
 import {
   loadConfig,
@@ -951,6 +952,49 @@ describe("discoverScenarios", () => {
       await writeFile("lone.ts", `export const x = 1;\n`);
 
       await expect(discoverScenarios(tmpDir, "./lone.ts")).rejects.toThrow("must default-export an object");
+    });
+  });
+
+  describe("remote scenarios", () => {
+    let tmpDir: string;
+    let restoreClone: (() => void) | undefined;
+
+    afterEach(async () => {
+      if (restoreClone) {
+        restoreClone();
+        restoreClone = undefined;
+      }
+      if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("walks scenarios from a remote URL entry as if it were local", async () => {
+      const { setCloneImplForTests } = await import("../../../src/config/remote-scenarios.js");
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-fed-"));
+
+      const url = "https://github.com/netlify/all-scenarios";
+      const cloneDir = path.join(tmpDir, ".axis", "remotes", "com.github", "netlify", "all-scenarios");
+
+      restoreClone = setCloneImplForTests((_url, target) => {
+        // Stub a remote repo on disk: ./my-scenarios contains one scenario file.
+        fsSync.mkdirSync(path.join(target, ".git"), { recursive: true });
+        fsSync.writeFileSync(
+          path.join(target, "axis.config.json"),
+          JSON.stringify({ scenarios: ["./my-scenarios"], agents: ["mock-agent"] }),
+        );
+        const sc = path.join(target, "my-scenarios");
+        fsSync.mkdirSync(sc, { recursive: true });
+        fsSync.writeFileSync(
+          path.join(sc, "remote-thing.json"),
+          JSON.stringify({ name: "Remote Thing", prompt: "do remote", judge: "ok" }),
+        );
+      });
+
+      const scenarios = await discoverScenarios(tmpDir, [url], undefined);
+      expect(scenarios).toHaveLength(1);
+      expect(scenarios[0].key).toBe("remote-thing");
+      expect(scenarios[0].name).toBe("Remote Thing");
+      // Confirm it actually came from the clone directory, not somewhere else.
+      expect(cloneDir.startsWith(path.join(tmpDir, ".axis", "remotes"))).toBe(true);
     });
   });
 });

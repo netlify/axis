@@ -16,15 +16,16 @@ AXIS (Agent Experience Index Score) is a synthetic testing framework for AI agen
 
 ## Architecture
 
-| Layer    | Key Files                                                  | Purpose                                                                                         |
-| -------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| CLI      | `src/cli.ts`                                               | Entry point, ink display, signal handling                                                       |
-| Runner   | `src/runner/runner.ts`, `lifecycle.ts`                     | Job orchestration, concurrency, isolation; `runLifecyclePhase` captures `$AXIS_OUTPUT` markdown for `setup`/`teardown`/`beforeAll`/`afterAll` phases |
-| Adapters | `src/adapters/*.ts`                                        | Spawn agent CLIs, parse NDJSON streams                                                          |
-| Scoring  | `src/scoring/`                                             | LLM judge + interaction-based evaluation pipeline                                               |
-| Reports  | `src/reports/writer.ts`, `reader.ts`                       | Persistent `.axis/reports/` store                                                               |
-| Display  | `src/ui/format.ts`, `LiveStatus.tsx`, `AnimatedTokens.tsx` | Pure formatting + ink components (incl. live token counter)                                     |
-| Types    | `src/types/`                                               | Shared interfaces (`agent`, `config`, `output`, `scoring`, `report`)                            |
+| Layer    | Key Files                                                  | Purpose                                                                                                                                                                                                                                                        |
+| -------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CLI      | `src/cli.ts`                                               | Entry point, ink display, signal handling                                                                                                                                                                                                                      |
+| Runner   | `src/runner/runner.ts`, `lifecycle.ts`                     | Job orchestration, concurrency, isolation; `runLifecyclePhase` captures `$AXIS_OUTPUT` markdown for `setup`/`teardown`/`beforeAll`/`afterAll` phases                                                                                                           |
+| Adapters | `src/adapters/*.ts`                                        | Spawn agent CLIs, parse NDJSON streams                                                                                                                                                                                                                         |
+| Scoring  | `src/scoring/`                                             | LLM judge + interaction-based evaluation pipeline                                                                                                                                                                                                              |
+| Reports  | `src/reports/writer.ts`, `reader.ts`                       | Persistent `.axis/reports/` store                                                                                                                                                                                                                              |
+| Config   | `src/config/loader.ts`, `remote-scenarios.ts`              | Parses `axis.config.*`; `mergeRemoteConfig` clones any git-URL entries in `scenarios` into `.axis/remotes/`, inlines their paths, AND folds each remote repo's `env`/`mcp_servers`/`skills`/`artifacts`/`adapters` into the parent (parent wins on collisions) |
+| Display  | `src/ui/format.ts`, `LiveStatus.tsx`, `AnimatedTokens.tsx` | Pure formatting + ink components (incl. live token counter)                                                                                                                                                                                                    |
+| Types    | `src/types/`                                               | Shared interfaces (`agent`, `config`, `output`, `scoring`, `report`)                                                                                                                                                                                           |
 
 ### Adapter Pattern
 
@@ -45,20 +46,20 @@ The NDJSON-style adapters (`claude-code`, `codex`) use `lines` mode for NDJSON p
 
 Call `createAgentAdapter(spec)` with an `AgentAdapterSpec<State>`. The spec is a single typed object -no class inheritance, no protected hooks:
 
-| Spec field        | Purpose                                                                                                                           |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `name`            | Adapter name (registered in `src/adapters/registry.ts`)                                                                           |
-| `cliCommand?`     | CLI binary for `resolveCommand`; omit if user-supplied                                                                            |
-| `timeoutMs?`      | Execution timeout (default 10 min)                                                                                                |
-| `requiredEnv?`    | Env vars validated by the runner pre-flight (e.g. `ANTHROPIC_API_KEY`)                                                            |
-| `hasLocalSession?`| Detect a usable local CLI login (e.g. `claude login`, `codex login`). Runner calls this only when `requiredEnv` is missing — explicit API keys always win |
-| `isolationEnv?`   | Isolation vars (e.g. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`). Signature: `({ workspace, home }) => Record<string, string>`. Point `*_HOME`-style paths under `home`, never `workspace` |
-| `prepare?`        | Side effects (mkdir, MCP / skills writers) before spawn                                                                           |
-| `resolveCommand?` | Override how the CLI command is resolved                                                                                          |
-| `buildArgs`       | Build CLI arguments (prefix args from command resolution prepended automatically)                                                 |
-| `initialState`    | Per-run mutable state used by `streamConfig` handlers and `getResult`                                                             |
-| `streamConfig`    | How to process agent stdout. Discriminated union: `{ mode: "lines", onLine, onEnd? }` or `{ mode: "aggregate", onChunk, onEnd? }` |
-| `getResult`       | Build final `{ result, metadata? }` from accumulated state after exit                                                             |
+| Spec field         | Purpose                                                                                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`             | Adapter name (registered in `src/adapters/registry.ts`)                                                                                                                           |
+| `cliCommand?`      | CLI binary for `resolveCommand`; omit if user-supplied                                                                                                                            |
+| `timeoutMs?`       | Execution timeout (default 10 min)                                                                                                                                                |
+| `requiredEnv?`     | Env vars validated by the runner pre-flight (e.g. `ANTHROPIC_API_KEY`)                                                                                                            |
+| `hasLocalSession?` | Detect a usable local CLI login (e.g. `claude login`, `codex login`). Runner calls this only when `requiredEnv` is missing — explicit API keys always win                         |
+| `isolationEnv?`    | Isolation vars (e.g. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`). Signature: `({ workspace, home }) => Record<string, string>`. Point `*_HOME`-style paths under `home`, never `workspace` |
+| `prepare?`         | Side effects (mkdir, MCP / skills writers) before spawn                                                                                                                           |
+| `resolveCommand?`  | Override how the CLI command is resolved                                                                                                                                          |
+| `buildArgs`        | Build CLI arguments (prefix args from command resolution prepended automatically)                                                                                                 |
+| `initialState`     | Per-run mutable state used by `streamConfig` handlers and `getResult`                                                                                                             |
+| `streamConfig`     | How to process agent stdout. Discriminated union: `{ mode: "lines", onLine, onEnd? }` or `{ mode: "aggregate", onChunk, onEnd? }`                                                 |
+| `getResult`        | Build final `{ result, metadata? }` from accumulated state after exit                                                                                                             |
 
 The `streamConfig` field uses a discriminated union so the mode and its handler can never get out of sync -no runtime assertions needed. `getResult` returns `null` for "no result" (never `""`). Metadata overrides (e.g. upstream `durationMs`) are spread on top of base-computed fields.
 

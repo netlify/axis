@@ -60,6 +60,19 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
     }
   }
 
+  if (settings?.remotes !== undefined) {
+    const remotes = settings.remotes as Record<string, unknown>;
+    if (typeof remotes !== "object" || remotes === null || Array.isArray(remotes)) {
+      throw new Error(`Invalid config at ${filePath}: "settings.remotes" must be an object`);
+    }
+    if (remotes.maxDepth !== undefined) {
+      const d = remotes.maxDepth;
+      if (typeof d !== "number" || !Number.isInteger(d) || d < 1) {
+        throw new Error(`Invalid config at ${filePath}: "settings.remotes.maxDepth" must be a positive integer`);
+      }
+    }
+  }
+
   if (obj.mcp_servers !== undefined) {
     validateMcpServers(obj.mcp_servers, filePath);
   }

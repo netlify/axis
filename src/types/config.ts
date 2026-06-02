@@ -107,6 +107,23 @@ export interface SettingsConfig {
   concurrency?: number;
   /** Time and token spend limits for the run and individual scenarios. */
   limits?: LimitsConfig;
+  /**
+   * Remote scenarios. Discover scenarios from remote git repositories listed
+   * in `scenarios`. URL entries are cloned into `.axis/remotes/` and their
+   * own `axis.config.*` is read to expand the scenarios list.
+   */
+  remotes?: RemotesConfig;
+}
+
+/** Settings for remote scenarios. */
+export interface RemotesConfig {
+  /**
+   * How many levels of remote-to-remote references to follow. `1` (the
+   * default) means the root config may reference remote repos, but those
+   * remote repos' own configs cannot themselves reference more remote
+   * repos. Increase to allow nested remote references.
+   */
+  maxDepth?: number;
 }
 
 /** Overall run limits and default per-scenario limits. */
