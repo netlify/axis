@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.14.0](https://github.com/netlify/axis/compare/v1.13.0...v1.14.0) (2026-06-03)
+
+
+### Features
+
+* support remote scenarios ([44c44f1](https://github.com/netlify/axis/commit/44c44f1b7633e48c6a91de2dc4783f3def8e3332))
+
+
+### Bug Fixes
+
+* adjust the evals for env and agents ([2fee690](https://github.com/netlify/axis/commit/2fee690155df59fecca9922d5ed4f9135ae7242a))
+* improve the judge system prompt to stay on track ([2583d1d](https://github.com/netlify/axis/commit/2583d1d633b9f3457c29ef3d193aad5b7d4a18e8))
+* reduce visual noise on cli output with judge clarifications ([1ab6e5d](https://github.com/netlify/axis/commit/1ab6e5dc3d05fd8918583ae5e9965e415e8ca5e9))
+
 ## [1.13.0](https://github.com/netlify/axis/compare/v1.12.0...v1.13.0) (2026-05-21)
 
 
