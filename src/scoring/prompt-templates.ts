@@ -238,11 +238,12 @@ JUDGE:
 INSTRUCTIONS:
 1. Review the transcript to understand what the agent did.
 2. Where possible, independently verify the results — check the filesystem for created/modified files, visit URLs, confirm that the claimed outcomes actually exist. Do not trust the transcript alone.
+3. Evaluate ONLY what the criterion asks for. If the criterion is fully satisfied, score 10 — do not deduct for adjacent concerns, code-quality preferences, defensive-coding ideas, alternative implementations, or anything else the criterion did not request. Out-of-scope observations are not grounds for a lower score.
 
 When done, respond with ONLY valid JSON on its own line:
 {"score": <0-10>, "rationale": "<1-2 sentence explanation>"}
 
-Score guide: 0 = not met at all, 5 = partially met, 10 = fully met.`,
+Score guide: 0 = not met at all, 5 = partially met, 10 = fully met. Reserve scores below 10 for cases where the criterion itself is incomplete or wrong, not for unrelated nitpicks.`,
   variables: [
     { name: "scenarioName", description: "Name of the test scenario", type: "string" },
     { name: "prompt", description: "The original task prompt given to the agent", type: "text" },
@@ -292,8 +293,9 @@ INSTRUCTIONS:
 1. Review the transcript to understand what the agent did.
 2. Where possible, independently verify the results — visit URLs, check endpoints, confirm that the claimed outcomes actually exist. Do not trust the transcript alone.
 3. For each criterion, provide a score from 0 to 10 and a brief rationale.
+4. Evaluate each criterion ONLY against what it asks for. If a criterion is fully satisfied, score it 10 — do not deduct for adjacent concerns, code-quality preferences, defensive-coding ideas, alternative implementations, or anything else the criterion did not request. Out-of-scope observations are not grounds for a lower score. Concerns about a different criterion belong to that criterion, not this one.
 
-Score guide: 0 = not met at all, 5 = partially met, 10 = fully met.
+Score guide: 0 = not met at all, 5 = partially met, 10 = fully met. Reserve scores below 10 for cases where the criterion itself is incomplete or wrong, not for unrelated nitpicks.
 
 When done, respond with ONLY valid JSON on its own line:
 {"grades": [{"criterion_index": 0, "score": <0-10>, "rationale": "<string>"}, ...]}`,
