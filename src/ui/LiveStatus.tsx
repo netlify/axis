@@ -9,16 +9,24 @@ interface LiveStatusProps {
   skippedCount?: number;
 }
 
+/** A job is "active" when it's mid-flight — counts toward the live scenario list. */
+function isActive(job: JobState): boolean {
+  if (job.inTeardown) return true;
+  return job.status === "setup" || job.status === "running" || job.status === "teardown" || job.status === "scoring";
+}
+
 export function LiveStatus({ jobs, skippedCount = 0 }: LiveStatusProps) {
   const done = jobs.filter((j) => j.status === "done").length;
   const failed = jobs.filter((j) => j.status === "failed").length;
+  const pending = jobs.filter((j) => j.status === "pending").length;
   const scoring = jobs.filter((j) => j.status === "scoring").length;
   const tearingDown = jobs.filter((j) => j.inTeardown).length;
   const total = jobs.length;
 
-  const scenarios = groupByScenario(jobs);
-  const scenarioCount = scenarios.length;
+  const scenarioCount = new Set(jobs.map((j) => getBaseKey(j.scenarioKey))).size;
   const agentCount = new Set(jobs.map((j) => j.agentName)).size;
+
+  const activeScenarios = groupByScenario(jobs.filter(isActive));
 
   const allFinished = done + failed === total && total > 0;
   const scoredJobs = jobs.filter((j) => j.axisScore !== undefined);
@@ -33,25 +41,44 @@ export function LiveStatus({ jobs, skippedCount = 0 }: LiveStatusProps) {
         {agentCount !== 1 ? "s" : ""}
       </Text>
       <Text>{"─".repeat(50)}</Text>
-      {scenarios.map(({ scenarioKey, agents }) => (
-        <ScenarioGroup key={scenarioKey} scenarioKey={scenarioKey} agents={agents} />
-      ))}
+      {activeScenarios.length > 0 ? (
+        activeScenarios.map(({ scenarioKey, agents }) => (
+          <ScenarioGroup key={scenarioKey} scenarioKey={scenarioKey} agents={agents} />
+        ))
+      ) : allFinished ? null : (
+        <>
+          <Text dimColor>Waiting for scenarios to start…</Text>
+          <Text> </Text>
+        </>
+      )}
       <Text>{"─".repeat(50)}</Text>
       {allFinished && avgScore !== null ? (
         <Text bold>Average AXIS Result: {avgScore} / 100</Text>
       ) : (
-        <Text>
-          {done + failed}/{total} complete
-          {scoring > 0 ? ` · scoring ${scoring} result${scoring !== 1 ? "s" : ""}…` : ""}
-          {tearingDown > 0
-            ? ` · tearing down ${tearingDown} scenario${tearingDown !== 1 ? "s" : ""}…`
-            : ""}
-        </Text>
+        <Text>{formatProgress({ done, failed, pending, total, scoring, tearingDown })}</Text>
       )}
       {skippedCount > 0 ? <Text dimColor>{skippedCount} marked to be skipped</Text> : null}
       <Text> </Text>
     </Box>
   );
+}
+
+function formatProgress(counts: {
+  done: number;
+  failed: number;
+  pending: number;
+  total: number;
+  scoring: number;
+  tearingDown: number;
+}): string {
+  const { done, failed, pending, total, scoring, tearingDown } = counts;
+  const parts: string[] = [`${done + failed}/${total} complete`];
+  if (done > 0) parts.push(`${done} passed`);
+  if (failed > 0) parts.push(`${failed} failed`);
+  if (pending > 0) parts.push(`${pending} pending`);
+  if (scoring > 0) parts.push(`scoring ${scoring}…`);
+  if (tearingDown > 0) parts.push(`tearing down ${tearingDown}…`);
+  return parts.join(" · ");
 }
 
 function ScenarioGroup({ scenarioKey, agents }: { scenarioKey: string; agents: JobState[] }) {
