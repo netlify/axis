@@ -1,0 +1,13 @@
+{
+  "name": "AXIS self AX",
+  "scenarios": "./scenarios",
+  "agents": ["claude-code", "codex"],
+  "judging": {
+    "agents": [{ "agent": "claude-code", "model": "claude-opus-4-7" }]
+  },
+  "settings": {
+    "limits": {
+      "scenario": { "time_minutes": 10 }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 {
   "name": "Long-running task",
   "prompt": "Refactor every file in src/.",
-  "rubric": [{ "check": "Refactor was completed", "weight": 1.0 }]
+  "judge": [{ "check": "Refactor was completed", "weight": 1.0 }]
 }

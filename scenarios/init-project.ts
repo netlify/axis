@@ -1,30 +1,25 @@
-import type { ScenarioInput } from "../dist/index.js";
+import type { ScenarioInput } from "../src/types/scenario.js";
 import { withSharedVariants } from "./shared/variants.js";
 
-export default withSharedVariants(
-  {
-    key: "init-project",
-    name: "Initialize a new AXIS project",
+export default withSharedVariants({
+  key: "init-project",
+  name: "Initialize a new AXIS project",
 
-    prompt:
-      "Initialize a new AXIS project in the current working directory. Create an `axis.config.json` that points to a `./scenarios` directory and uses `claude-code` as the agent. Then create one scenario at `scenarios/url-fetch.json` that asks the agent to fetch https://example.com and describe what it sees. The scenario must include a `name`, a `prompt`, and a `judge` with at least two items, each having a `check` field.",
+  prompt:
+    "Initialize a new AXIS project in the current working directory. Create an `axis.config.json` that points to a `./scenarios` directory and uses `claude-code` as the agent. Then create one scenario at `scenarios/url-fetch.json` that asks the agent to fetch https://example.com and describe what it sees. The scenario must include a `name`, a `prompt`, and a `judge` with at least two items, each having a `check` field.",
 
-    judge: [
-      {
-        check: "An `axis.config.json` file was created in the workspace root and contains valid JSON",
-        weight: 0.2,
-      },
-      {
-        check:
-          "The config includes a `scenarios` field pointing at `./scenarios` (or equivalent) and an `agents` array containing `claude-code`",
-        weight: 0.2,
-      },
-      { check: "A `scenarios/url-fetch.json` file was created and contains valid JSON", weight: 0.2 },
-      { check: "The scenario file has top-level `name`, `prompt`, and `judge` fields", weight: 0.2 },
-      { check: "The judge is an array with at least two items, each containing a `check` field", weight: 0.2 },
-    ],
-  },
-  {
-    docsPage: "https://axis.run/quickstart",
-  },
-) satisfies ScenarioInput;
+  judge: [
+    {
+      check: "An `axis.config.json` file was created in the workspace root and contains valid JSON",
+      weight: 0.2,
+    },
+    {
+      check:
+        "The config includes a `scenarios` field pointing at `./scenarios` (or equivalent) and an `agents` array containing `claude-code`",
+      weight: 0.2,
+    },
+    { check: "A `scenarios/url-fetch.json` file was created and contains valid JSON", weight: 0.2 },
+    { check: "The scenario file has top-level `name`, `prompt`, and `judge` fields", weight: 0.2 },
+    { check: "The judge is an array with at least two items, each containing a `check` field", weight: 0.2 },
+  ],
+}) satisfies ScenarioInput;
