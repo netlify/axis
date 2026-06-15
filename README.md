@@ -1,18 +1,28 @@
-# AXIS - Agent Experience Index Score
+<div align="center">
+  <a href="https://axis.run">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/76547bab-3a2e-498a-b556-99c58b3c553b">
+      <img alt="AXIS logo" src="https://github.com/user-attachments/assets/76547bab-3a2e-498a-b556-99c58b3c553b" height="128">
+    </picture>
+  </a>
+  <h1>AXIS — Agent Experience Index Score</h1>
+  <a href="https://www.npmjs.com/package/@netlify/axis"><img alt="NPM version" src="https://img.shields.io/npm/v/@netlify/axis?style=for-the-badge&labelColor=000000"></a>
+  <a href="https://github.com/netlify/axis/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/@netlify/axis?style=for-the-badge&labelColor=000000"></a>
+  <a href="https://github.com/netlify/axis/issues"><img alt="Contribute" src="https://img.shields.io/badge/CONTRIBUTE-blueviolet.svg?style=for-the-badge&labelColor=000000"></a>
+</div>
+<br />
 
-Full documentation lives at **https://axis.run**:
+AXIS is an open source tooling and a scoring framework to measure how well services work for AI agents. Think [Lighthouse](https://developer.chrome.com/docs/lighthouse), but for agent experience. 
 
-AXIS is a synthetic testing framework for measuring how well systems support AI agent interaction. Think [Lighthouse](https://developer.chrome.com/docs/lighthouse), but instead of scoring user experience, AXIS scores **agent experience**.
-
-Given a scenario, an agent, and a prompt, AXIS runs the agent, captures a full transcript of the interaction, and produces a graded score across four independent dimensions: Goal Achievement, Environment, Service, and Agent.
+Give AXIS a scenario, an agent, and a prompt. It runs the agent, captures a full transcript, and produces a graded score across four independent dimensions: Goal Achievement, Environment, Service, and Agent.
 
 ## Why AXIS
 
-The web has Lighthouse. APIs have contract testing. Performance has k6. But there's no standardized way to answer: _"How well does my system work when an AI agent tries to use it?"_
+The web has Lighthouse. APIs have contract testing. Performance has k6. But there's no standardized way to answer: "How well does my system work when an AI agent tries to use it?".
 
-As agents become a primary interface for interacting with websites, APIs, and developer platforms, the systems they interact with need to be measured and optimized for that experience, just like we optimize for page load time or accessibility.
+As agents become a primary interface for interacting with sites, APIs, and developer platforms, the systems they interact with need to be measured and optimized for that experience — just like we optimize for page load time or accessibility. AXIS is that measurement.
 
-## Quick Start
+## Quick start
 
 ```bash
 npm install @netlify/axis
@@ -31,7 +41,7 @@ npm install @netlify/axis
 
 ```json
 {
-  "name": "Hello World",
+  "name": "Hello world",
   "prompt": "Navigate to https://example.com and describe what you see on the page.",
   "judge": [
     { "check": "Agent visited the target URL", "weight": 0.5 },
@@ -48,29 +58,17 @@ AXIS executes the scenario, scores the result, and writes a report to `.axis/rep
 
 ## Documentation
 
-Full documentation lives at **https://axis.run**:
+Full documentation lives at **[axis.run](https://axis.run)**:
 
-- [Overview](https://axis.run/) - what AXIS measures and why
-- [Quick Start](https://axis.run/quickstart) - install through your first scored run
+- [Quick start](https://axis.run/quickstart) - install through your first scored run
 - [Configuration](https://axis.run/configuration) - `axis.config.json`, scenarios, MCP servers, skills
-- [CLI Reference](https://axis.run/cli) - `axis run`, `axis reports`, `axis baseline`
-- [Running Tests](https://axis.run/running) - execution model, workspace isolation, custom adapters, CI integration
-- [Scoring Framework](https://axis.run/scoring) - the four dimensions, signals, calibration
+- [CLI reference](https://axis.run/cli) - `axis run`, `axis reports`, `axis baseline`
+- [Running tests](https://axis.run/running) - execution model, workspace isolation, custom adapters, CI integration
+- [Scoring framework](https://axis.run/scoring) - the four dimensions, signals, calibration
 
 ## Programmatic API
 
-`@netlify/axis` exports its core functionality for use as a library:
-
-```typescript
-import { run, scoreResults } from "@netlify/axis";
-
-const output = await run({ configPath: "axis.config.json" });
-const scored = await scoreResults(output);
-
-console.log(`Average AXIS Result: ${scored.summary.averageAxisScore}`);
-```
-
-The package also exports `loadConfig`, `discoverScenarios`, `setBaseline`, `compareBaseline`, `createAgentAdapter`, `registerAdapter`, and the underlying scoring primitives (`buildSparseIndex`, `categorizeInteraction`, `normalizeTranscript`). See [`src/index.ts`](./src/index.ts) for the full surface.
+Use the programmatic API when you want to integrate AXIS into an existing test runner, build tool, or CI pipeline rather than calling the CLI directly.
 
 ## Roadmap
 
@@ -79,7 +77,22 @@ Delivered: scenario runner, four-dimension scoring pipeline, baselines with regr
 Planned:
 
 - **Historical trending** - score regression detection over time
-- **AXIS Badge** - embeddable score badge for READMEs
+- **AXIS badge** - embeddable score badge for READMEs
 - **Configurable judge** - separate adapter/model for scoring, independent of the agent under test
 - **Score thresholds** - CI gating with configurable pass/fail thresholds
 - **Human interruption detection** - penalize agent requests for human intervention
+
+## Contributing
+
+AXIS is built in the open. Contributions are welcome. New scenarios, agent adapters,
+bug fixes, and documentation improvements all help.
+<br />
+<br />
+
+---
+
+AXIS is open source under the MIT license, created by [Netlify](https://www.netlify.com)
+and developed with founding contributors including [Auth0](https://auth0.com) and
+[Resend](https://resend.com).
+
+Full docs: [axis.run](https://axis.run)
