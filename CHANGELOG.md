@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.15.0](https://github.com/netlify/axis/compare/v1.14.0...v1.15.0) (2026-06-15)
+
+
+### Features
+
+* add AXIS skills ([1d32968](https://github.com/netlify/axis/commit/1d329686fde9399d5e437a276aeebdf2d2b3df4a))
+
+
+### Bug Fixes
+
+* only show active runs ([e934b74](https://github.com/netlify/axis/commit/e934b7403ce242efa4d120700cd037a26754b48f))
+
 ## [1.14.0](https://github.com/netlify/axis/compare/v1.13.0...v1.14.0) (2026-06-03)
 
 

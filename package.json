@@ -3,7 +3,7 @@
   "workspaces": [
     "src/docs-site"
   ],
-  "version": "1.14.0",
+  "version": "1.15.0",
   "description": "Open source tooling and scoring framework to measure how well services work for AI agents.",
   "license": "MIT",
   "type": "module",
