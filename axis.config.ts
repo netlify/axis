@@ -5,7 +5,7 @@ export default {
   settings: {
     limits: {
       scenario: {
-        time_minutes: 3,
+        time_minutes: 10,
         tokens: 3000000,
       },
     },

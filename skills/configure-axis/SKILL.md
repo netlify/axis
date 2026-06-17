@@ -325,67 +325,7 @@ export default createAgentAdapter<{ stdout: string }>({
 
 ## Reading AXIS reports
 
-When asked to interpret a report, compare reports, identify regressions, or explain a score, the structure to navigate:
-
-- `.axis/reports/{reportId}/report.json` is the run manifest. Top-level fields: `version`, `reportId`, `timestamp`, `durationMs`, `summary`, `results[]`.
-- `.axis/reports/{reportId}/scenarios/{scenarioKey}/{agentName}.json` is the per-run detail.
-- `.axis/baselines/{name}.json` is a saved baseline (default name: `main`). Entries contain `axisScore`, `goalAchievement`, `environment`, `service`, `agent`.
-
-### Per-result shape (inside `results[]`)
-
-- `scenarioKey`, `scenarioName`, `agentName`
-- `durationMs`, `exitCode`, `tokenUsage: { input, output, cacheReadInput }`
-- `score.axisScore` (0-100, composite)
-- `score.goalAchievement.{score, criteria[]}` where each criterion has `check`, `weight`, `score`, `rationale`
-- `score.environment.{score, dimensions, audits[]}` with `dimensions: { success, speed, weight, relevance, necessity }`
-- `score.service.{score, dimensions, audits[]}` (same shape)
-- `score.agent.{score, dimensions, audits[]}` (same shape, but the agent dimension audits every interaction, not just agent-tagged ones)
-
-### What each dimension measures
-
-- **Goal achievement** (default weight 0.4): LLM judge scores the agent against the scenario's `judge` checks. The only dimension that depends on the prompt; the other three are intrinsic.
-- **Environment** (0.2): execution reliability of filesystem, shell, and network operations. Did `ls` / `cat` / `bash` / `fetch` calls succeed cleanly? NOT about whether the output was useful.
-- **Service** (0.2): execution reliability of external service interactions (MCP servers, APIs). Same idea: did the service respond cleanly?
-- **Agent** (0.2): decision quality across every interaction (every tool call is an agent choice, including a plain `ls`). Sub-dimensions: success (0.1), speed (0.1), weight (0.2), relevance (0.2), necessity (0.4). Necessity is the biggest signal: redundant calls are penalized hard.
-
-Speed is always heuristic (threshold buckets per category), never LLM-evaluated. All other dimensions use an LLM judge.
-
-### Composite formula
-
-`axisScore = goalAchievement * w_goal + environment * w_env + service * w_svc + agent * w_agent`
-
-Default weights `{ goal_achievement: 0.4, environment: 0.2, service: 0.2, agent: 0.2 }`. Override in `axis.config.json` under `settings.scoring_weights`.
-
-### Calibration
-
-All categories use log-normal CDF mapping with median=0.5, sigma=0.4:
-
-- raw 0.5 → 50
-- raw 0.8 → 88
-- raw 0.985 → 96
-
-So even "perfect" runs typically cap around 95-99. You will not see a clean 100 unless every interaction is flawless across every sub-dimension; treat 95+ as a top-band result.
-
-### Finding a regression vs a baseline
-
-1. Match on `scenarioKey` (variants like `foo@bar` count as distinct scenarios).
-2. Subtract: `delta = report.axisScore - baseline.axisScore`.
-3. The dimension that dropped the most indicates the failure mode:
-   - Goal dropped: the agent did not satisfy the judge checks. Read `criteria[].rationale` to see which checks failed.
-   - Environment dropped: shell, filesystem, or network operations failed. Read `environment.audits[]` and look for `success < 1`.
-   - Service dropped: external service interactions flaked.
-   - Agent dropped: redundant, unnecessary, or low-relevance tool calls. Look at `agent.dimensions.necessity` first.
-
-### Signals to cite when writing analyses
-
-Cite numbers from the actual report file. Do not paraphrase or guess.
-
-- "AXIS Result dropped from 84 to 53 (a 31-point regression)"
-- "Service success collapsed from 0.95 to 0.30"
-- "Agent necessity was 0.32: roughly 68% of tool calls were judged unnecessary"
-- "5 of 7 service interactions returned errors per the audits[] entries"
-
-If a value is not in the file, do not invent it. Open the file and read it.
+For interpreting reports, comparing runs, finding regressions, or explaining scores, use the companion skill `using-axis`. It covers the report file layout, dimension semantics, calibration, and citation rules in depth. This skill stays focused on authoring.
 
 ## Rules you must follow
 
@@ -398,7 +338,7 @@ If a value is not in the file, do not invent it. Open the file and read it.
 7. When `judge` is a weighted array, sum your weights to 1.0 (or leave some unweighted to split the remainder; do not exceed 1.0).
 8. Variant names match `/^[a-zA-Z0-9_-]+$/`. Scenario keys are derived from the file path; do not set `key` for file-based scenarios.
 9. `beforeAll` and `afterAll` only fire from the CLI. Do not rely on them when the user runs AXIS programmatically via `run()`.
-10. In an isolated AXIS scenario workspace, do NOT run verification commands like `tsc`, `node -e "require(...)"`, `git diff`, `git status`, or `npm install` to check your authored files. The workspace is intentionally minimal: no `node_modules`, no git history. These commands fail with environment errors that tank the environment dimension. Write the file correctly against the schema. The AXIS judge inspects your output directly.
+10. In an isolated AXIS scenario workspace, do NOT try to verify your authored file by executing it, importing it, or cross-checking it against an installed copy of `@netlify/axis`. The workspace is intentionally minimal: no `node_modules`, no git history. That means: no `tsc`, no `node -e "require(...)"`, no `git diff` or `git status`, no `npm install`, and no reading or grepping the globally-installed `@netlify/axis` package outside the workspace (paths like `/usr/local/lib/node_modules/@netlify/axis`, `/opt/homebrew/.../node_modules/@netlify/axis`, or any `node_modules/@netlify/axis` you did not put there yourself). Every such command fails or wastes interactions and tanks the environment and agent dimensions. Write the file once, correctly, against the schema you already know from this skill. The AXIS judge inspects your output directly; you do not need to prove it works first.
 11. When asked to make a targeted edit (add a field, fix a single bug), edit ONLY what the prompt specifies. Do not reorganize, reformat, or add unrelated fields. Preserve every field the prompt did not name. The judge often checks "original X and Y fields are preserved unchanged".
 12. Minimize unnecessary tool calls. Every tool call is evaluated as an agent decision; redundant `ls`, repeated `cat` of the same file, exploratory `find` that you do not act on, all tank the agent dimension via the `necessity` sub-dimension. Read each file you need once. Write each edit once. Stop when the task is done.
 13. Field-name discipline. AXIS uses snake_case in all JSON config fields: `mcp_servers` not `mcpServers`, `time_minutes` not `timeMinutes`, `run_script` not `runScript` or `shell`. The deprecated alias `rubric` exists for backwards compat; prefer `judge`. Other commonly-invented names that are WRONG: `criteria`, `success_criteria`, `expected`, `tasks`, `evaluators`, `models`, `timeout`, `maxTokens`, `tokenLimit`, `timeoutMinutes`.

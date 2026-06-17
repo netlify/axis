@@ -46,6 +46,13 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     <li><code>scenarios/hello-world.json</code> -a sample scenario that asks the agent to create a file with specific content.</li>
   </ul>
   <p>
+    After the files are written, <code>init</code> also runs
+    <code>npx skills add netlify/axis --all</code> to install the
+    <code>configure-axis</code> skill into your detected agent config directories. This is what
+    teaches Claude Code, Codex, Gemini, and other supported agents to author valid AXIS scenarios
+    and configs. Pass <code>--no-skills</code> to skip the install.
+  </p>
+  <p>
     To skip the prompts, pass flags directly. Use <code>--format ts</code> (or <code>js</code>) to
     scaffold a typed config; the default is <code>json</code>:
   </p>

@@ -1,12 +1,12 @@
 import type { ScenarioInput, ScenarioVariant } from "../../src/types/scenario.js";
 
-const DEFAULT_SKILLS = ["./skills/configure-axis"];
+const DEFAULT_SKILLS = ["./skills/configure-axis", "./skills/using-axis"];
 
 export interface SharedVariantsOptions {
   /**
    * Skill source strings attached to the `with-skills` variant. Defaults to
-   * `["./skills/configure-axis"]`. Paths resolve relative to the config dir
-   * (see `src/skills/resolver.ts`).
+   * the full set of AXIS skills (`configure-axis` + `using-axis`). Paths
+   * resolve relative to the config dir (see `src/skills/resolver.ts`).
    */
   skills?: string[];
 }
@@ -16,7 +16,7 @@ export interface SharedVariantsOptions {
  * repo's dogfood scenarios:
  *
  *   - `no-context`: baseline, no skills attached
- *   - `with-skills`: attaches the configure-axis skill (or `options.skills`)
+ *   - `with-skills`: attaches every AXIS skill (or `options.skills`)
  *
  * Any variants already on the scenario are appended after these two.
  */

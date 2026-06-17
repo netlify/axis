@@ -32,6 +32,15 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <span class="cli-flag-name"><code>-f, --force</code></span>
         <span class="cli-flag-desc">Overwrite existing files.</span>
       </div>
+      <div class="cli-flag">
+        <span class="cli-flag-name"><code>--no-skills</code></span>
+        <span class="cli-flag-desc">
+          Skip the automatic install of AXIS skills. By default, <code>init</code> runs
+          <code>npx skills add netlify/axis --all</code> after writing the config so the
+          <code>configure-axis</code> skill is wired into every detected agent. Pass
+          <code>--no-skills</code> to opt out.
+        </span>
+      </div>
     </div>
   </div>
 

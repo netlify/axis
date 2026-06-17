@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as readline from "node:readline";
@@ -103,6 +104,41 @@ function renderConfigFile(format: ConfigFormat, config: { scenarios: string; age
   );
 }
 
+/**
+ * Run `npx skills add netlify/axis --all` so AXIS users get the configure-axis
+ * skill (and any future AXIS skills) wired into their project's agent configs
+ * in one step. Failures are reported but do not fail the init.
+ */
+function installAxisSkills(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    process.stdout.write(`\n  Installing AXIS skills via npx skills...\n\n`);
+    const child = spawn("npx", ["--yes", "-p", "skills@latest", "skills", "add", "netlify/axis", "--all"], {
+      stdio: "inherit",
+      env: { ...process.env, CI: "true" },
+    });
+    child.on("close", (code) => {
+      if (code === 0) {
+        process.stdout.write(`\n  AXIS skills installed.\n\n`);
+      } else {
+        process.stdout.write(`\n  Skills install exited with code ${code}.\n`);
+        process.stdout.write(`  Rerun manually: npx skills add netlify/axis --all\n\n`);
+      }
+      resolve();
+    });
+    child.on("error", (err) => {
+      process.stdout.write(`\n  Skills install failed: ${err.message}\n`);
+      process.stdout.write(`  Rerun manually: npx skills add netlify/axis --all\n\n`);
+      resolve();
+    });
+  });
+}
+
+function parseYesNo(answer: string, defaultYes: boolean): boolean {
+  const trimmed = answer.trim().toLowerCase();
+  if (trimmed === "") return defaultYes;
+  return /^(y|yes|true|1)$/.test(trimmed);
+}
+
 program
   .command("init")
   .description("Initialize a new AXIS configuration and sample scenario")
@@ -110,6 +146,7 @@ program
   .option("-a, --agent <names>", "agent(s) to include (comma-separated, e.g. claude-code,codex)")
   .option("--format <format>", `config file format (${CONFIG_FORMATS.join(", ")})`, "json")
   .option("-f, --force", "overwrite existing files")
+  .option("--no-skills", "skip installing AXIS skills via the `skills` npm package")
   .action(async (opts) => {
     let scenariosPath: string = opts.scenarios;
     let agents: string[] = opts.agent
@@ -119,6 +156,7 @@ program
           .map((a: string) => a.toLowerCase())
       : [];
     let format: ConfigFormat = opts.format;
+    let installSkills: boolean = opts.skills !== false;
 
     const hasExplicitFlags = opts.agent || opts.scenarios !== "./scenarios" || opts.format !== "json";
     const interactive = process.stdin.isTTY && !hasExplicitFlags;
@@ -134,6 +172,10 @@ program
         .map((a) => a.toLowerCase());
       const formatAnswer = await prompt(rl, `  Config format [${CONFIG_FORMATS.join(", ")}] (${format}): `, format);
       format = formatAnswer.toLowerCase() as ConfigFormat;
+      if (installSkills) {
+        const skillsAnswer = await prompt(rl, `  Install AXIS skills via \`npx skills\`? (Y/n): `, "y");
+        installSkills = parseYesNo(skillsAnswer, true);
+      }
       rl.close();
     }
 
@@ -189,7 +231,12 @@ program
     fs.writeFileSync(scenarioFile, JSON.stringify(scenario, null, 2) + "\n");
 
     process.stdout.write(`\n  Created ${configFilename}\n`);
-    process.stdout.write(`  Created ${path.relative(".", scenarioFile)}\n\n`);
+    process.stdout.write(`  Created ${path.relative(".", scenarioFile)}\n`);
+
+    if (installSkills) {
+      await installAxisSkills();
+    }
+
     process.stdout.write(`  Run \`axis run\` to execute your first scenario.\n\n`);
   });
 
