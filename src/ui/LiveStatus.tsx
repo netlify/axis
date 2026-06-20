@@ -26,9 +26,9 @@ export function LiveStatus({ jobs, skippedCount = 0 }: LiveStatusProps) {
   const scenarioCount = new Set(jobs.map((j) => getBaseKey(j.scenarioKey))).size;
   const agentCount = new Set(jobs.map((j) => j.agentName)).size;
 
-  const activeScenarios = groupByScenario(jobs.filter(isActive));
-
   const allFinished = done + failed === total && total > 0;
+  const displayedScenarios = allFinished ? groupByScenario(jobs) : groupByScenario(jobs.filter(isActive));
+
   const scoredJobs = jobs.filter((j) => j.axisScore !== undefined);
   const avgScore =
     scoredJobs.length > 0 ? Math.round(scoredJobs.reduce((sum, j) => sum + j.axisScore!, 0) / scoredJobs.length) : null;
@@ -41,8 +41,8 @@ export function LiveStatus({ jobs, skippedCount = 0 }: LiveStatusProps) {
         {agentCount !== 1 ? "s" : ""}
       </Text>
       <Text>{"─".repeat(50)}</Text>
-      {activeScenarios.length > 0 ? (
-        activeScenarios.map(({ scenarioKey, agents }) => (
+      {displayedScenarios.length > 0 ? (
+        displayedScenarios.map(({ scenarioKey, agents }) => (
           <ScenarioGroup key={scenarioKey} scenarioKey={scenarioKey} agents={agents} />
         ))
       ) : allFinished ? null : (
