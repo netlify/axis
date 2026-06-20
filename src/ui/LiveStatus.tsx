@@ -12,7 +12,13 @@ interface LiveStatusProps {
 /** A job is "active" when it's mid-flight — counts toward the live scenario list. */
 function isActive(job: JobState): boolean {
   if (job.inTeardown) return true;
-  return job.status === "setup" || job.status === "running" || job.status === "teardown" || job.status === "scoring";
+  return (
+    job.status === "setup" ||
+    job.status === "starting" ||
+    job.status === "running" ||
+    job.status === "teardown" ||
+    job.status === "scoring"
+  );
 }
 
 export function LiveStatus({ jobs, skippedCount = 0 }: LiveStatusProps) {
@@ -109,15 +115,15 @@ function AgentRow({ job }: { job: JobState }) {
       ? "green"
       : job.status === "failed"
         ? "red"
-        : job.status === "running" || job.status === "scoring"
+        : job.status === "starting" || job.status === "running" || job.status === "scoring"
           ? "yellow"
           : undefined;
 
   // The timer and token counter are both visible in every state where they
-  // have a value. The timer shows live-elapsed during running/scoring and
-  // the final `durationMs` afterwards. The token counter keeps animating
+  // have a value. The timer shows live-elapsed during starting/running/scoring
+  // and the final `durationMs` afterwards. The token counter keeps animating
   // until it catches up to the final real total even after the job is done.
-  const active = job.status === "running" || job.status === "scoring";
+  const active = job.status === "starting" || job.status === "running" || job.status === "scoring";
   const hasTime = job.runStartedAt !== undefined || job.durationMs !== undefined;
   const hasTokens = (job.liveTokens ?? 0) > 0;
 

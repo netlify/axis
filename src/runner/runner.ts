@@ -251,13 +251,20 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
 
   const updateStatus = (index: number, status: JobStatus, durationMs?: number) => {
     const patch: Partial<JobState> = { status, durationMs };
-    // Stamp the start time on the first transition into "running" so the
-    // live UI can tick an elapsed-duration counter.
-    if (status === "running" && jobStates[index].runStartedAt === undefined) {
+    // Stamp the start time on the first transition into "starting"/"running"
+    // so the live UI can tick an elapsed-duration counter that includes the
+    // adapter's own startup (CLI cold start, ACP handshake, etc.).
+    if ((status === "starting" || status === "running") && jobStates[index].runStartedAt === undefined) {
       patch.runStartedAt = Date.now();
     }
     jobStates[index] = { ...jobStates[index], ...patch };
     logger.onJobUpdate?.(jobStates, jobMeta);
+  };
+
+  const promoteToRunning = (index: number) => {
+    if (jobStates[index].status === "starting") {
+      updateStatus(index, "running");
+    }
   };
 
   const setTeardown = (index: number, inTeardown: boolean) => {
@@ -443,6 +450,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
         logger,
         updateStatus,
         updateTokens,
+        promoteToRunning,
         resolvedSkillMap,
         options.registerCleanup,
         options.debug ?? false,
@@ -492,6 +500,7 @@ async function executeJob(
   logger: Logger,
   updateStatus: (index: number, status: JobStatus, durationMs?: number) => void,
   updateTokens: (index: number, tokens: number, final?: boolean) => void,
+  promoteToRunning: (index: number) => void,
   resolvedSkillMap: Map<string, ResolvedSkill>,
   registerCleanup?: (fn: () => void) => void,
   debug?: boolean,
@@ -618,7 +627,7 @@ async function executeJob(
   }
 
   try {
-    updateStatus(index, "running");
+    updateStatus(index, "starting");
     logger.verbose?.(`[${label}] Executing agent...`);
 
     // Merge top-level + per-agent + per-scenario skills, deduplicate by source
@@ -648,6 +657,8 @@ async function executeJob(
         : axisConfig.mcp_servers,
       resolvedSkills: agentSkills.length > 0 ? agentSkills : undefined,
       onTokenProgress: (tokens) => {
+        // First token from the agent → it's past startup, into real work.
+        promoteToRunning(index);
         updateTokens(index, tokens);
         // Per-scenario token limit
         if (jobLimits?.tokenLimit && tokens >= jobLimits.tokenLimit) {
@@ -656,6 +667,7 @@ async function executeJob(
         // Overall token limit (checks cumulative across all jobs)
         checkOverallTokenLimit?.();
       },
+      onAgentReady: () => promoteToRunning(index),
       ...(jobLimits?.timeoutMs ? { timeoutMs: jobLimits.timeoutMs } : {}),
       ...(jobAbortController ? { signal: jobAbortController.signal } : {}),
       debug,

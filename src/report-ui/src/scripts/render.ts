@@ -767,9 +767,13 @@ function renderWaterfall(si: SparseIndex, totalDurationMs: number): string {
   const hasTimingData = interactions.some((ix) => ix.startMs !== null);
   if (!hasTimingData || interactions.length === 0) return "";
 
-  // Prefer the agent's full run duration so the timeline matches the row's reported duration.
-  // Fall back to the interaction window if the entry's duration is missing.
-  const wallClockMs = totalDurationMs > 0 ? totalDurationMs : si.stats.wallClockMs || computeWallClock(interactions);
+  // Interaction startMs values are measured from process spawn (wall clock),
+  // so the chart axis must use wall-clock too. For ACP-based adapters
+  // entry.durationMs is the prompt() time only (excludes handshake/shutdown)
+  // and is smaller than the interactions' timeline — using it would push bars
+  // off the right edge. Prefer sparse-index wallClockMs, fall back to entry
+  // duration for adapters without stats, then to the interaction window.
+  const wallClockMs = si.stats.wallClockMs || (totalDurationMs > 0 ? totalDurationMs : computeWallClock(interactions));
   if (wallClockMs <= 0) return "";
 
   const ticks = computeTickMarks(wallClockMs);

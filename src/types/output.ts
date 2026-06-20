@@ -64,7 +64,7 @@ export interface RunSummary {
   skipped?: number;
 }
 
-export type JobStatus = "pending" | "setup" | "running" | "teardown" | "done" | "failed" | "scoring";
+export type JobStatus = "pending" | "setup" | "starting" | "running" | "teardown" | "done" | "failed" | "scoring";
 
 export interface JobState {
   scenarioKey: string;
@@ -87,9 +87,10 @@ export interface JobState {
    */
   tokensFinal?: boolean;
   /**
-   * Wall-clock ms-epoch when the agent transitioned to `running`. Used by the
-   * live UI to tick an elapsed-duration counter before the job finishes (once
-   * finished, `durationMs` takes over as the authoritative value).
+   * Wall-clock ms-epoch when the agent transitioned out of `pending` into
+   * `starting`/`running`. Used by the live UI to tick an elapsed-duration
+   * counter before the job finishes (once finished, `durationMs` takes over
+   * as the authoritative value).
    */
   runStartedAt?: number;
   /**

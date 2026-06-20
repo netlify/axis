@@ -45,6 +45,7 @@ const CRITERION_MEDIUM = 4;
 export const STATUS_ICONS: Record<string, string> = {
   pending: "○",
   setup: "◌",
+  starting: "◔",
   running: "●",
   teardown: "◌",
   done: "✓",
@@ -55,6 +56,7 @@ export const STATUS_ICONS: Record<string, string> = {
 export const STATUS_LABELS: Record<string, string> = {
   pending: "pending",
   setup: "setup",
+  starting: "starting",
   running: "running",
   teardown: "teardown",
   done: "done",

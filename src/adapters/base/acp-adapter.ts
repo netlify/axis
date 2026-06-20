@@ -112,8 +112,6 @@ interface AcpState {
   activeToolCalls: Map<string, { title: string; kind?: string }>;
   /** Cumulative session cost from usage_update events. */
   totalCostUsd?: number;
-  /** Duration of the prompt() call only (excludes ACP handshake and process lifecycle). */
-  promptDurationMs?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -289,13 +287,15 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
           input.onRawLine?.(line);
         }
 
-        // 14. Send prompt and wait for completion — time just the agent work
-        const promptStart = Date.now();
+        // 14. Send prompt and wait for completion. Signal "agent is now
+        // doing real work" — for ACP adapters the initialize+newSession
+        // handshake can take 10–20s (kiro-cli AWS auth, etc.) and shouldn't
+        // count as `running` in the live UI.
+        input.onAgentReady?.();
         const promptResult = await connection.prompt({
           sessionId: sessionResult.sessionId,
           prompt: [{ type: "text", text: input.prompt }],
         });
-        state.promptDurationMs = Date.now() - promptStart;
         {
           const line = JSON.stringify({ type: "prompt_result", ...promptResult });
           rawOutput?.push(line);
@@ -391,7 +391,7 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       const metadata: AgentMetadata = {
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
-        durationMs: state.promptDurationMs ?? endTime.getTime() - startTime.getTime(),
+        durationMs: endTime.getTime() - startTime.getTime(),
         exitCode,
         tokenUsage: state.tokenUsage,
         totalCostUsd: state.totalCostUsd,
