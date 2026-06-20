@@ -1,0 +1,11 @@
+{
+  "name": "Generate a utility function",
+  "prompt": "Write a JavaScript file called isPrime.js in the current directory that exports a function `isPrime(n)` which returns true if n is a prime number and false otherwise. It should handle edge cases (negative numbers, 0, 1). Do not use any external libraries.",
+  "judge": [
+    { "check": "File isPrime.js exists in the workspace", "weight": 0.2 },
+    { "check": "Exports a function named isPrime", "weight": 0.2 },
+    { "check": "Correctly identifies prime numbers (e.g. 2, 3, 7, 13)", "weight": 0.2 },
+    { "check": "Correctly identifies non-primes (e.g. 0, 1, 4, 9)", "weight": 0.2 },
+    { "check": "Handles edge cases: negative numbers return false", "weight": 0.2 }
+  ]
+}

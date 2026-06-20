@@ -228,8 +228,10 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       // The ACP SDK calls `console.error` directly whenever a request handler
       // returns an error (e.g. agent asks to read a file that doesn't exist).
       // Outside of debug mode these are noise — the failure is already
-      // communicated to the agent via the JSON-RPC error response.
-      const restoreConsoleError = input.debug ? null : suppressAcpSdkNoise();
+      // communicated to the agent via the JSON-RPC error response. Even in
+      // debug mode we drop vendor-extension notifications (`_<vendor>/*`),
+      // which are reserved by JSON-RPC convention and known to be optional.
+      const releaseConsoleError = acquireAcpSdkNoiseFilter(input.debug ?? false);
 
       try {
         // 9. Wire ACP SDK — convert Node streams to Web Streams for ndJsonStream
@@ -357,7 +359,7 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
           }, SIGTERM_TO_SIGKILL_MS);
           child.on("close", () => clearTimeout(cleanupKillTimer));
         }
-        restoreConsoleError?.();
+        releaseConsoleError();
       }
 
       // 17. Wait for process exit
@@ -496,19 +498,44 @@ function buildClient(
  * Patch `console.error` to drop ACP SDK request/notification error logs.
  * The SDK logs every JSON-RPC error response with `console.error("Error handling request", ...)`
  * — useful in debug, but noisy in normal runs (every missed file read shows up).
- * Returns a restore function to call when the connection scope ends.
+ *
+ * Installed once, process-wide. Each active run "acquires" the filter and
+ * releases it on teardown; while any acquirer asked for debug visibility,
+ * standard-method errors pass through. Vendor-extension notifications
+ * (methods starting with `_`, e.g. `_kiro.dev/metadata`) are always dropped
+ * — the SDK rejects them with "Method not found" but they're optional by
+ * JSON-RPC convention and benign.
+ *
+ * A process-wide install (instead of patch-per-run) avoids races: the SDK
+ * keeps processing stdout briefly after `prompt()` returns, so a per-run
+ * restore in `finally` would unpatch before the last notifications arrive.
  */
-function suppressAcpSdkNoise(): () => void {
+let acpSdkNoiseInstalled = false;
+let acpDebugAcquirers = 0;
+
+function acquireAcpSdkNoiseFilter(debug: boolean): () => void {
+  installAcpSdkNoiseFilter();
+  if (debug) acpDebugAcquirers++;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (debug) acpDebugAcquirers--;
+  };
+}
+
+function installAcpSdkNoiseFilter(): void {
+  if (acpSdkNoiseInstalled) return;
+  acpSdkNoiseInstalled = true;
   const original = console.error;
   console.error = (...args: unknown[]) => {
     const first = args[0];
     if (typeof first === "string" && (first === "Error handling request" || first === "Error handling notification")) {
-      return;
+      const method = (args[1] as { method?: string } | undefined)?.method;
+      if (typeof method === "string" && method.startsWith("_")) return;
+      if (acpDebugAcquirers === 0) return;
     }
     original(...args);
-  };
-  return () => {
-    console.error = original;
   };
 }
 
