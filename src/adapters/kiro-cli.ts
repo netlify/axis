@@ -33,6 +33,12 @@ export function createKiroCliAdapter(): AgentAdapter {
       if (process.platform === "darwin") {
         const appSupportRel = path.join("Library", "Application Support", "kiro-cli");
         copyDirIfExists(path.join(realHome, appSupportRel), path.join(isolatedHome, appSupportRel));
+
+        // kiro-cli reads AWS Builder ID credentials through the macOS Security
+        // framework, which resolves the login keychain via $HOME. Symlink the
+        // real Keychains dir so the child finds it. Tradeoff: exposes every
+        // keychain item the user has to the kiro-cli process for this run.
+        linkIfMissing(path.join(realHome, "Library", "Keychains"), path.join(isolatedHome, "Library", "Keychains"));
       }
 
       mirrorKiroBinShims(path.join(realHome, ".local", "bin"), path.join(isolatedHome, ".local", "bin"));
@@ -58,6 +64,17 @@ function copyDirIfExists(src: string, dest: string): void {
   if (!fs.existsSync(src)) return;
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.cpSync(src, dest, { recursive: true });
+}
+
+function linkIfMissing(src: string, dest: string): void {
+  if (!fs.existsSync(src)) return;
+  if (fs.existsSync(dest) || fs.lstatSync(dest, { throwIfNoEntry: false })) return;
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  try {
+    fs.symlinkSync(src, dest);
+  } catch {
+    // ignore — best-effort
+  }
 }
 
 /** Symlink any `kiro-cli*` entries from the real `~/.local/bin/` into the isolated one. */
