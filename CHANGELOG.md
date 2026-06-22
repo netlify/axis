@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.15.1](https://github.com/netlify/axis/compare/v1.15.0...v1.15.1) (2026-06-20)
+
+
+### Bug Fixes
+
+* cli duration outputs ([9234ebd](https://github.com/netlify/axis/commit/9234ebd9c6c0b20c682d85fb0dc648c399ff8c03))
+* kiro keychain symlinking ([15a8f39](https://github.com/netlify/axis/commit/15a8f39156facaa6d01f96e37be70cd0acf6ea9c))
+* kiro-cli needed updating to pull in the right settings ([1ec2f73](https://github.com/netlify/axis/commit/1ec2f73693b6e5741eb8ebd39a7b5c89ba0bd6f2))
+* setting up skills docs ([9fe8653](https://github.com/netlify/axis/commit/9fe8653c740bcf07909ba7aadf84b81652844344))
+* show all at end of cli run ([2b7e790](https://github.com/netlify/axis/commit/2b7e79001e9a25aa95857c506544057f4bcb46d0))
+
 ## [1.15.0](https://github.com/netlify/axis/compare/v1.14.0...v1.15.0) (2026-06-15)
 
 
