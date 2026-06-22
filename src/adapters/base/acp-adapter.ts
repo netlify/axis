@@ -211,16 +211,48 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         input.onStderr?.(chunk);
       });
 
-      // 8. Timeout → SIGTERM → SIGKILL
+      // 8. Timeout → SIGTERM → SIGKILL. Honour the per-run timeout the runner
+      // passes (the scenario time limit) and fall back to the adapter default.
+      // Previously this used only the adapter default (10m), ignoring
+      // `input.timeoutMs` — so scenarios with a larger limit (default 15m) were
+      // killed early, and a run that finished right at the 10m mark was recorded
+      // as a timeout failure instead of a success.
+      const effectiveTimeout = input.timeoutMs ?? timeoutMs;
       let timedOut = false;
       let killTimer: NodeJS.Timeout | undefined;
       const outerTimer = setTimeout(() => {
         timedOut = true;
         child.kill("SIGTERM");
         killTimer = setTimeout(() => child.kill("SIGKILL"), SIGTERM_TO_SIGKILL_MS);
-      }, timeoutMs);
+      }, effectiveTimeout);
+
+      // 8b. External abort signal (runner limits / Ctrl-C). The ACP adapter
+      // previously ignored `input.signal` entirely, so a per-scenario token
+      // limit, an overall limit, or a Ctrl-C never tore down the agent child —
+      // it kept running until the timeout above fired. Mirror the base adapter:
+      // SIGTERM with a SIGKILL fallback.
+      let abortedBySignal = false;
+      let abortReason = "";
+      let signalKillTimer: NodeJS.Timeout | undefined;
+      if (input.signal) {
+        const onAbort = () => {
+          if (abortedBySignal) return;
+          abortedBySignal = true;
+          abortReason = String(input.signal!.reason || "Job aborted");
+          child.kill("SIGTERM");
+          signalKillTimer = setTimeout(() => child.kill("SIGKILL"), SIGTERM_TO_SIGKILL_MS);
+        };
+        if (input.signal.aborted) {
+          onAbort();
+        } else {
+          input.signal.addEventListener("abort", onAbort, { once: true });
+          child.on("close", () => input.signal!.removeEventListener("abort", onAbort));
+        }
+      }
+
       child.on("close", () => {
         if (killTimer) clearTimeout(killTimer);
+        if (signalKillTimer) clearTimeout(signalKillTimer);
       });
 
       // The ACP SDK calls `console.error` directly whenever a request handler
@@ -327,7 +359,9 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
           state.resultError = "Agent exceeded max turn requests";
         }
       } catch (err) {
-        if (!timedOut) {
+        // A SIGTERM from the timeout/abort handlers can surface here as a
+        // connection error — don't let it clobber the timeout/abort reason.
+        if (!timedOut && !abortedBySignal) {
           state.resultError = err instanceof Error ? err.message : String(err);
         }
       } finally {
@@ -344,7 +378,7 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         }
         // SIGTERM with SIGKILL fallback — some agents catch SIGTERM and never exit.
         // Without the fallback, `await exitPromise` would hang until outerTimer.
-        if (!timedOut && child.exitCode === null && child.signalCode === null) {
+        if (!timedOut && !abortedBySignal && child.exitCode === null && child.signalCode === null) {
           try {
             child.kill("SIGTERM");
           } catch {
@@ -377,7 +411,27 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
             endTime: endTime.toISOString(),
             durationMs: endTime.getTime() - startTime.getTime(),
             exitCode,
-            error: `Agent timed out after ${timeoutMs / 1000}s`,
+            tokenUsage: state.tokenUsage,
+            error: `Agent timed out after ${effectiveTimeout / 1000}s`,
+          },
+        };
+      }
+
+      // 18b. Abort path (external signal from runner limits / Ctrl-C). Attribute
+      // any token usage observed before the abort so a cut-off run still reports
+      // what it spent.
+      if (abortedBySignal) {
+        return {
+          transcript,
+          result: null,
+          rawOutput,
+          metadata: {
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            durationMs: endTime.getTime() - startTime.getTime(),
+            exitCode,
+            tokenUsage: state.tokenUsage,
+            error: abortReason,
           },
         };
       }
