@@ -1,233 +1,397 @@
 ---
 import DocsLayout from "../layouts/DocsLayout.astro";
+import DimensionCards from "../components/DimensionCards";
+
+// Figma asset URLs (valid for 7 days from design export — replace with permanent assets)
+const imgUsedByLogos = "https://www.figma.com/api/mcp/asset/b2c48c87-848e-4c58-b98d-1ac5a8fdeeae";
+const imgNetlifyLogo = "https://www.figma.com/api/mcp/asset/ad7cac49-b844-4e32-a892-d84e57381563";
 ---
 
-<DocsLayout title="AXIS - Agent Experience Index Score" active="overview" landing={true}>
-  <div class="home">
-    <section class="home-hero">
-      <div class="home-tag">
-        <span class="home-tag-pulse" aria-hidden="true"></span>
-        <span class="home-tag-label">Open Source</span>
-        <span class="home-tag-sep" aria-hidden="true">·</span>
-        <span class="home-tag-text">Built by Netlify, for the agent web</span>
-      </div>
+<DocsLayout
+  title="AXIS — Agent Experience Index Score"
+  description="AXIS is open source tooling and a scoring framework to measure how well services work for AI agents. Run real scenarios, get a 0–100 score, and fix what's slowing agents down."
+  active="overview"
+  landing={true}
+>
+  <div class="lp">
 
-      <h1 class="home-headline">
-        Stop guessing if agents<br />
-        can use your service.
-      </h1>
+    <!-- ── Hero ─────────────────────────────────────── -->
+    <section class="lp-hero">
+      <div class="lp-hero-inner">
+        <!-- Top: badge + headline (full left width) -->
+        <div class="lp-hero-top">
+          <div class="lp-badge">
+            <span class="lp-badge-dot" aria-hidden="true"></span>
+            <span class="lp-badge-label">OPEN SOURCE</span>
+            <span class="lp-badge-sep" aria-hidden="true">•</span>
+            <span>Created by Netlify</span>
+          </div>
 
-      <p class="home-lead">
-        AXIS is an open scoring framework <em>and</em> CLI that measures how well your project,
-        APIs, and tooling actually work when an AI agent tries to use them. Run real agents
-        against real scenarios, capture every tool call, and get a comparable
-        <strong>0&ndash;100 score</strong> back.
-      </p>
-
-      <div class="home-cta">
-        <a href="/quickstart" class="btn btn-primary">
-          Get started
-          <span aria-hidden="true">&rarr;</span>
-        </a>
-        <a href="https://github.com/netlify/axis" class="btn btn-secondary">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
-            <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
-          </svg>
-          View on GitHub
-        </a>
-      </div>
-
-      <div class="home-steps" role="region" aria-label="Three step quick start">
-        <div class="home-step">
-          <span class="home-step-num">1</span>
-          <span class="home-step-label">Install</span>
-          <code class="home-step-cmd"><span class="home-step-prompt">$</span>npm i -g @netlify/axis</code>
-          <button class="home-step-copy" type="button" data-copy="npm i -g @netlify/axis" aria-label="Copy install command">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h7A1.5 1.5 0 0 1 14 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10v-1h2.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5V4H4V1.5Z"/>
-              <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h7A1.5 1.5 0 0 1 12 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 14.5v-9Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7Z"/>
-            </svg>
-          </button>
+          <h1 class="lp-headline">
+            Stop guessing if agents<br />
+            can use your service
+          </h1>
         </div>
-        <div class="home-step">
-          <span class="home-step-num">2</span>
-          <span class="home-step-label">Set up</span>
-          <code class="home-step-cmd"><span class="home-step-prompt">$</span>axis init</code>
-          <button class="home-step-copy" type="button" data-copy="axis init" aria-label="Copy setup command">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h7A1.5 1.5 0 0 1 14 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10v-1h2.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5V4H4V1.5Z"/>
-              <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h7A1.5 1.5 0 0 1 12 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 14.5v-9Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7Z"/>
-            </svg>
-          </button>
-        </div>
-        <div class="home-step">
-          <span class="home-step-num">3</span>
-          <span class="home-step-label">Run</span>
-          <code class="home-step-cmd"><span class="home-step-prompt">$</span>axis run</code>
-          <button class="home-step-copy" type="button" data-copy="axis run" aria-label="Copy run command">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h7A1.5 1.5 0 0 1 14 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10v-1h2.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5V4H4V1.5Z"/>
-              <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h7A1.5 1.5 0 0 1 12 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 14.5v-9Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7Z"/>
-            </svg>
-          </button>
+
+        <!-- Bottom: lead row (paragraph + card) then CTA -->
+        <div class="lp-hero-bottom">
+          <div class="lp-hero-lead-row">
+          <p class="lp-lead">
+            Think Lighthouse, but for agent experience. AXIS — the Agent Experience Index Score — is open source tooling and a scoring framework to measure how well your APIs, services, and project structure work for AI agents.
+          </p>
+
+          <!-- Right: numbered steps card -->
+          <div class="lp-steps-wrap">
+          <div class="lp-steps-card">
+          <div class="lp-step">
+            <div class="lp-step-left">
+              <span class="lp-step-num">1</span>
+              <div class="lp-step-content">
+                <span class="lp-step-label">INSTALL</span>
+                <code class="lp-step-cmd">$ npm i -g @netlify/axis</code>
+              </div>
+            </div>
+            <button class="lp-step-copy" type="button" data-copy="npm i -g @netlify/axis" aria-label="Copy install command">
+              <svg width="12" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M4 1.5A1.5 1.5 0 0 1 5.5 0h7A1.5 1.5 0 0 1 14 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10v-1h2.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7a.5.5 0 0 0-.5.5V4H4V1.5Z"/>
+                <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h7A1.5 1.5 0 0 1 12 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 2 14.5v-9Zm1.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7Z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="lp-step-divider" aria-hidden="true"></div>
+          <div class="lp-step">
+            <div class="lp-step-left">
+              <span class="lp-step-num">2</span>
+              <div class="lp-step-content">
+                <span class="lp-step-label">SET UP</span>
+                <code class="lp-step-cmd">$ axis init</code>
+              </div>
+            </div>
+          </div>
+          <div class="lp-step-divider" aria-hidden="true"></div>
+          <div class="lp-step">
+            <div class="lp-step-left">
+              <span class="lp-step-num">3</span>
+              <div class="lp-step-content">
+                <span class="lp-step-label">RUN</span>
+                <code class="lp-step-cmd">$ axis run</code>
+              </div>
+            </div>
+          </div>
+          </div><!-- /.lp-steps-card -->
+          </div><!-- /.lp-steps-wrap -->
+          </div><!-- /.lp-hero-lead-row -->
+
+          <div class="lp-hero-cta">
+            <a href="/quickstart" class="lp-btn-primary">Get started <span class="btn-arrow">→</span></a>
+            <a href="https://github.com/netlify/axis" class="lp-btn-ghost" target="_blank" rel="noopener">
+              View on
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="19.75" viewBox="0 0 21 21" fill="none" aria-hidden="true" style="width:20px;height:19.75px;aspect-ratio:20/19.75;flex-shrink:0">
+                <path d="M9.48986 6.00024C9.19595 5.54029 8.79093 5.16178 8.31217 4.89962C7.8334 4.63747 7.29633 4.50012 6.75049 4.50024C6.50769 4.92003 6.36206 5.38889 6.32431 5.87236C6.28657 6.35583 6.35766 6.84161 6.53236 7.29399C6.19033 7.79767 6.00524 8.39143 6.00049 9.00024V9.50024C6.00049 10.2959 6.31656 11.059 6.87917 11.6216C7.44178 12.1842 8.20484 12.5002 9.00049 12.5002H12.0005C12.7961 12.5002 13.5592 12.1842 14.1218 11.6216C14.6844 11.059 15.0005 10.2959 15.0005 9.50024V9.00024C14.9957 8.39143 14.8107 7.79767 14.4686 7.29399C14.6433 6.84161 14.7144 6.35583 14.6767 5.87236C14.6389 5.38889 14.4933 4.92003 14.2505 4.50024C13.7047 4.50012 13.1676 4.63747 12.6888 4.89962C12.21 5.16178 11.805 5.54029 11.5111 6.00024H9.48986Z" stroke="#353A3E" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8.50049 16.9996V14.4996C8.50049 13.9692 8.7112 13.4605 9.08627 13.0854C9.46135 12.7103 9.97006 12.4996 10.5005 12.4996C11.0309 12.4996 11.5396 12.7103 11.9147 13.0854C12.2898 13.4605 12.5005 13.9692 12.5005 14.4996V16.9996" stroke="#353A3E" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8.50034 15.4998H6.50034C5.9699 15.4998 5.4612 15.2891 5.08612 14.914C4.71105 14.5389 4.50034 14.0302 4.50034 13.4998C4.50034 12.9694 4.28962 12.4606 3.91455 12.0856" stroke="#353A3E" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M3 17.1146L3.37487 16.7837V16.7837L3 17.1146ZM18 17.1146L17.6251 16.7837V16.7837L18 17.1146ZM15 19.4327L15.2253 19.8791V19.8791L15 19.4327ZM6 19.4327L6.22531 18.9863V18.9863L6 19.4327ZM8.5 20.25L8.38796 20.7373C8.53639 20.7714 8.69228 20.736 8.81143 20.6412C8.93058 20.5463 9 20.4023 9 20.25H8.5ZM12.5 20.25H12C12 20.4023 12.0694 20.5463 12.1886 20.6412C12.3077 20.736 12.4636 20.7714 12.612 20.7373L12.5 20.25ZM0.5 10.5H1C1 5.25329 5.25329 1 10.5 1V0.5V0C4.70101 0 0 4.70101 0 10.5H0.5ZM10.5 0.5V1C15.7467 1 20 5.25329 20 10.5H20.5H21C21 4.70101 16.299 0 10.5 0V0.5ZM3 17.1146L3.37487 16.7837C1.89649 15.1087 1 12.9097 1 10.5H0.5H0C0 13.1626 0.991693 15.5948 2.62513 17.4454L3 17.1146ZM20.5 10.5H20C20 12.9097 19.1035 15.1087 17.6251 16.7837L18 17.1146L18.3749 17.4454C20.0083 15.5948 21 13.1626 21 10.5H20.5ZM18 17.1146L17.6251 16.7837C16.8274 17.6875 15.8607 18.4382 14.7747 18.9863L15 19.4327L15.2253 19.8791C16.4259 19.2731 17.4939 18.4436 18.3749 17.4454L18 17.1146ZM6 19.4327L6.22531 18.9863C5.13935 18.4382 4.17257 17.6875 3.37487 16.7837L3 17.1146L2.62513 17.4454C3.50611 18.4436 4.57411 19.2731 5.7747 19.8791L6 19.4327ZM8.5 20.25L8.61204 19.7627C7.82798 19.5824 6.87405 19.3138 6.22531 18.9863L6 19.4327L5.7747 19.8791C6.53812 20.2644 7.59238 20.5544 8.38796 20.7373L8.5 20.25ZM15 19.4327L14.7747 18.9863C14.126 19.3138 13.172 19.5824 12.388 19.7627L12.5 20.25L12.612 20.7373C13.4076 20.5544 14.4619 20.2644 15.2253 19.8791L15 19.4327ZM8.5 20.25H9V16.6146H8.5H8V20.25H8.5ZM12.5 20.25H13V16.6146H12.5H12V20.25H12.5Z" fill="#353A3E"/>
+              </svg>
+              GitHub
+            </a>
+          </div>
+        </div><!-- /.lp-hero-bottom -->
+      </div><!-- /.lp-hero-inner -->
+    </section>
+
+    <!-- ── Agents bar ───────────────────────────────── -->
+    <section class="lp-usedby" aria-label="Supported agents">
+      <div class="lp-usedby-inner">
+        <span class="lp-usedby-label">TEST YOUR API · MCP · CLI WITH 20+ CODING AGENTS</span>
+        <div class="lp-agents-track-wrap">
+          <div class="lp-agents-fade lp-agents-fade-left"></div>
+          <div class="lp-agents-track">
+            <div class="lp-agents-list" aria-hidden="true">
+              <div class="lp-agent-logo"><img src="/agents/claude.svg" class="lp-agent-icon" alt="">Claude Code</div>
+              <div class="lp-agent-logo"><img src="/agents/codex.svg" class="lp-agent-icon" alt="">Codex</div>
+
+              <div class="lp-agent-logo"><img src="/agents/gemini.svg" class="lp-agent-icon" alt="">Gemini</div>
+              <div class="lp-agent-logo"><img src="/agents/kiro.png" class="lp-agent-icon" alt="">Kiro</div>
+              <div class="lp-agent-logo"><img src="/agents/goose.svg" class="lp-agent-icon" alt="">Goose</div>
+              <div class="lp-agent-logo"><img src="/agents/opencode.svg" class="lp-agent-icon" alt="">opencode</div>
+              <div class="lp-agent-logo"><img src="/agents/fastagent.png" class="lp-agent-icon" alt="">fast-agent</div>
+              <div class="lp-agent-logo"><img src="/agents/openhands.png" class="lp-agent-icon" alt="">OpenHands</div>
+              <div class="lp-agent-logo"><img src="/agents/qwen.svg" class="lp-agent-icon" alt="">Qwen Code</div>
+              <div class="lp-agent-logo"><img src="/agents/kimi.svg" class="lp-agent-icon" alt="">Kimi</div>
+              <div class="lp-agent-logo"><img src="/agents/mistral.svg" class="lp-agent-icon" alt="">Mistral Vibe</div>
+              <div class="lp-agent-logo"><img src="/agents/blackbox.png" class="lp-agent-icon" alt="">Blackbox</div>
+              <div class="lp-agent-logo"><img src="/agents/stakpak.png" class="lp-agent-icon" alt="">Stakpak</div>
+              <div class="lp-agent-logo"><img src="/agents/poolside.svg" class="lp-agent-icon" alt="">Poolside</div>
+
+              <div class="lp-agent-logo"><img src="/agents/cursor.png" class="lp-agent-icon" alt="">Cursor</div>
+              <div class="lp-agent-logo"><img src="/agents/auggie.png" class="lp-agent-icon" alt="">Auggie</div>
+              <div class="lp-agent-logo"><img src="/agents/factorydroid.png" class="lp-agent-icon" alt="">Factory Droid</div>
+              <div class="lp-agent-logo"><img src="/agents/qoder.svg" class="lp-agent-icon" alt="">Qoder</div>
+              <div class="lp-agent-logo"><img src="/agents/cline.svg" class="lp-agent-icon" alt="">Cline</div>
+              <div class="lp-agent-logo"><img src="/agents/kilo.svg" class="lp-agent-icon" alt="">Kilo</div>
+              <div class="lp-agent-logo"><img src="/agents/copilot.png" class="lp-agent-icon" alt="">Copilot</div>
+              <!-- duplicate for seamless loop -->
+              <div class="lp-agent-logo"><img src="/agents/claude.svg" class="lp-agent-icon" alt="">Claude Code</div>
+              <div class="lp-agent-logo"><img src="/agents/codex.svg" class="lp-agent-icon" alt="">Codex</div>
+
+              <div class="lp-agent-logo"><img src="/agents/gemini.svg" class="lp-agent-icon" alt="">Gemini</div>
+              <div class="lp-agent-logo"><img src="/agents/kiro.png" class="lp-agent-icon" alt="">Kiro</div>
+              <div class="lp-agent-logo"><img src="/agents/goose.svg" class="lp-agent-icon" alt="">Goose</div>
+              <div class="lp-agent-logo"><img src="/agents/opencode.svg" class="lp-agent-icon" alt="">opencode</div>
+              <div class="lp-agent-logo"><img src="/agents/fastagent.png" class="lp-agent-icon" alt="">fast-agent</div>
+              <div class="lp-agent-logo"><img src="/agents/openhands.png" class="lp-agent-icon" alt="">OpenHands</div>
+              <div class="lp-agent-logo"><img src="/agents/qwen.svg" class="lp-agent-icon" alt="">Qwen Code</div>
+              <div class="lp-agent-logo"><img src="/agents/kimi.svg" class="lp-agent-icon" alt="">Kimi</div>
+              <div class="lp-agent-logo"><img src="/agents/mistral.svg" class="lp-agent-icon" alt="">Mistral Vibe</div>
+              <div class="lp-agent-logo"><img src="/agents/blackbox.png" class="lp-agent-icon" alt="">Blackbox</div>
+              <div class="lp-agent-logo"><img src="/agents/stakpak.png" class="lp-agent-icon" alt="">Stakpak</div>
+              <div class="lp-agent-logo"><img src="/agents/poolside.svg" class="lp-agent-icon" alt="">Poolside</div>
+
+              <div class="lp-agent-logo"><img src="/agents/cursor.png" class="lp-agent-icon" alt="">Cursor</div>
+              <div class="lp-agent-logo"><img src="/agents/auggie.png" class="lp-agent-icon" alt="">Auggie</div>
+              <div class="lp-agent-logo"><img src="/agents/factorydroid.png" class="lp-agent-icon" alt="">Factory Droid</div>
+              <div class="lp-agent-logo"><img src="/agents/qoder.svg" class="lp-agent-icon" alt="">Qoder</div>
+              <div class="lp-agent-logo"><img src="/agents/cline.svg" class="lp-agent-icon" alt="">Cline</div>
+              <div class="lp-agent-logo"><img src="/agents/kilo.svg" class="lp-agent-icon" alt="">Kilo</div>
+              <div class="lp-agent-logo"><img src="/agents/copilot.png" class="lp-agent-icon" alt="">Copilot</div>
+            </div>
+          </div>
+          <div class="lp-agents-fade lp-agents-fade-right"></div>
         </div>
       </div>
     </section>
 
-    <!-- Highlights: the four scoring dimensions -->
-    <section class="home-highlights">
-      <div class="home-section-eyebrow">The framework</div>
-      <h2 class="home-section-title">Four dimensions, one score.</h2>
-      <p class="home-section-blurb">
-        A single pass/fail tells you nothing about <em>why</em> an agent struggled. AXIS scores
-        four independent dimensions so you can focus on what matters: a slow API, a confusing
-        layout, a noisy tool, or the agent's own decisions.
-      </p>
+    <!-- ── Framework ─────────────────────────────── -->
+    <!-- ── Framework (animated diamond → cards) ─── -->
+    <DimensionCards client:load />
 
-      <div class="home-dim-grid">
-        <a href="/scoring#goal-achievement" class="home-dim home-dim-goal">
-          <div class="home-dim-head">
-            <span class="home-dim-weight">40%</span>
-            <span class="home-dim-name">Goal Achievement</span>
+    <!-- ── Report demo ───────────────────────────── -->
+    <section class="lp-report-demo">
+      <div class="lp-report-demo-inner">
+        <div class="lp-browser">
+          <div class="lp-browser-bar">
+            <div class="lp-browser-dots" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <g filter="url(#dot-r)">
+                  <circle cx="5" cy="5" r="5" fill="#FFADA9"/>
+                </g>
+                <defs>
+                  <filter id="dot-r" x="0" y="-1" width="10" height="11" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                    <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+                    <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                    <feOffset dy="-1"/>
+                    <feGaussianBlur stdDeviation="1.5"/>
+                    <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                    <feBlend mode="normal" in2="shape" result="effect1_innerShadow"/>
+                  </filter>
+                </defs>
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <g filter="url(#dot-y)">
+                  <circle cx="5" cy="5" r="5" fill="#FBB13D"/>
+                </g>
+                <defs>
+                  <filter id="dot-y" x="0" y="-1" width="10" height="11" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                    <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+                    <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                    <feOffset dy="-1"/>
+                    <feGaussianBlur stdDeviation="1.5"/>
+                    <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                    <feBlend mode="normal" in2="shape" result="effect1_innerShadow"/>
+                  </filter>
+                </defs>
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <g filter="url(#dot-g)">
+                  <circle cx="5" cy="5" r="5" fill="#64D87F"/>
+                </g>
+                <defs>
+                  <filter id="dot-g" x="0" y="-1" width="10" height="11" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                    <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+                    <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                    <feOffset dy="-1"/>
+                    <feGaussianBlur stdDeviation="1.5"/>
+                    <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+                    <feBlend mode="normal" in2="shape" result="effect1_innerShadow"/>
+                  </filter>
+                </defs>
+              </svg>
+            </div>
+            <div class="lp-browser-url">
+              <svg width="11" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M11 6V4.5a3 3 0 0 0-6 0V6H3.5A1.5 1.5 0 0 0 2 7.5v6A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 12.5 6H11Zm-5-1.5a2 2 0 1 1 4 0V6H6V4.5Z"/>
+              </svg>
+              .axis/reports/sample/report.html
+            </div>
+            <a class="lp-browser-open" href="/sample-report.html" target="_blank" rel="noopener">
+              Open full ↗
+            </a>
           </div>
-          <p class="home-dim-desc">
-            Did the agent actually finish the task? Scored against your rubric checks by an
-            LLM judge.
-          </p>
-        </a>
-        <a href="/scoring#environment" class="home-dim home-dim-env">
-          <div class="home-dim-head">
-            <span class="home-dim-weight">20%</span>
-            <span class="home-dim-name">Environment</span>
+          <div class="lp-browser-body">
+            <iframe
+              src="/sample-report.html"
+              title="Sample AXIS report"
+              loading="lazy"
+              class="lp-browser-iframe"
+            ></iframe>
           </div>
-          <p class="home-dim-desc">
-            Shell, filesystem, build tools. Measures whether your project structure and dev
-            workflow trip agents up.
-          </p>
-        </a>
-        <a href="/scoring#service" class="home-dim home-dim-svc">
-          <div class="home-dim-head">
-            <span class="home-dim-weight">20%</span>
-            <span class="home-dim-name">Service</span>
-          </div>
-          <p class="home-dim-desc">
-            APIs, MCP tools, third-party services. Tells you whether your endpoints are
-            actually usable by an agent.
-          </p>
-        </a>
-        <a href="/scoring#agent" class="home-dim home-dim-agent">
-          <div class="home-dim-head">
-            <span class="home-dim-weight">20%</span>
-            <span class="home-dim-name">Agent</span>
-          </div>
-          <p class="home-dim-desc">
-            Planning, tool selection, self-organization. Captures the quality of the agent's
-            own decisions.
-          </p>
-        </a>
+        </div>
       </div>
     </section>
 
-    <!-- Featured: live sample report iframe -->
-    <section class="home-report home-full">
-      <div class="home-report-text">
-        <div class="home-section-eyebrow">The report</div>
-        <h2 class="home-section-title">Every run, fully inspectable.</h2>
-        <p class="home-section-blurb">
-          AXIS doesn't just hand you a number. Each run produces a self-contained HTML report
-          with the full transcript, every tool call, the LLM judge's per-criterion grading,
-          and a sparse-index view that's optimized for skimming. Try the live sample
-          below. Click around, expand interactions, read the rubric grades.
-        </p>
-      </div>
+    <!-- ── Workflow ───────────────────────────────── -->
+    <section class="lp-workflow">
+      <div class="lp-workflow-inner">
+        <div class="lp-section-head">
+          <div class="lp-eyebrow">Fits in your workflow</div>
+          <h2 class="lp-section-title">Score it. Baseline it. Gate CI on it.</h2>
+          <p class="lp-section-blurb">
+            AXIS is built to slot into the same place as your unit tests, just for agent
+            experience. Run it locally to iterate, then turn on baselines and let your CI catch
+            regressions automatically.
+          </p>
+        </div>
 
-      <div class="home-report-frame">
-        <div class="home-report-bar">
-          <span class="home-report-dot home-report-dot-r" aria-hidden="true"></span>
-          <span class="home-report-dot home-report-dot-y" aria-hidden="true"></span>
-          <span class="home-report-dot home-report-dot-g" aria-hidden="true"></span>
-          <div class="home-report-url">
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M11 6V4.5a3 3 0 0 0-6 0V6H3.5A1.5 1.5 0 0 0 2 7.5v6A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 12.5 6H11Zm-5-1.5a2 2 0 1 1 4 0V6H6V4.5Z"/>
-            </svg>
-            .axis/reports/sample/report.html
+        <div class="lp-flow-grid">
+          <div class="lp-flow lp-flow-blue">
+            <div class="lp-flow-num">1</div>
+            <div class="lp-flow-title">Define a scenario</div>
+            <p class="lp-flow-desc">
+              A JSON file with a prompt, a rubric, and optional setup steps. A minimal scenario is five lines.
+            </p>
           </div>
-          <a class="home-report-open" href="/sample-report.html" target="_blank" rel="noopener">
-            Open full
-            <span aria-hidden="true">&UpperRightArrow;</span>
+          <div class="lp-flow lp-flow-green">
+            <div class="lp-flow-num">2</div>
+            <div class="lp-flow-title">Run any agent</div>
+            <p class="lp-flow-desc">
+              23 built-in agents including Claude Code, Codex, Gemini, Cursor, Copilot, and more. Not listed? Register any agent via the custom agent API.
+            </p>
+          </div>
+          <div class="lp-flow lp-flow-pink">
+            <div class="lp-flow-num">3</div>
+            <div class="lp-flow-title">Set a baseline</div>
+            <p class="lp-flow-desc">
+              Snapshot a passing run, commit the baseline, and any future regression beyond
+              noise tolerance fails the build.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Founding contributors ────────────────── -->
+    <section class="lp-contributors">
+      <div class="lp-contributors-inner">
+        <div class="lp-section-head">
+          <div class="lp-eyebrow">Founding contributors</div>
+          <h2 class="lp-section-title">Built with teams already building for agents.</h2>
+          <p class="lp-section-blurb">
+            AXIS was created by Netlify and is being developed in the open. These are the founding
+            contributors — the first teams to run it, publish their results, and help shape the standard.
+          </p>
+        </div>
+
+        <div class="lp-contrib-logos">
+          <a href="https://www.netlify.com/agent-experience/" target="_blank" rel="noopener" class="lp-contrib-logo">
+            <img src="/logos/netlify.png" alt="Netlify" height="48" />
+          </a>
+          <a href="https://auth0.com/agent-experience" target="_blank" rel="noopener" class="lp-contrib-logo">
+            <img src="/logos/auth0.png" alt="Auth0" height="48" />
           </a>
         </div>
-        <iframe
-          src="/sample-report.html"
-          title="Sample AXIS report"
-          loading="lazy"
-          class="home-report-iframe"
-        ></iframe>
-        <div class="home-report-caption">
-          Sample data: 2 scenarios, 3 agents, generated at docs build time. Interactive.
+
+        <div class="lp-contrib-cta">
+          <a href="https://github.com/netlify/axis/blob/main/CONTRIBUTING.md" class="lp-btn-ghost" target="_blank" rel="noopener">
+            Become a founding contributor <span class="btn-arrow">→</span>
+          </a>
         </div>
       </div>
     </section>
 
-    <!-- Workflow -->
-    <section class="home-workflow">
-      <div class="home-section-eyebrow">The workflow</div>
-      <h2 class="home-section-title">Score it. Baseline it. Gate CI on it.</h2>
-      <p class="home-section-blurb">
-        AXIS is built to slot into the same place as your unit tests, just for agent
-        experience. Run it locally to iterate, then turn on baselines and let your CI catch
-        regressions automatically.
+    <!-- ── Footer CTA ────────────────────────────── -->
+    <section class="lp-cta-section">
+      <div class="lp-cta-card">
+        <div class="lp-cta-copy">
+          <h2 class="lp-cta-title">
+            Ship for humans and<br />
+            the agents they use
+          </h2>
+          <p class="lp-cta-blurb">
+            AXIS is open source and free.<br />
+            You can wire it into your project in just a few minutes.
+          </p>
+        </div>
+        <div class="lp-cta-actions">
+          <a href="/quickstart" class="lp-cta-btn-primary">Read the quickstart <span class="btn-arrow">→</span></a>
+          <a href="/scoring" class="lp-cta-btn-ghost">How scoring works</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Footer ────────────────────────────────── -->
+    <footer class="lp-footer">
+      <img src="/logos/netlify.png" alt="Netlify" class="lp-footer-logo" />
+      <p class="lp-footer-text">
+        AXIS is OSS maintained by <a href="https://www.netlify.com" target="_blank" rel="noopener">Netlify</a> and the open source contributors.
       </p>
+    </footer>
 
-      <div class="home-flow-grid">
-        <div class="home-flow">
-          <div class="home-flow-num">1</div>
-          <div class="home-flow-title">Define a scenario</div>
-          <p class="home-flow-desc">
-            A JSON file with a prompt, a rubric, and optional setup steps. Five lines of YAML
-            is enough to start.
-          </p>
-        </div>
-        <div class="home-flow">
-          <div class="home-flow-num">2</div>
-          <div class="home-flow-title">Run any agent</div>
-          <p class="home-flow-desc">
-            Built-in agents including Claude Code, Codex, Gemini, plus any ACP-compliant
-            agent. Bring your own with a small adapter.
-          </p>
-        </div>
-        <div class="home-flow">
-          <div class="home-flow-num">3</div>
-          <div class="home-flow-title">Set a baseline</div>
-          <p class="home-flow-desc">
-            Snapshot a passing run, commit the baseline, and any future regression beyond
-            noise tolerance fails the build.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Bottom CTA -->
-    <section class="home-bottom">
-      <h2 class="home-bottom-title">Ship for humans <em>and</em> the agents they use.</h2>
-      <p class="home-bottom-blurb">
-        AXIS is open source and free.<br />
-        You can wire it into your project in a couple of minutes.
-      </p>
-      <div class="home-cta">
-        <a href="/quickstart" class="btn btn-primary">
-          Read the quickstart
-          <span aria-hidden="true">&rarr;</span>
-        </a>
-        <a href="/scoring" class="btn btn-secondary">
-          How scoring works
-        </a>
-      </div>
-    </section>
   </div>
 
   <script is:inline>
-    document.querySelectorAll(".home-step-copy").forEach(function (btn) {
+    (function () {
+      var header = document.querySelector(".site-header");
+      if (header) {
+        var onScroll = function () {
+          header.classList.toggle("scrolled", window.scrollY > 10);
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        onScroll();
+      }
+    })();
+
+    (function () {
+      var wrap = document.querySelector(".lp-steps-wrap");
+      var card = document.querySelector(".lp-steps-card");
+      if (!wrap || !card) return;
+
+      var targetX = 0.5, targetY = 0.5;
+      var currentX = 0.5, currentY = 0.5;
+
+      function lerp(a, b, t) { return a + (b - a) * t; }
+
+      function tick() {
+        currentX = lerp(currentX, targetX, 0.07);
+        currentY = lerp(currentY, targetY, 0.07);
+        var x = (currentX * 100).toFixed(1) + "%";
+        var y = (currentY * 100).toFixed(1) + "%";
+        // wrapper drives the external glow
+        wrap.style.setProperty("--glow-x", x);
+        wrap.style.setProperty("--glow-y", y);
+        // card drives the internal gradient shift
+        card.style.setProperty("--glow-x", x);
+        card.style.setProperty("--glow-y", y);
+        requestAnimationFrame(tick);
+      }
+
+      window.addEventListener("mousemove", function (e) {
+        var nx = e.clientX / window.innerWidth;
+        var ny = e.clientY / window.innerHeight;
+        // invert and constrain to a narrow band around center (40%–60%)
+        targetX = 0.5 + (0.5 - nx) * 0.08;
+        targetY = 0.5 + (0.5 - ny) * 0.08;
+      });
+
+      tick();
+    })();
+
+    document.querySelectorAll(".lp-step-copy").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var text = btn.getAttribute("data-copy") || "";
         if (!navigator.clipboard) return;

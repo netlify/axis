@@ -214,7 +214,7 @@ function renderHeader(report: ReportData): string {
     <header class="report-header">
       <div class="header-left">
         <div class="report-branding">
-          <span class="site-logo-mark"><span class="logo-ax">AX</span><span class="logo-i">I</span>S</span>
+          <svg class="axis-logo" width="181" height="44" viewBox="0 0 181 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="AXIS"><path d="M133.883 13.68C133.883 6 141.443 0 156.863 0C170.423 0 178.883 3.9 180.803 13.56L165.743 13.44C165.023 9.18 161.603 7.2 156.983 7.2C152.423 7.2 149.783 9 149.783 11.52C149.783 14.58 152.963 15.36 159.623 16.32L162.683 16.74C176.423 18.66 180.983 23.04 180.983 30C180.983 37.98 173.303 43.8 157.703 43.8C143.603 43.8 134.543 39.6 132.863 29.58L148.163 29.7C149.063 34.08 152.423 36.42 157.583 36.42C161.963 36.42 164.903 34.8 164.903 32.1C164.903 28.8 161.603 28.2 154.223 27L151.463 26.58C138.323 24.66 133.883 20.94 133.883 13.68Z" fill="#353A3E"/><path d="M113 42.9V0.900024H128V42.9H113Z" fill="#353A3E"/><path d="M55.597 42.9L73.477 22.74L56.197 0.900024H74.437L84.757 14.34L96.217 0.900024H109.177L91.957 20.94L109.777 42.9H91.357L80.617 29.34L68.737 42.9H55.597Z" fill="#353A3E"/><path d="M0 42.9L19.62 0.900024H36.6L56.28 42.9H40.14L36.3 34.32H15.12L11.28 42.9H0ZM18.78 26.1H32.64L25.68 10.56L18.78 26.1Z" fill="#353A3E"/></svg>
           <span class="report-badge">Report</span>
         </div>
         <div class="report-meta">
