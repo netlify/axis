@@ -184,16 +184,21 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         activeToolCalls: new Map(),
       };
 
-      // 4. Spawn the ACP agent process — keep stdin OPEN for bidirectional JSON-RPC
+      // 4. Spawn the ACP agent process — keep stdin OPEN for bidirectional
+      // JSON-RPC. `detached: true` puts the CLI in its own process group so we
+      // can tear down the whole tree on teardown: ACP agents shell out to
+      // subprocesses (e.g. `node --test`) that can outlive the CLI and, if left
+      // running, hold the job open past its time limit.
       const child: ChildProcess = spawn(command, [...prefixArgs, ...args], {
         cwd: input.workingDirectory,
         stdio: ["pipe", "pipe", "pipe"],
         env: input.env ?? { ...process.env },
+        detached: true,
       });
 
       // 5. Cleanup handler for Ctrl-C
       input.registerCleanup?.(() => {
-        child.kill("SIGTERM");
+        killProcessTree(child, "SIGTERM");
       });
 
       // 6. Register close listener BEFORE reading (ordering matters)
@@ -222,8 +227,8 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       let killTimer: NodeJS.Timeout | undefined;
       const outerTimer = setTimeout(() => {
         timedOut = true;
-        child.kill("SIGTERM");
-        killTimer = setTimeout(() => child.kill("SIGKILL"), SIGTERM_TO_SIGKILL_MS);
+        killProcessTree(child, "SIGTERM");
+        killTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), SIGTERM_TO_SIGKILL_MS);
       }, effectiveTimeout);
 
       // 8b. External abort signal (runner limits / Ctrl-C). The ACP adapter
@@ -239,8 +244,8 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
           if (abortedBySignal) return;
           abortedBySignal = true;
           abortReason = String(input.signal!.reason || "Job aborted");
-          child.kill("SIGTERM");
-          signalKillTimer = setTimeout(() => child.kill("SIGKILL"), SIGTERM_TO_SIGKILL_MS);
+          killProcessTree(child, "SIGTERM");
+          signalKillTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), SIGTERM_TO_SIGKILL_MS);
         };
         if (input.signal.aborted) {
           onAbort();
@@ -393,19 +398,11 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         }
         // SIGTERM with SIGKILL fallback — some agents catch SIGTERM and never exit.
         // Without the fallback, `await exitPromise` would hang until outerTimer.
+        // Tear down the whole process group so lingering subprocesses are reaped
+        // and can't keep the child's pipes (and thus the job) open.
         if (!timedOut && !abortedBySignal && child.exitCode === null && child.signalCode === null) {
-          try {
-            child.kill("SIGTERM");
-          } catch {
-            // already dead
-          }
-          const cleanupKillTimer = setTimeout(() => {
-            try {
-              child.kill("SIGKILL");
-            } catch {
-              // already dead
-            }
-          }, SIGTERM_TO_SIGKILL_MS);
+          killProcessTree(child, "SIGTERM");
+          const cleanupKillTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), SIGTERM_TO_SIGKILL_MS);
           child.on("close", () => clearTimeout(cleanupKillTimer));
         }
         releaseConsoleError();
@@ -483,6 +480,32 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       };
     },
   };
+}
+
+/**
+ * Signal the agent's entire process group, then the child itself.
+ *
+ * The child is spawned `detached`, so on POSIX its pid doubles as its
+ * process-group id and `process.kill(-pid, …)` reaches every descendant —
+ * reaping subprocesses (e.g. `node --test`) the agent shelled out to. Without
+ * this, killing only the CLI can leave grandchildren running, which both leak
+ * resources and can hold the child's stdio pipes open so its `close` event
+ * never fires. The group kill is best-effort (the group may already be gone);
+ * the direct `child.kill` is the fallback and the belt-and-suspenders path.
+ */
+function killProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+  if (child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal);
+    } catch {
+      // Group already gone, or the child was never a group leader.
+    }
+  }
+  try {
+    child.kill(signal);
+  } catch {
+    // already dead
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter, Readable, Writable } from "node:stream";
 import type { AgentAdapter, AgentInput } from "../../../src/types/agent.js";
 
@@ -105,11 +105,17 @@ async function sendUpdate(update: Record<string, unknown>) {
 
 describe("createAcpBasedAdapter", () => {
   let adapter: AgentAdapter;
+  let processKillSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     acpState.capturedClientFactory = null;
     acpState.capturedClient = null;
+
+    // Never let the adapter's process-group teardown signal the real OS during
+    // unit tests — the mock child's pid would otherwise be passed to the real
+    // `process.kill(-pid, …)`. Asserting on it is also handy.
+    processKillSpy = vi.spyOn(process, "kill").mockReturnValue(true);
 
     // Reset mock return values
     mockInitialize.mockResolvedValue({});
@@ -123,6 +129,10 @@ describe("createAcpBasedAdapter", () => {
       cliCommand: "goose",
       buildArgs: () => ["acp"],
     });
+  });
+
+  afterEach(() => {
+    processKillSpy.mockRestore();
   });
 
   it("has the correct adapter name", () => {
