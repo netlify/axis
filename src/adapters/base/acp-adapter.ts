@@ -255,6 +255,14 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         if (signalKillTimer) clearTimeout(signalKillTimer);
       });
 
+      // Set once `connection.prompt()` returns a genuine terminal result
+      // (any stop reason other than `cancelled`). The agent finishing is the
+      // real completion signal — not the child process exiting. The CLI, or a
+      // subprocess it spawned (e.g. `node --test`), can linger for minutes
+      // after the final `prompt_result`. When that lingering races the timeout
+      // or an abort, the run is still a success and must be recorded as one.
+      let completedCleanly = false;
+
       // The ACP SDK calls `console.error` directly whenever a request handler
       // returns an error (e.g. agent asks to read a file that doesn't exist).
       // Outside of debug mode these are noise — the failure is already
@@ -358,6 +366,13 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         } else if (promptResult.stopReason === "max_turn_requests") {
           state.resultError = "Agent exceeded max turn requests";
         }
+
+        // The agent delivered a terminal result. `cancelled` means the turn was
+        // interrupted (typically by our own timeout/abort SIGTERM), so it isn't
+        // a genuine completion — every other stop reason is, even the ones that
+        // map to an error above (max_tokens, refusal, …), which are real
+        // outcomes rather than timeouts.
+        completedCleanly = promptResult.stopReason !== "cancelled";
       } catch (err) {
         // A SIGTERM from the timeout/abort handlers can surface here as a
         // connection error — don't let it clobber the timeout/abort reason.
@@ -400,8 +415,10 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       const exitCode = await exitPromise;
       const endTime = new Date();
 
-      // 18. Timeout path
-      if (timedOut) {
+      // 18. Timeout path — only when the agent did NOT reach a terminal result.
+      // If it completed before/while we killed the child, fall through to the
+      // success path below so the result and token usage aren't discarded.
+      if (timedOut && !completedCleanly) {
         return {
           transcript,
           result: null,
@@ -417,10 +434,11 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         };
       }
 
-      // 18b. Abort path (external signal from runner limits / Ctrl-C). Attribute
+      // 18b. Abort path (external signal from runner limits / Ctrl-C). Same rule:
+      // a run that completed before the abort is a success. Otherwise attribute
       // any token usage observed before the abort so a cut-off run still reports
       // what it spent.
-      if (abortedBySignal) {
+      if (abortedBySignal && !completedCleanly) {
         return {
           transcript,
           result: null,
@@ -436,17 +454,21 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         };
       }
 
-      // 19. Build result
+      // 19. Build result. When we killed the child after a clean completion, its
+      // non-zero exit code is our doing — trust the terminal result instead, so
+      // don't surface an exit-code error and normalise the code to success.
+      const killedAfterCompletion = (timedOut || abortedBySignal) && completedCleanly;
       let error = state.resultError ?? undefined;
-      if (!error && exitCode !== 0 && !state.lastAssistantMessage) {
+      if (!error && !killedAfterCompletion && exitCode !== 0 && !state.lastAssistantMessage) {
         error = stderr || "Agent process exited with non-zero code";
       }
+      const reportedExitCode = killedAfterCompletion ? (error ? 1 : 0) : exitCode;
 
       const metadata: AgentMetadata = {
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         durationMs: endTime.getTime() - startTime.getTime(),
-        exitCode,
+        exitCode: reportedExitCode,
         tokenUsage: state.tokenUsage,
         totalCostUsd: state.totalCostUsd,
         sessionId: state.sessionId,
