@@ -958,6 +958,32 @@ describe("run", () => {
     expect(output.summary.completed).toBe(0);
     expect(output.summary.failed).toBe(1);
   });
+
+  it("counts ACP runs with a result but non-zero exit code as completed", async () => {
+    // ACP agents (opencode, gemini --acp) are SIGTERM'd after completing
+    // successfully — the process exits via signal so exitCode is non-zero,
+    // but the run produced a result and should count as completed.
+    const mockAdapter = {
+      name: "mock-acp-agent",
+      run: vi.fn().mockResolvedValue({
+        transcript: [],
+        result: "Task completed successfully.",
+        metadata: {
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          durationMs: 5000,
+          exitCode: 1,
+        },
+      }),
+    };
+    mockGetAdapter.mockReturnValue(mockAdapter);
+
+    const output = await run(baseOptions);
+
+    expect(output.summary.total).toBe(1);
+    expect(output.summary.completed).toBe(1);
+    expect(output.summary.failed).toBe(0);
+  });
 });
 
 describe("artifact capture", () => {
