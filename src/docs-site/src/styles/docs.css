@@ -589,7 +589,7 @@ tbody tr:hover {
 
 .req-no {
   background: var(--light-gray);
-  color: var(--text-muted);
+  color: var(--text);
   border: 1px solid var(--border);
 }
 

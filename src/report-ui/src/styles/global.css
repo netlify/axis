@@ -114,7 +114,7 @@ h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.0625rem; c
 
 .report-branding {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -169,9 +169,7 @@ h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.0625rem; c
 
 .summary-hero {
   text-align: center;
-  padding: 0 30px 0 0;
-  margin-right: 30px;
-  border-right: 1px solid var(--border);
+  padding: 0;
 }
 
 .summary-hero .hero-score {
@@ -259,7 +257,7 @@ h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.0625rem; c
 .score-badge.score-yellow { background: var(--score-yellow-bg); }
 .score-badge.score-orange { background: var(--score-amber-bg); }
 .score-badge.score-red    { background: var(--score-red-bg); }
-.score-badge.score-na     { background: var(--neutral-200); color: var(--text-muted); }
+.score-badge.score-na     { background: var(--neutral-200); color: var(--text); }
 
 .score-badge-lg {
   min-width: 64px;
@@ -568,7 +566,7 @@ h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.0625rem; c
 .criterion-weight {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
-  color: var(--text-muted);
+  color: var(--text);
   background: var(--border-light);
   padding: 2px 7px;
   border-radius: 999px;
@@ -659,7 +657,7 @@ a.wf-id.interaction-link { color: var(--text); }
   background: var(--neutral-200);
   padding: 1px 5px;
   border-radius: 3px;
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 .speed-tag {
@@ -806,7 +804,7 @@ a.wf-id.interaction-link { color: var(--text); }
 
 .category-empty-state {
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  color: var(--text);
   font-style: italic;
   padding: 12px 14px;
   background: var(--neutral-200);
