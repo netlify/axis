@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.15.3](https://github.com/netlify/axis/compare/v1.15.2...v1.15.3) (2026-06-23)
+
+
+### Bug Fixes
+
+* don't zero-score ACP runs killed by signal after completing ([e8b4615](https://github.com/netlify/axis/commit/e8b4615d7e209d4d218bcbffbb056f3529291fb5))
+* preserve completed signal-exit classification ([fd4b26d](https://github.com/netlify/axis/commit/fd4b26d5f98dda9ce24602327cf186c1b4b8d3d1))
+
 ## [1.15.2](https://github.com/netlify/axis/compare/v1.15.1...v1.15.2) (2026-06-23)
 
 
