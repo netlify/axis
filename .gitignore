@@ -5,3 +5,5 @@ dist/
 .claude/worktrees
 src/docs-site/public/sample-report.html
 .DS_Store
+**/.DS_Store
+**/.netlify/

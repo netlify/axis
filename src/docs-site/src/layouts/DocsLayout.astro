@@ -26,49 +26,65 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site).href;
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <title>{title} - AXIS Docs</title>
+    <title>{landing ? title : `${title} — AXIS`}</title>
+
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#f6f6f7" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet" />
+    <meta property="og:site_name" content="AXIS" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonicalUrl} />
-    <meta property="og:title" content={`${title} - AXIS Docs`} />
+    <meta property="og:title" content={landing ? title : `${title} — AXIS`} />
     <meta property="og:description" content={description} />
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content={`${title} - AXIS Docs`} />
+    <meta property="og:image" content="/AXIS_OG.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="AXIS — Stop guessing if agents can use your service" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@netlify" />
+    <meta name="twitter:title" content={landing ? title : `${title} — AXIS`} />
     <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content="/AXIS_OG.png" />
+    <meta name="twitter:image:alt" content="AXIS — Stop guessing if agents can use your service" />
   </head>
   <body class:list={{ "body-landing": landing }}>
     <header class="site-header">
-      <a href="/" class="site-logo" aria-label="AXIS home">
-        <span class="site-logo-mark"><span class="logo-ax">AX</span><span class="logo-i">I</span>S</span>
-      </a>
-      <div class="site-header-links">
-        {landing && (
-          <a href="/quickstart" class="site-header-doc">Docs</a>
+      <div class="site-header-inner">
+        <a href="/" class="site-logo" aria-label="AXIS home">
+          <img src="/Header/AXIS.svg" alt="AXIS" class="site-logo-img" width="181" height="44" />
+        </a>
+        <div class="site-header-links">
+          <div class="site-header-links-row">
+            <a href="/quickstart" class="site-header-doc">Docs</a>
+            <a href="https://github.com/netlify/axis">GitHub</a>
+            <a href="https://www.npmjs.com/package/@netlify/axis" class="nav-npm">npm</a>
+          </div>
+        </div>
+        {!landing && (
+          <button class="mobile-menu-btn" id="menu-btn" aria-label="Toggle navigation">&#9776;</button>
         )}
-        <a href="https://github.com/netlify/axis">GitHub</a>
-        <a href="https://www.npmjs.com/package/@netlify/axis">npm</a>
       </div>
-      {!landing && (
-        <button class="mobile-menu-btn" id="menu-btn" aria-label="Toggle navigation">&#9776;</button>
-      )}
     </header>
 
     {landing ? (
       <main class="landing-main">
         <slot />
-        <footer class="site-footer site-footer-landing">
-          AXIS is OSS maintained by <a href="https://www.netlify.com">Netlify</a> and the open source contributors.
-        </footer>
       </main>
     ) : (
       <div class="site-shell">
+        <div class="site-shell-inner">
         <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
         <aside class="sidebar" id="sidebar">
+          <!-- Mobile-only nav links at top of sidebar -->
+          <div class="sidebar-mobile-nav">
+            <a href="https://github.com/netlify/axis" class="sidebar-mobile-nav-link">GitHub</a>
+            <a href="https://www.npmjs.com/package/@netlify/axis" class="sidebar-mobile-nav-link">npm</a>
+          </div>
           <nav class="sidebar-nav">
             <div class="sidebar-section-label">Getting Started</div>
-            <a href="/" class:list={["sidebar-link", { active: active === "overview" }]}>Home</a>
             <a href="/quickstart" class:list={["sidebar-link", { active: active === "quickstart" }]}>Quick Start</a>
             <div class="sidebar-section-label">Core Concepts</div>
             <a href="/scoring" class:list={["sidebar-link", { active: active === "scoring" }]}>Scoring Framework</a>
@@ -89,6 +105,7 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site).href;
             AXIS is OSS maintained by <a href="https://www.netlify.com">Netlify</a> and the open source contributors.
           </footer>
         </main>
+        </div><!-- /.site-shell-inner -->
       </div>
     )}
 
@@ -99,12 +116,24 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site).href;
         const backdrop = document.getElementById("sidebar-backdrop");
 
         function toggle() {
-          sidebar.classList.toggle("open");
+          var isOpen = sidebar.classList.toggle("open");
           backdrop.classList.toggle("open");
+          document.body.classList.toggle("sidebar-open", isOpen);
+        }
+
+        function close() {
+          sidebar.classList.remove("open");
+          backdrop.classList.remove("open");
+          document.body.classList.remove("sidebar-open");
         }
 
         btn.addEventListener("click", toggle);
-        backdrop.addEventListener("click", toggle);
+        backdrop.addEventListener("click", close);
+
+        // Close sidebar when a nav link is tapped
+        sidebar.querySelectorAll("a").forEach(function(link) {
+          link.addEventListener("click", close);
+        });
 
         // Auto-generate heading IDs and anchor links
         document.querySelectorAll(".main-content h2, .main-content h3, .main-content h4").forEach(function (heading) {

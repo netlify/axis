@@ -8,7 +8,13 @@
     "preview": "astro preview"
   },
   "dependencies": {
+    "@astrojs/react": "^5.0.7",
     "@astrojs/sitemap": "^3.7.2",
-    "astro": "^5.7.10"
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "astro": "^5.7.10",
+    "framer-motion": "^12.40.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }
