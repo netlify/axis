@@ -123,6 +123,11 @@ export default createAgentAdapter<{ stdout: string }>({
     reports, identified by its <code>@</code>-suffixed key (e.g., <code>create-post@with-mcp</code>).
   </p>
   <p>
+    Report manifest entries include a <code>failed</code> boolean computed from the full run output before
+    transcripts are stripped from <code>report.json</code>. This preserves the correct status for agents that
+    return a final result even when their process exits non-zero during cleanup.
+  </p>
+  <p>
     See <a href="/scenarios#variants">Writing Scenarios &rarr; Variants</a> for the full field
     reference and examples.
   </p>

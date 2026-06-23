@@ -86,7 +86,7 @@ vi.mock("../../../src/scoring/category-score.js", () => ({
   DEFAULT_AUDIT_SCORES: { success: 1.0, speed: 0.8, weight: 0.8, contextRelevance: 0.8 },
 }));
 
-import { scoreResults } from "../../../src/scoring/index.js";
+import { scoreResults, scoreRunResult } from "../../../src/scoring/index.js";
 import { buildSparseIndex } from "../../../src/scoring/sparse-index.js";
 import { runDeepEval } from "../../../src/scoring/deep-eval.js";
 import { computeCategoryScore } from "../../../src/scoring/category-score.js";
@@ -303,6 +303,17 @@ describe("scoreResults", () => {
       expect(scoreGoalAchievement).toHaveBeenCalled();
     });
 
+    it("does not treat an empty-string result as failed", async () => {
+      const output = makeRunOutput();
+      output.results[0].output.metadata.exitCode = 1;
+      output.results[0].output.result = "";
+
+      const scored = await scoreResults(output);
+
+      expect(scored.results[0].score.axisScore).not.toBe(0);
+      expect(scoreGoalAchievement).toHaveBeenCalled();
+    });
+
     it("treats a run with a result AND an error as failed", async () => {
       const output = makeRunOutput();
       output.results[0].output.metadata.exitCode = 1;
@@ -313,6 +324,19 @@ describe("scoreResults", () => {
 
       expect(scored.results[0].score.axisScore).toBe(0);
       expect(scoreGoalAchievement).not.toHaveBeenCalled();
+    });
+
+    it("emits failed progress for failed runs", async () => {
+      const output = makeRunOutput();
+      output.results[0].output.metadata.exitCode = 1;
+      output.results[0].output.result = null;
+      const onProgress = vi.fn();
+
+      await scoreRunResult(output.results[0], { onProgress });
+
+      expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "start");
+      expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "failed");
+      expect(onProgress).not.toHaveBeenCalledWith("test-scenario", "claude-code", "done");
     });
   });
 });

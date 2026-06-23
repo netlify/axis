@@ -365,7 +365,7 @@ function renderScenarioHeaderRow(group: ScenarioGroup, _startIndex: number, hasS
 
 function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, scenarioKey: string): string {
   const s = entry.score;
-  const isFailed = entry.exitCode !== 0 || !!entry.error;
+  const isFailed = entry.failed ?? (entry.exitCode !== 0 || !!entry.error);
   const errorBtn = entry.error
     ? `<button class="error-btn" data-error-index="${index}" title="${escapeHtml(friendlyError(entry.error))}">!</button>`
     : "";

@@ -141,6 +141,6 @@ export function formatError(err: unknown): string {
  */
 export function isFailedRun(output: AgentOutput): boolean {
   const { exitCode, error } = output.metadata;
-  if (output.result) return Boolean(error);
+  if (output.result !== null) return Boolean(error);
   return exitCode !== 0 || Boolean(error);
 }

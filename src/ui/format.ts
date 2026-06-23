@@ -1,5 +1,5 @@
 import type { RunOutput, RunResult, RunSummary } from "../types/output.js";
-import { isScoredResult } from "../types/output.js";
+import { isFailedRun, isScoredResult } from "../types/output.js";
 import type { CategoryScore, InteractionAudit, ScoreResult, ScoredOutput, ScoredRunResult } from "../types/scoring.js";
 import type { ReportManifest } from "../types/report.js";
 import type { Baseline, BaselineComparison } from "../types/baseline.js";
@@ -203,7 +203,7 @@ export function renderSummaryTable(output: RunOutput): string {
   let totalCost = 0;
   for (const result of output.results) {
     const meta = result.output.metadata;
-    const failed = meta.exitCode !== 0 || !!meta.error;
+    const failed = isFailedRun(result.output);
     const status = failed ? "✗ fail" : "✓ pass";
     const cost = meta.totalCostUsd ?? 0;
     totalCost += cost;
@@ -234,7 +234,7 @@ export function renderResultDetail(result: RunResult): string {
   lines.push(`  AXIS Run: ${result.scenarioName} [${result.scenarioKey}]`);
   lines.push(`  Agent: ${result.agentName}`);
   lines.push(`  ${"─".repeat(40)}`);
-  const detailFailed = meta.exitCode !== 0 || !!meta.error;
+  const detailFailed = isFailedRun(result.output);
   lines.push(`  Status:     ${detailFailed ? `Failed (exit ${meta.exitCode})` : "Complete"}`);
   if (meta.error) {
     lines.push(`  Error:      ${friendlyError(meta.error)}`);
@@ -515,7 +515,7 @@ export function renderReportDetail(report: ReportManifest): string {
     lines.push(`  ${sep}`);
 
     for (const r of report.results) {
-      const status = r.exitCode !== 0 || r.error ? "\u2717 fail" : "\u2713 pass";
+      const status = (r.failed ?? (r.exitCode !== 0 || r.error)) ? "\u2717 fail" : "\u2713 pass";
       const cost = r.totalCostUsd ?? 0;
       lines.push(
         `  ${getBaseKey(r.scenarioKey).padEnd(COL_SCENARIO)} ${displayAgent(r.scenarioKey, r.agentName).padEnd(COL_AGENT)} ` +
@@ -551,7 +551,7 @@ export function renderScenarioDetail(result: RunResult | ScoredRunResult): strin
   lines.push(`  AXIS Result: ${result.scenarioName} [${result.scenarioKey}]`);
   lines.push(`  ${sep}`);
   lines.push(`  Agent:    ${result.agentName}`);
-  const scenarioFailed = result.output.metadata.exitCode !== 0 || !!result.output.metadata.error;
+  const scenarioFailed = isFailedRun(result.output);
   lines.push(`  Status:   ${scenarioFailed ? `Failed (exit ${result.output.metadata.exitCode})` : "Complete"}`);
   if (result.output.metadata.error) {
     lines.push(`  Error:    ${friendlyError(result.output.metadata.error)}`);

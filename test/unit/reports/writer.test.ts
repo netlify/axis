@@ -123,6 +123,7 @@ describe("writeReportToStore", () => {
     expect(manifest.results[0].scenarioKey).toBe("hello-world");
     expect(manifest.results[0].durationMs).toBe(2000);
     expect(manifest.results[0].exitCode).toBe(0);
+    expect(manifest.results[0].failed).toBe(false);
     expect(manifest.results[0].tokenUsage).toEqual({ input: 500, output: 200 });
     expect(manifest.results[0].totalCostUsd).toBe(0.005);
     expect(manifest.results[0].file).toBe("scenarios/hello-world/claude-code.json");
@@ -150,6 +151,17 @@ describe("writeReportToStore", () => {
     expect(manifest.results[0].score).toBeDefined();
     expect(manifest.results[0].score.axisScore).toBe(85);
     expect(manifest.summary.averageAxisScore).toBe(85);
+  });
+
+  it("writes computed failure classification to manifest", () => {
+    const output = makeRunOutput();
+    output.results[0].output.metadata.exitCode = 1;
+    output.results[0].output.result = "Completed despite signal-style exit.";
+
+    const reportId = writeReportToStore(output, tmpDir);
+    const manifest = JSON.parse(fs.readFileSync(path.join(tmpDir, ".axis/reports", reportId, "report.json"), "utf-8"));
+
+    expect(manifest.results[0].failed).toBe(false);
   });
 
   it("handles nested scenario keys", () => {

@@ -63,7 +63,7 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   // get perfect-score defaults in env/service/agent because nothing was audited.
   if (isFailedRun(result.output)) {
     const score = buildZeroScore(result, weights, sparseIndex.lines.length > 0 ? sparseIndex : undefined, judgeAgent);
-    options?.onProgress?.(result.scenarioKey, result.agentName, "done");
+    options?.onProgress?.(result.scenarioKey, result.agentName, "failed");
     result.output.transcriptAnalysis = toTranscriptAnalysis(normalized);
     return {
       scenarioKey: result.scenarioKey,

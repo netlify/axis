@@ -208,7 +208,7 @@ export interface ScoringOptions {
   weights?: ScoringWeights;
   logger?: Logger;
   /** Called when scoring starts/finishes for a result. */
-  onProgress?: (scenarioKey: string, agentName: string, phase: "start" | "done") => void;
+  onProgress?: (scenarioKey: string, agentName: string, phase: "start" | "done" | "failed") => void;
   /** Report directory for writing raw data before judges run. */
   reportDir?: string;
   /**

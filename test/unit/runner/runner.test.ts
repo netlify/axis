@@ -571,7 +571,13 @@ describe("run", () => {
   });
 
   it("stamps runStartedAt when the job transitions to running", async () => {
-    const mockAdapter = createMockAdapter();
+    const mockAdapter = {
+      name: "mock-agent",
+      run: vi.fn().mockImplementation(async (input) => {
+        input.onAgentReady?.();
+        return createMockAdapter().run(input);
+      }),
+    };
     mockGetAdapter.mockReturnValue(mockAdapter);
 
     let seenRunning: number | undefined;
