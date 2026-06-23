@@ -133,6 +133,7 @@ describe("createAcpBasedAdapter", () => {
 
   afterEach(() => {
     processKillSpy.mockRestore();
+    vi.useRealTimers();
   });
 
   it("has the correct adapter name", () => {
@@ -953,7 +954,6 @@ describe("createAcpBasedAdapter", () => {
     releasePrompt();
 
     const output = await runPromise;
-    vi.useRealTimers();
 
     // Success, not a timeout failure: real result, real usage, exit 0.
     expect(output.metadata.error).toBeUndefined();
@@ -991,7 +991,6 @@ describe("createAcpBasedAdapter", () => {
     releasePrompt();
 
     const output = await runPromise;
-    vi.useRealTimers();
 
     expect(output.metadata.error).toBeUndefined();
     expect(output.metadata.exitCode).toBe(0);
@@ -1032,7 +1031,6 @@ describe("createAcpBasedAdapter", () => {
     await vi.advanceTimersByTimeAsync(600);
 
     const output = await runPromise;
-    vi.useRealTimers();
 
     expect(output.result).toBeNull();
     // 0.6s == input.timeoutMs (600ms), NOT the 10-minute spec default.
@@ -1062,7 +1060,6 @@ describe("createAcpBasedAdapter", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     const output = await runPromise;
-    vi.useRealTimers();
 
     expect(output.result).toBeNull();
     expect(output.metadata.error).toBe("Scenario token limit reached (500000 tokens)");
