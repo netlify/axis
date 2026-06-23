@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.2](https://github.com/netlify/axis/compare/v1.15.1...v1.15.2) (2026-06-23)
+
+
+### Bug Fixes
+
+* **runner:** always promote jobs to running before completion ([10c2dd2](https://github.com/netlify/axis/commit/10c2dd294a40abc2b99ea6698695905774964573))
+
 ## [1.15.1](https://github.com/netlify/axis/compare/v1.15.0...v1.15.1) (2026-06-20)
 
 
