@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter, Readable, Writable } from "node:stream";
 import type { AgentAdapter, AgentInput } from "../../../src/types/agent.js";
 
@@ -105,11 +105,17 @@ async function sendUpdate(update: Record<string, unknown>) {
 
 describe("createAcpBasedAdapter", () => {
   let adapter: AgentAdapter;
+  let processKillSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     acpState.capturedClientFactory = null;
     acpState.capturedClient = null;
+
+    // Never let the adapter's process-group teardown signal the real OS during
+    // unit tests — the mock child's pid would otherwise be passed to the real
+    // `process.kill(-pid, …)`. Asserting on it is also handy.
+    processKillSpy = vi.spyOn(process, "kill").mockReturnValue(true);
 
     // Reset mock return values
     mockInitialize.mockResolvedValue({});
@@ -123,6 +129,11 @@ describe("createAcpBasedAdapter", () => {
       cliCommand: "goose",
       buildArgs: () => ["acp"],
     });
+  });
+
+  afterEach(() => {
+    processKillSpy.mockRestore();
+    vi.useRealTimers();
   });
 
   it("has the correct adapter name", () => {
@@ -549,14 +560,18 @@ describe("createAcpBasedAdapter", () => {
     expect(output.metadata.error).toBe("Connection lost");
   });
 
-  it("handles non-zero exit code with no result", async () => {
+  it("treats a clean completion with no assistant text as success despite a non-zero exit", async () => {
+    // Agent finished its turn (end_turn) but produced only tool calls, so there
+    // is no final message; the CLI then exits non-zero. The terminal result is
+    // the success signal, so a non-zero exit must not fabricate a failure.
     mockSpawn.mockImplementation((() => createMockProcess(1)) as any);
     mockPrompt.mockResolvedValue({ stopReason: "end_turn" });
 
     const output = await adapter.run(makeInput());
 
-    expect(output.metadata.exitCode).toBe(1);
     expect(output.result).toBeNull();
+    expect(output.metadata.error).toBeUndefined();
+    expect(output.metadata.exitCode).toBe(0);
   });
 
   it("calls prepare before spawning", async () => {
@@ -866,5 +881,192 @@ describe("createAcpBasedAdapter", () => {
     expect(output.metadata.durationMs).toBeGreaterThanOrEqual(40);
     // Should be well under 5s (generous bound to avoid flakiness)
     expect(output.metadata.durationMs).toBeLessThan(5000);
+  });
+
+  // -------------------------------------------------------------------------
+  // Timeout / abort racing the agent finishing.
+  //
+  // A scenario time/token limit (or Ctrl-C) is a hard cutoff: when it fires the
+  // run fails even if a terminal prompt_result lands in the same instant — but
+  // the token usage observed before the cut is still attributed. (The original
+  // false-timeout bug — runs killed at 10m instead of the configured limit — is
+  // fixed by honouring input.timeoutMs and reaping the process tree, covered by
+  // the tests below.)
+  // -------------------------------------------------------------------------
+
+  /**
+   * A mock process that stays alive until signalled. On kill it closes (after a
+   * microtask), modelling a CLI that only dies when we tear it down. `onKill`
+   * lets a test break the ACP connection (reject the in-flight prompt) the way
+   * a real SIGTERM would.
+   */
+  function createLingeringProcess(pid: number, onKill?: (signal: NodeJS.Signals) => void) {
+    const stdout = new Readable({ read() {} });
+    const stderr = new Readable({ read() {} });
+    const stdin = new Writable({
+      write(_chunk, _enc, cb) {
+        cb();
+      },
+    });
+    const proc = Object.assign(new EventEmitter(), {
+      stdout,
+      stderr,
+      stdin,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        onKill?.(signal);
+        queueMicrotask(() => {
+          proc.exitCode = 143;
+          proc.emit("close", 143);
+        });
+        return true;
+      }),
+      pid,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+    });
+    return proc;
+  }
+
+  it("fails as a timeout even if a terminal result lands after the cutoff, attributing usage", async () => {
+    vi.useFakeTimers();
+
+    mockSpawn.mockImplementation((() => createLingeringProcess(4242)) as any);
+
+    // The prompt sends its final message, then parks until we release it —
+    // simulating the agent finishing in the same instant the timeout fires.
+    let releasePrompt!: () => void;
+    const gate = new Promise<void>((r) => {
+      releasePrompt = r;
+    });
+    mockPrompt.mockImplementation(async () => {
+      await sendUpdate({
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "All tests pass." },
+      });
+      await gate;
+      return { stopReason: "end_turn", usage: { inputTokens: 285071, outputTokens: 4742 } };
+    });
+
+    const input = makeInput();
+    input.timeoutMs = 600;
+    const runPromise = adapter.run(input);
+
+    // Let the ACP handshake run and the prompt send its message + park.
+    await vi.advanceTimersByTimeAsync(0);
+    // Fire the timeout — tears down the lingering child.
+    await vi.advanceTimersByTimeAsync(600);
+    // The agent's terminal result lands right after the cutoff.
+    releasePrompt();
+
+    const output = await runPromise;
+
+    // Hard cutoff: a failure even though a result arrived — but usage is kept.
+    expect(output.result).toBeNull();
+    expect(output.metadata.error).toMatch(/timed out after 0\.6s/i);
+    expect(output.metadata.tokenUsage).toEqual({ input: 285071, output: 4742 });
+  });
+
+  it("fails on abort even if a terminal result lands after the cutoff, attributing usage", async () => {
+    vi.useFakeTimers();
+
+    mockSpawn.mockImplementation((() => createLingeringProcess(4243)) as any);
+
+    let releasePrompt!: () => void;
+    const gate = new Promise<void>((r) => {
+      releasePrompt = r;
+    });
+    mockPrompt.mockImplementation(async () => {
+      await sendUpdate({
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "Resource config applied." },
+      });
+      await gate;
+      return { stopReason: "end_turn", usage: { inputTokens: 758017, outputTokens: 13569 } };
+    });
+
+    const controller = new AbortController();
+    const input = makeInput();
+    input.signal = controller.signal;
+    const runPromise = adapter.run(input);
+
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort("Scenario token limit reached (500000 tokens)");
+    await vi.advanceTimersByTimeAsync(0);
+    releasePrompt();
+
+    const output = await runPromise;
+
+    expect(output.result).toBeNull();
+    expect(output.metadata.error).toBe("Scenario token limit reached (500000 tokens)");
+    expect(output.metadata.tokenUsage).toEqual({ input: 758017, output: 13569 });
+  });
+
+  it("still fails as a timeout when no terminal result arrives, honouring input.timeoutMs", async () => {
+    vi.useFakeTimers();
+
+    // Spec default is far larger than the per-run timeout the runner passes.
+    const a = createAcpBasedAdapter({
+      name: "test-acp",
+      cliCommand: "goose",
+      buildArgs: () => ["acp"],
+      timeoutMs: 10 * 60 * 1000,
+    });
+
+    let rejectPrompt!: (err: Error) => void;
+    mockPrompt.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectPrompt = reject;
+        }),
+    );
+
+    // The connection breaks when we signal the child, as a real SIGTERM would.
+    mockSpawn.mockImplementation((() =>
+      createLingeringProcess(4244, () => rejectPrompt(new Error("Connection closed")))) as any);
+
+    const input = makeInput();
+    input.timeoutMs = 600;
+    const runPromise = a.run(input);
+
+    await vi.advanceTimersByTimeAsync(0);
+    // Nothing should be torn down before the per-run timeout.
+    expect(processKillSpy).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(600);
+
+    const output = await runPromise;
+
+    expect(output.result).toBeNull();
+    // 0.6s == input.timeoutMs (600ms), NOT the 10-minute spec default.
+    expect(output.metadata.error).toMatch(/timed out after 0\.6s/i);
+  });
+
+  it("tears down the child process group and fails when aborted before completion", async () => {
+    vi.useFakeTimers();
+
+    let rejectPrompt!: (err: Error) => void;
+    mockPrompt.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectPrompt = reject;
+        }),
+    );
+    mockSpawn.mockImplementation((() =>
+      createLingeringProcess(9999, () => rejectPrompt(new Error("Connection closed")))) as any);
+
+    const controller = new AbortController();
+    const input = makeInput();
+    input.signal = controller.signal;
+    const runPromise = adapter.run(input);
+
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort("Scenario token limit reached (500000 tokens)");
+    await vi.advanceTimersByTimeAsync(0);
+
+    const output = await runPromise;
+
+    expect(output.result).toBeNull();
+    expect(output.metadata.error).toBe("Scenario token limit reached (500000 tokens)");
+    // The whole process group is signalled (negative pid), not just the child.
+    expect(processKillSpy).toHaveBeenCalledWith(-9999, "SIGTERM");
   });
 });

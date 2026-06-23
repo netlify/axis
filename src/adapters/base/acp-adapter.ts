@@ -184,16 +184,21 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         activeToolCalls: new Map(),
       };
 
-      // 4. Spawn the ACP agent process — keep stdin OPEN for bidirectional JSON-RPC
+      // 4. Spawn the ACP agent process — keep stdin OPEN for bidirectional
+      // JSON-RPC. `detached: true` puts the CLI in its own process group so we
+      // can tear down the whole tree on teardown: ACP agents shell out to
+      // subprocesses (e.g. `node --test`) that can outlive the CLI and, if left
+      // running, hold the job open past its time limit.
       const child: ChildProcess = spawn(command, [...prefixArgs, ...args], {
         cwd: input.workingDirectory,
         stdio: ["pipe", "pipe", "pipe"],
         env: input.env ?? { ...process.env },
+        detached: true,
       });
 
       // 5. Cleanup handler for Ctrl-C
       input.registerCleanup?.(() => {
-        child.kill("SIGTERM");
+        killProcessTree(child, "SIGTERM");
       });
 
       // 6. Register close listener BEFORE reading (ordering matters)
@@ -211,17 +216,58 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         input.onStderr?.(chunk);
       });
 
-      // 8. Timeout → SIGTERM → SIGKILL
+      // 8. Timeout → SIGTERM → SIGKILL. Honour the per-run timeout the runner
+      // passes (the scenario time limit) and fall back to the adapter default.
+      // Previously this used only the adapter default (10m), ignoring
+      // `input.timeoutMs` — so scenarios with a larger limit (default 15m) were
+      // killed early, and a run that finished right at the 10m mark was recorded
+      // as a timeout failure instead of a success.
+      const effectiveTimeout = input.timeoutMs ?? timeoutMs;
       let timedOut = false;
       let killTimer: NodeJS.Timeout | undefined;
       const outerTimer = setTimeout(() => {
         timedOut = true;
-        child.kill("SIGTERM");
-        killTimer = setTimeout(() => child.kill("SIGKILL"), SIGTERM_TO_SIGKILL_MS);
-      }, timeoutMs);
+        killProcessTree(child, "SIGTERM");
+        killTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), SIGTERM_TO_SIGKILL_MS);
+      }, effectiveTimeout);
+
+      // 8b. External abort signal (runner limits / Ctrl-C). The ACP adapter
+      // previously ignored `input.signal` entirely, so a per-scenario token
+      // limit, an overall limit, or a Ctrl-C never tore down the agent child —
+      // it kept running until the timeout above fired. Mirror the base adapter:
+      // SIGTERM with a SIGKILL fallback.
+      let abortedBySignal = false;
+      let abortReason = "";
+      let signalKillTimer: NodeJS.Timeout | undefined;
+      if (input.signal) {
+        const onAbort = () => {
+          if (abortedBySignal) return;
+          abortedBySignal = true;
+          abortReason = String(input.signal!.reason || "Job aborted");
+          killProcessTree(child, "SIGTERM");
+          signalKillTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), SIGTERM_TO_SIGKILL_MS);
+        };
+        if (input.signal.aborted) {
+          onAbort();
+        } else {
+          input.signal.addEventListener("abort", onAbort, { once: true });
+          child.on("close", () => input.signal!.removeEventListener("abort", onAbort));
+        }
+      }
+
       child.on("close", () => {
         if (killTimer) clearTimeout(killTimer);
+        if (signalKillTimer) clearTimeout(signalKillTimer);
       });
+
+      // Set once `connection.prompt()` returns a genuine terminal result (any
+      // stop reason other than `cancelled`). The agent finishing — not the child
+      // process exiting — is the real success signal: ACP CLIs (and subprocesses
+      // they spawn, e.g. `node --test`) can exit non-zero or via our cleanup
+      // SIGTERM after a clean turn, so this guards the normal-exit path below from
+      // fabricating an error for a run that actually completed. A timeout or abort
+      // is still a hard cutoff and fails regardless (see the paths below).
+      let completedCleanly = false;
 
       // The ACP SDK calls `console.error` directly whenever a request handler
       // returns an error (e.g. agent asks to read a file that doesn't exist).
@@ -326,8 +372,17 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         } else if (promptResult.stopReason === "max_turn_requests") {
           state.resultError = "Agent exceeded max turn requests";
         }
+
+        // The agent delivered a terminal result. `cancelled` means the turn was
+        // interrupted (typically by our own timeout/abort SIGTERM), so it isn't
+        // a genuine completion — every other stop reason is, even the ones that
+        // map to an error above (max_tokens, refusal, …), which are real
+        // outcomes rather than timeouts.
+        completedCleanly = promptResult.stopReason !== "cancelled";
       } catch (err) {
-        if (!timedOut) {
+        // A SIGTERM from the timeout/abort handlers can surface here as a
+        // connection error — don't let it clobber the timeout/abort reason.
+        if (!timedOut && !abortedBySignal) {
           state.resultError = err instanceof Error ? err.message : String(err);
         }
       } finally {
@@ -344,19 +399,11 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         }
         // SIGTERM with SIGKILL fallback — some agents catch SIGTERM and never exit.
         // Without the fallback, `await exitPromise` would hang until outerTimer.
-        if (!timedOut && child.exitCode === null && child.signalCode === null) {
-          try {
-            child.kill("SIGTERM");
-          } catch {
-            // already dead
-          }
-          const cleanupKillTimer = setTimeout(() => {
-            try {
-              child.kill("SIGKILL");
-            } catch {
-              // already dead
-            }
-          }, SIGTERM_TO_SIGKILL_MS);
+        // Tear down the whole process group so lingering subprocesses are reaped
+        // and can't keep the child's pipes (and thus the job) open.
+        if (!timedOut && !abortedBySignal && child.exitCode === null && child.signalCode === null) {
+          killProcessTree(child, "SIGTERM");
+          const cleanupKillTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), SIGTERM_TO_SIGKILL_MS);
           child.on("close", () => clearTimeout(cleanupKillTimer));
         }
         releaseConsoleError();
@@ -366,7 +413,9 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       const exitCode = await exitPromise;
       const endTime = new Date();
 
-      // 18. Timeout path
+      // 18. Timeout path. A scenario time limit is a hard cap, so reaching it is
+      // a failure even if a terminal result lands in the same instant we tear the
+      // child down — but still attribute any token usage observed before the cut.
       if (timedOut) {
         return {
           transcript,
@@ -377,22 +426,49 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
             endTime: endTime.toISOString(),
             durationMs: endTime.getTime() - startTime.getTime(),
             exitCode,
-            error: `Agent timed out after ${timeoutMs / 1000}s`,
+            tokenUsage: state.tokenUsage,
+            error: `Agent timed out after ${effectiveTimeout / 1000}s`,
           },
         };
       }
 
-      // 19. Build result
+      // 18b. Abort path (external signal from runner limits / Ctrl-C). Like the
+      // timeout above, a limit or cancel is a hard cutoff: it fails even on a
+      // last-instant completion. Attribute any token usage observed before it.
+      if (abortedBySignal) {
+        return {
+          transcript,
+          result: null,
+          rawOutput,
+          metadata: {
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            durationMs: endTime.getTime() - startTime.getTime(),
+            exitCode,
+            tokenUsage: state.tokenUsage,
+            error: abortReason,
+          },
+        };
+      }
+
+      // 19. Build result. A run that reached a terminal result is a success even
+      // if the child then exited non-zero: we close stdin and SIGTERM a lingering
+      // CLI (and its process group) during cleanup, so a non-zero/signal exit is
+      // our own doing — not a failure. Only fabricate an exit-code error when the
+      // agent did NOT complete cleanly. This also covers a clean turn that emitted
+      // only tool calls and no final text (lastAssistantMessage stays null),
+      // which must not be flagged just because cleanup left a non-zero exit code.
       let error = state.resultError ?? undefined;
-      if (!error && exitCode !== 0 && !state.lastAssistantMessage) {
+      if (!error && !completedCleanly && exitCode !== 0 && !state.lastAssistantMessage) {
         error = stderr || "Agent process exited with non-zero code";
       }
+      const reportedExitCode = completedCleanly ? (error ? 1 : 0) : exitCode;
 
       const metadata: AgentMetadata = {
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         durationMs: endTime.getTime() - startTime.getTime(),
-        exitCode,
+        exitCode: reportedExitCode,
         tokenUsage: state.tokenUsage,
         totalCostUsd: state.totalCostUsd,
         sessionId: state.sessionId,
@@ -407,6 +483,32 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       };
     },
   };
+}
+
+/**
+ * Signal the agent's entire process group, then the child itself.
+ *
+ * The child is spawned `detached`, so on POSIX its pid doubles as its
+ * process-group id and `process.kill(-pid, …)` reaches every descendant —
+ * reaping subprocesses (e.g. `node --test`) the agent shelled out to. Without
+ * this, killing only the CLI can leave grandchildren running, which both leak
+ * resources and can hold the child's stdio pipes open so its `close` event
+ * never fires. The group kill is best-effort (the group may already be gone);
+ * the direct `child.kill` is the fallback and the belt-and-suspenders path.
+ */
+function killProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+  if (child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal);
+    } catch {
+      // Group already gone, or the child was never a group leader.
+    }
+  }
+  try {
+    child.kill(signal);
+  } catch {
+    // already dead
+  }
 }
 
 // ---------------------------------------------------------------------------
