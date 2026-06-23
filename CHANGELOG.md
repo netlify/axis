@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.16.0](https://github.com/netlify/axis/compare/v1.15.4...v1.16.0) (2026-06-23)
+
+
+### Features
+
+* **docs-site:** complete landing page and docs redesign ([87981de](https://github.com/netlify/axis/commit/87981de12a0d33df90fe4494db0ee310cbb57f10))
+
+
+### Bug Fixes
+
+* ui consistency work ([948136c](https://github.com/netlify/axis/commit/948136c0a7fe10af9f75982cf879c5cda24c4703))
+
 ## [1.15.4](https://github.com/netlify/axis/compare/v1.15.3...v1.15.4) (2026-06-23)
 
 
