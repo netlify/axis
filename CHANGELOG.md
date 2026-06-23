@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.4](https://github.com/netlify/axis/compare/v1.15.3...v1.15.4) (2026-06-23)
+
+
+### Bug Fixes
+
+* Gemini ACP runs recorded as false 15m timeouts ([3eacdba](https://github.com/netlify/axis/commit/3eacdbaff3ec29c7646684a6c3ccab502d0fbd50))
+
 ## [1.15.3](https://github.com/netlify/axis/compare/v1.15.2...v1.15.3) (2026-06-23)
 
 
