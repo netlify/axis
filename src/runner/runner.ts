@@ -702,6 +702,10 @@ async function executeJob(
       checkOverallTokenLimit?.();
     }
 
+    // Some adapters may never emit tokens nor signal readiness; ensure those
+    // jobs still transition out of "starting" before final status.
+    promoteToRunning(index);
+
     const durationMs = output.metadata.durationMs || Date.now() - jobStart;
     const failed = output.metadata.exitCode !== 0 || !!output.metadata.error;
     updateStatus(index, failed ? "failed" : "done", durationMs);
