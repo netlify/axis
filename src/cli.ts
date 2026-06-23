@@ -535,7 +535,7 @@ program
         process.exit(1);
       }
       jobFilter = manifest.results
-        .filter((r) => r.exitCode !== 0 || r.error)
+        .filter((r) => r.failed ?? (r.exitCode !== 0 || r.error))
         .map((r) => ({ scenarioKey: r.scenarioKey, agentName: r.agentName }));
       if (jobFilter.length === 0) {
         process.stderr.write(`\n  No failed jobs in report ${manifest.reportId}. Nothing to retry.\n\n`);

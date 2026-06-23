@@ -86,7 +86,7 @@ vi.mock("../../../src/scoring/category-score.js", () => ({
   DEFAULT_AUDIT_SCORES: { success: 1.0, speed: 0.8, weight: 0.8, contextRelevance: 0.8 },
 }));
 
-import { scoreResults } from "../../../src/scoring/index.js";
+import { scoreResults, scoreRunResult } from "../../../src/scoring/index.js";
 import { buildSparseIndex } from "../../../src/scoring/sparse-index.js";
 import { runDeepEval } from "../../../src/scoring/deep-eval.js";
 import { computeCategoryScore } from "../../../src/scoring/category-score.js";
@@ -188,6 +188,7 @@ describe("scoreResults", () => {
   it("excludes failed results from average", async () => {
     const output = makeRunOutput();
     output.results[0].output.metadata.exitCode = 1;
+    output.results[0].output.result = null;
     output.summary.completed = 0;
     output.summary.failed = 1;
 
@@ -231,6 +232,7 @@ describe("scoreResults", () => {
       const output = makeRunOutput();
       output.results[0].output.metadata.exitCode = 1;
       output.results[0].output.metadata.error = "Authentication required";
+      output.results[0].output.result = null;
 
       const scored = await scoreResults(output);
       const score = scored.results[0].score;
@@ -263,6 +265,7 @@ describe("scoreResults", () => {
       output.results[0].judge = [{ check: "Did the thing", weight: 1.0 }];
       output.results[0].output.metadata.exitCode = 1;
       output.results[0].output.metadata.error = "Authentication required";
+      output.results[0].output.result = null;
 
       const scored = await scoreResults(output);
       const criteria = scored.results[0].score.goalAchievement.criteria;
@@ -276,6 +279,7 @@ describe("scoreResults", () => {
       const output = makeRunOutput();
       output.results[0].judge = "Agent should echo prompt";
       output.results[0].output.metadata.exitCode = 1;
+      output.results[0].output.result = null;
 
       const scored = await scoreResults(output);
       const criteria = scored.results[0].score.goalAchievement.criteria;
@@ -283,6 +287,56 @@ describe("scoreResults", () => {
       expect(criteria).toHaveLength(1);
       expect(criteria[0].check).toBe("Agent should echo prompt");
       expect(criteria[0].score).toBe(0);
+    });
+
+    it("does not treat a run with a result as failed, even with non-zero exit code", async () => {
+      // ACP agents (e.g. opencode) are SIGTERM'd after completing successfully;
+      // the process exits via signal so exitCode is null → resolved as 1, but
+      // the run produced a result and should be scored normally.
+      const output = makeRunOutput();
+      output.results[0].output.metadata.exitCode = 1;
+      // result is already set to "Completed" by makeRunOutput
+
+      const scored = await scoreResults(output);
+
+      expect(scored.results[0].score.axisScore).not.toBe(0);
+      expect(scoreGoalAchievement).toHaveBeenCalled();
+    });
+
+    it("does not treat an empty-string result as failed", async () => {
+      const output = makeRunOutput();
+      output.results[0].output.metadata.exitCode = 1;
+      output.results[0].output.result = "";
+
+      const scored = await scoreResults(output);
+
+      expect(scored.results[0].score.axisScore).not.toBe(0);
+      expect(scoreGoalAchievement).toHaveBeenCalled();
+    });
+
+    it("treats a run with a result AND an error as failed", async () => {
+      const output = makeRunOutput();
+      output.results[0].output.metadata.exitCode = 1;
+      output.results[0].output.metadata.error = "Something went wrong";
+      // result is set by makeRunOutput, but the error should still flag it
+
+      const scored = await scoreResults(output);
+
+      expect(scored.results[0].score.axisScore).toBe(0);
+      expect(scoreGoalAchievement).not.toHaveBeenCalled();
+    });
+
+    it("emits failed progress for failed runs", async () => {
+      const output = makeRunOutput();
+      output.results[0].output.metadata.exitCode = 1;
+      output.results[0].output.result = null;
+      const onProgress = vi.fn();
+
+      await scoreRunResult(output.results[0], { onProgress });
+
+      expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "start");
+      expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "failed");
+      expect(onProgress).not.toHaveBeenCalledWith("test-scenario", "claude-code", "done");
     });
   });
 });

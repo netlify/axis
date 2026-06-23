@@ -28,6 +28,7 @@ export interface ResultEntry {
   agentName: string;
   durationMs: number;
   exitCode: number;
+  failed?: boolean;
   tokenUsage?: TokenUsage;
   totalCostUsd?: number;
   score?: ScoreResult;

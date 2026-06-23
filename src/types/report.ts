@@ -24,6 +24,8 @@ export interface ReportResultEntry {
   agentName: string;
   durationMs: number;
   exitCode: number;
+  /** Failure classification computed before the manifest is flattened. */
+  failed?: boolean;
   tokenUsage?: TokenUsage;
   totalCostUsd?: number;
   score?: ScoreResult;

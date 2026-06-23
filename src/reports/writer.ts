@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { RunOutput, RunResult } from "../types/output.js";
-import { isScoredResult } from "../types/output.js";
+import { isFailedRun, isScoredResult } from "../types/output.js";
 import type { ScoredOutput, ScoredRunResult, SparseIndex } from "../types/scoring.js";
 import type { ReportManifest, ReportResultEntry } from "../types/report.js";
 import { generateReportHtml } from "./html.js";
@@ -151,6 +151,7 @@ function buildResultEntry(result: RunResult | ScoredRunResult, relPath: string):
     agentName: result.agentName,
     durationMs: result.output.metadata.durationMs,
     exitCode: result.output.metadata.exitCode,
+    failed: isFailedRun(result.output),
     file: relPath,
   };
 

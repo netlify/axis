@@ -7,7 +7,7 @@ import { getAdapter, registerAdapter } from "../adapters/registry.js";
 import { runLifecyclePhase } from "./lifecycle.js";
 import { captureArtifacts, resolveArtifactPatterns } from "./artifacts.js";
 import type { ResolvedRunConfig, RunOutput, RunResult, Logger, JobState, JobStatus } from "../types/output.js";
-import { silentLogger as defaultLogger, formatError } from "../types/output.js";
+import { silentLogger as defaultLogger, formatError, isFailedRun } from "../types/output.js";
 import type { Scenario } from "../types/scenario.js";
 import type { AgentConfig, AxisConfig, ResolvedSkill, ScenarioLimitsConfig } from "../types/config.js";
 import { resolveSkills } from "../skills/resolver.js";
@@ -707,7 +707,7 @@ async function executeJob(
     promoteToRunning(index);
 
     const durationMs = output.metadata.durationMs || Date.now() - jobStart;
-    const failed = output.metadata.exitCode !== 0 || !!output.metadata.error;
+    const failed = isFailedRun(output);
     updateStatus(index, failed ? "failed" : "done", durationMs);
 
     const result: RunResult = {
@@ -849,7 +849,7 @@ function buildFailedResult(job: Job, error: string): RunResult {
 }
 
 function buildOutput(runStart: number, results: RunResult[], skippedCount = 0): RunOutput {
-  const completed = results.filter((r) => r.output.metadata.exitCode === 0 && !r.output.metadata.error).length;
+  const completed = results.filter((r) => !isFailedRun(r.output)).length;
 
   return {
     version: "0.1.0",

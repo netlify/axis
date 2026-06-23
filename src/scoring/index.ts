@@ -10,6 +10,7 @@ import type {
   ScoreResult,
   ScoringOptions,
 } from "../types/scoring.js";
+import { isFailedRun } from "../types/output.js";
 import { normalizeTranscript, toTranscriptAnalysis } from "../transcript/normalize.js";
 import { writeScenarioRawData } from "../reports/writer.js";
 import { scoreGoalAchievement } from "./goal-achievement.js";
@@ -60,9 +61,9 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   // Short-circuit: runs that failed entirely shouldn't be graded on process
   // quality — there's no process to grade. Without this, empty-transcript runs
   // get perfect-score defaults in env/service/agent because nothing was audited.
-  if (isFailedRun(result)) {
+  if (isFailedRun(result.output)) {
     const score = buildZeroScore(result, weights, sparseIndex.lines.length > 0 ? sparseIndex : undefined, judgeAgent);
-    options?.onProgress?.(result.scenarioKey, result.agentName, "done");
+    options?.onProgress?.(result.scenarioKey, result.agentName, "failed");
     result.output.transcriptAnalysis = toTranscriptAnalysis(normalized);
     return {
       scenarioKey: result.scenarioKey,
@@ -157,7 +158,7 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
  * Assemble a ScoredOutput from run metadata and scored results.
  */
 export function buildScoredOutput(runOutput: RunOutput, scoredResults: ScoredRunResult[]): ScoredOutput {
-  const completedResults = scoredResults.filter((r) => r.output.metadata.exitCode === 0);
+  const completedResults = scoredResults.filter((r) => !isFailedRun(r.output));
   const averageAxisScore =
     completedResults.length > 0
       ? completedResults.reduce((sum, r) => sum + r.score.axisScore, 0) / completedResults.length
@@ -185,11 +186,6 @@ export async function scoreResults(runOutput: RunOutput, options?: ScoringOption
   const scoredResults = await Promise.all(runOutput.results.map((r) => scoreRunResult(r, options)));
 
   return buildScoredOutput(runOutput, scoredResults);
-}
-
-function isFailedRun(result: RunResult): boolean {
-  const { exitCode, error } = result.output.metadata;
-  return exitCode !== 0 || Boolean(error);
 }
 
 function buildZeroScore(

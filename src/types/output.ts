@@ -2,7 +2,6 @@ import type { AgentOutput } from "./agent.js";
 import type { AgentConfig, McpServerConfig, ScenarioLimitsConfig } from "./config.js";
 import type { JudgeCriterion, LifecycleAction } from "./scenario.js";
 import type { ScoredRunResult } from "./scoring.js";
-
 /** Materialized scenario configuration for a single run — limits, skills, lifecycle, and MCP, with defaults already applied. */
 export interface ResolvedRunConfig {
   limits?: ScenarioLimitsConfig;
@@ -125,4 +124,23 @@ export function isScoredResult(result: BaseRunResult): result is ScoredRunResult
 export function formatError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+/**
+ * Determine whether an agent run should be treated as failed for scoring and
+ * reporting purposes.
+ *
+ * A run with a {@link AgentOutput.result} is considered successful unless it
+ * also carries an error — this covers ACP-based agents (opencode, gemini
+ * --acp, …) that are SIGTERM'd after completing successfully: the process
+ * exits via signal so `exitCode` is non-zero, but the run produced a result
+ * and should be scored normally.
+ *
+ * Runs without a result are failed when either `exitCode` is non-zero or an
+ * explicit `error` is present (timeouts, crashes, mid-run kills, …).
+ */
+export function isFailedRun(output: AgentOutput): boolean {
+  const { exitCode, error } = output.metadata;
+  if (output.result !== null) return Boolean(error);
+  return exitCode !== 0 || Boolean(error);
 }
