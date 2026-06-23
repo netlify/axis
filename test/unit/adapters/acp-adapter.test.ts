@@ -560,14 +560,18 @@ describe("createAcpBasedAdapter", () => {
     expect(output.metadata.error).toBe("Connection lost");
   });
 
-  it("handles non-zero exit code with no result", async () => {
+  it("treats a clean completion with no assistant text as success despite a non-zero exit", async () => {
+    // Agent finished its turn (end_turn) but produced only tool calls, so there
+    // is no final message; the CLI then exits non-zero. The terminal result is
+    // the success signal, so a non-zero exit must not fabricate a failure.
     mockSpawn.mockImplementation((() => createMockProcess(1)) as any);
     mockPrompt.mockResolvedValue({ stopReason: "end_turn" });
 
     const output = await adapter.run(makeInput());
 
-    expect(output.metadata.exitCode).toBe(1);
     expect(output.result).toBeNull();
+    expect(output.metadata.error).toBeUndefined();
+    expect(output.metadata.exitCode).toBe(0);
   });
 
   it("calls prepare before spawning", async () => {

@@ -451,15 +451,18 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         };
       }
 
-      // 19. Build result. When we killed the child after a clean completion, its
-      // non-zero exit code is our doing — trust the terminal result instead, so
-      // don't surface an exit-code error and normalise the code to success.
-      const killedAfterCompletion = (timedOut || abortedBySignal) && completedCleanly;
+      // 19. Build result. A run that reached a terminal result is a success even
+      // if the child then exited non-zero: we close stdin and SIGTERM a lingering
+      // CLI (and its process group) during cleanup, so a non-zero/signal exit is
+      // our own doing — not a failure. Only fabricate an exit-code error when the
+      // agent did NOT complete cleanly. This also covers a clean turn that emitted
+      // only tool calls and no final text (lastAssistantMessage stays null),
+      // which must not be flagged just because cleanup left a non-zero exit code.
       let error = state.resultError ?? undefined;
-      if (!error && !killedAfterCompletion && exitCode !== 0 && !state.lastAssistantMessage) {
+      if (!error && !completedCleanly && exitCode !== 0 && !state.lastAssistantMessage) {
         error = stderr || "Agent process exited with non-zero code";
       }
-      const reportedExitCode = killedAfterCompletion ? (error ? 1 : 0) : exitCode;
+      const reportedExitCode = completedCleanly ? (error ? 1 : 0) : exitCode;
 
       const metadata: AgentMetadata = {
         startTime: startTime.toISOString(),
