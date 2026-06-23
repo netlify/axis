@@ -200,6 +200,9 @@ export function renderReport(report: ReportData): string {
     <div class="container">
       ${renderHeader(orderedReport)}
       ${renderResultsSection(orderedReport)}
+      <footer class="report-footer">
+        AXIS is OSS maintained by <a href="https://www.netlify.com" target="_blank" rel="noopener">Netlify</a> and the open source contributors.
+      </footer>
     </div>
     ${renderModals(orderedResults)}`;
 }

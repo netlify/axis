@@ -1755,6 +1755,22 @@ a.wf-id.interaction-link { color: var(--text); }
 .markdown-body th, .markdown-body td { border: 1px solid var(--border-light); padding: 4px 8px; text-align: left; }
 .markdown-body a { color: var(--text); text-decoration: underline; }
 
+/* ── Footer ─────────────────────────────────────────── */
+
+.report-footer {
+  margin-top: 64px;
+  padding: 24px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.8125rem;
+  color: var(--text);
+  text-align: center;
+}
+
+.report-footer a {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 /* ── Responsive ─────────────────────────────────────── */
 
 @media (max-width: 768px) {

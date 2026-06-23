@@ -375,7 +375,7 @@ export default {
     <a href="#lifecycle-environment-variables"><code>AXIS_*</code> environment variables</a> let
     the command branch on agent, scenario, variant, etc.
   </p>
-  <table>
+  <table class="table-fields">
     <thead>
       <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
     </thead>
@@ -384,7 +384,7 @@ export default {
         <td><code>action</code></td>
         <td><code>"run_script"</code></td>
         <td><span class="req-yes">Yes</span></td>
-        <td>Discriminator.</td>
+        <td></td>
       </tr>
       <tr>
         <td><code>command</code></td>
@@ -405,7 +405,7 @@ export default {
     This is the recommended way to stage fixtures &mdash; faster and clearer than the equivalent
     <code>cp -R</code> command, and portable across operating systems.
   </p>
-  <table>
+  <table class="table-fields">
     <thead>
       <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
     </thead>
@@ -414,7 +414,7 @@ export default {
         <td><code>action</code></td>
         <td><code>"copy"</code></td>
         <td><span class="req-yes">Yes</span></td>
-        <td>Discriminator.</td>
+        <td></td>
       </tr>
       <tr>
         <td><code>match</code></td>
@@ -463,7 +463,7 @@ export default {
     Setup and teardown scripts run with the workspace as their working directory. The following
     environment variables are available inside <code>run_script</code> commands:
   </p>
-  <table>
+  <table class="table-fields">
     <thead>
       <tr>
         <th>Variable</th>

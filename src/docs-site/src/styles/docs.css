@@ -178,11 +178,10 @@ body {
 
 .site-shell-inner {
   display: flex;
-  /* Use 100vw (same reference as the sticky header) so centering matches exactly */
-  width: min(1200px, 100vw);
-  margin-left: max(0px, calc((100vw - 1200px) / 2));
-  padding: 60px 32px;
-  gap: 60px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 32px 60px 0;
   align-items: start;
 }
 
@@ -193,6 +192,7 @@ body {
   border: 1px solid #9da7b2;
   border-radius: 10px;
   padding: 10px;
+  margin-right: 60px;
   width: 220px;
   flex-shrink: 0;
   position: sticky;
@@ -211,7 +211,7 @@ body {
 
 .sidebar-link {
   display: block;
-  padding: 14px;
+  padding: 8px 14px;
   font-size: 14px;
   font-weight: 400;
   font-family: "Instrument Sans", sans-serif;
@@ -229,7 +229,6 @@ body {
 
 .sidebar-link.active {
   background: #f6f6f7;
-  border-color: #353a3e;
   font-weight: 400;
 }
 
@@ -256,7 +255,7 @@ body {
 }
 
 .sidebar-section-label {
-  padding: 14px 14px 6px;
+  padding: 22px 14px 6px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -265,13 +264,17 @@ body {
   font-family: "Instrument Sans", sans-serif;
 }
 
+.sidebar-section-label:first-child {
+  padding-top: 6px;
+}
+
 /* --- Main content --- */
 
 .main-content {
   flex: 1;
   min-width: 0;
-  padding: 40px 0 80px;
-  max-width: 680px;
+  padding: 0 0 80px;
+  max-width: 920px;
 }
 
 /* --- Typography --- */
@@ -566,8 +569,45 @@ tbody tr:hover {
   background: var(--light-gray);
 }
 
+.table-fields {
+  table-layout: fixed;
+}
+
+/* Field / Variable / Format / etc. — first column */
+.table-fields th:nth-child(1),
+.table-fields td:nth-child(1) {
+  width: 20%;
+}
+
+/* Type / Loader / Example / etc. — second column */
+.table-fields th:nth-child(2),
+.table-fields td:nth-child(2) {
+  width: 20%;
+}
+
+/* Required column (only present in 4-col tables) — narrow.
+   For 3-col tables the 3rd column IS the last child and absorbs remaining space. */
+.table-fields th:nth-child(3):not(:last-child),
+.table-fields td:nth-child(3):not(:last-child) {
+  width: 12%;
+}
+
+/* Long-form column (Description / Behavior / etc.) wraps cleanly */
+.table-fields th:last-child,
+.table-fields td:last-child {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
 .table-fields td:first-child {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-fields td:nth-child(2) {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Required badge */
