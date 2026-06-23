@@ -260,12 +260,13 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         if (signalKillTimer) clearTimeout(signalKillTimer);
       });
 
-      // Set once `connection.prompt()` returns a genuine terminal result
-      // (any stop reason other than `cancelled`). The agent finishing is the
-      // real completion signal — not the child process exiting. The CLI, or a
-      // subprocess it spawned (e.g. `node --test`), can linger for minutes
-      // after the final `prompt_result`. When that lingering races the timeout
-      // or an abort, the run is still a success and must be recorded as one.
+      // Set once `connection.prompt()` returns a genuine terminal result (any
+      // stop reason other than `cancelled`). The agent finishing — not the child
+      // process exiting — is the real success signal: ACP CLIs (and subprocesses
+      // they spawn, e.g. `node --test`) can exit non-zero or via our cleanup
+      // SIGTERM after a clean turn, so this guards the normal-exit path below from
+      // fabricating an error for a run that actually completed. A timeout or abort
+      // is still a hard cutoff and fails regardless (see the paths below).
       let completedCleanly = false;
 
       // The ACP SDK calls `console.error` directly whenever a request handler
@@ -412,10 +413,10 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       const exitCode = await exitPromise;
       const endTime = new Date();
 
-      // 18. Timeout path — only when the agent did NOT reach a terminal result.
-      // If it completed before/while we killed the child, fall through to the
-      // success path below so the result and token usage aren't discarded.
-      if (timedOut && !completedCleanly) {
+      // 18. Timeout path. A scenario time limit is a hard cap, so reaching it is
+      // a failure even if a terminal result lands in the same instant we tear the
+      // child down — but still attribute any token usage observed before the cut.
+      if (timedOut) {
         return {
           transcript,
           result: null,
@@ -431,11 +432,10 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
         };
       }
 
-      // 18b. Abort path (external signal from runner limits / Ctrl-C). Same rule:
-      // a run that completed before the abort is a success. Otherwise attribute
-      // any token usage observed before the abort so a cut-off run still reports
-      // what it spent.
-      if (abortedBySignal && !completedCleanly) {
+      // 18b. Abort path (external signal from runner limits / Ctrl-C). Like the
+      // timeout above, a limit or cancel is a hard cutoff: it fails even on a
+      // last-instant completion. Attribute any token usage observed before it.
+      if (abortedBySignal) {
         return {
           transcript,
           result: null,

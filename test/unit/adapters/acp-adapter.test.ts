@@ -884,13 +884,14 @@ describe("createAcpBasedAdapter", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Completion vs. timeout / abort racing the agent finishing.
+  // Timeout / abort racing the agent finishing.
   //
-  // Regression coverage for Gemini runs that finished (terminal
-  // prompt_result / end_turn) but were recorded as "Scenario time limit
-  // reached" failures with a zeroed score and 0 tokens — because the CLI (or a
-  // subprocess like `node --test`) lingered and the timeout/abort fired right
-  // after the agent completed.
+  // A scenario time/token limit (or Ctrl-C) is a hard cutoff: when it fires the
+  // run fails even if a terminal prompt_result lands in the same instant — but
+  // the token usage observed before the cut is still attributed. (The original
+  // false-timeout bug — runs killed at 10m instead of the configured limit — is
+  // fixed by honouring input.timeoutMs and reaping the process tree, covered by
+  // the tests below.)
   // -------------------------------------------------------------------------
 
   /**
@@ -926,13 +927,13 @@ describe("createAcpBasedAdapter", () => {
     return proc;
   }
 
-  it("records a completed run when the timeout fires after the agent finishes", async () => {
+  it("fails as a timeout even if a terminal result lands after the cutoff, attributing usage", async () => {
     vi.useFakeTimers();
 
     mockSpawn.mockImplementation((() => createLingeringProcess(4242)) as any);
 
     // The prompt sends its final message, then parks until we release it —
-    // simulating the agent having finished while the child lingers.
+    // simulating the agent finishing in the same instant the timeout fires.
     let releasePrompt!: () => void;
     const gate = new Promise<void>((r) => {
       releasePrompt = r;
@@ -954,19 +955,18 @@ describe("createAcpBasedAdapter", () => {
     await vi.advanceTimersByTimeAsync(0);
     // Fire the timeout — tears down the lingering child.
     await vi.advanceTimersByTimeAsync(600);
-    // The agent's terminal result lands right after.
+    // The agent's terminal result lands right after the cutoff.
     releasePrompt();
 
     const output = await runPromise;
 
-    // Success, not a timeout failure: real result, real usage, exit 0.
-    expect(output.metadata.error).toBeUndefined();
-    expect(output.metadata.exitCode).toBe(0);
+    // Hard cutoff: a failure even though a result arrived — but usage is kept.
+    expect(output.result).toBeNull();
+    expect(output.metadata.error).toMatch(/timed out after 0\.6s/i);
     expect(output.metadata.tokenUsage).toEqual({ input: 285071, output: 4742 });
-    expect(output.result).toBe("All tests pass.");
   });
 
-  it("records a completed run when an abort signal fires after the agent finishes", async () => {
+  it("fails on abort even if a terminal result lands after the cutoff, attributing usage", async () => {
     vi.useFakeTimers();
 
     mockSpawn.mockImplementation((() => createLingeringProcess(4243)) as any);
@@ -996,10 +996,9 @@ describe("createAcpBasedAdapter", () => {
 
     const output = await runPromise;
 
-    expect(output.metadata.error).toBeUndefined();
-    expect(output.metadata.exitCode).toBe(0);
+    expect(output.result).toBeNull();
+    expect(output.metadata.error).toBe("Scenario token limit reached (500000 tokens)");
     expect(output.metadata.tokenUsage).toEqual({ input: 758017, output: 13569 });
-    expect(output.result).toBe("Resource config applied.");
   });
 
   it("still fails as a timeout when no terminal result arrives, honouring input.timeoutMs", async () => {
