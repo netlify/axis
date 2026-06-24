@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.1](https://github.com/netlify/axis/compare/v1.16.0...v1.16.1) (2026-06-23)
+
+
+### Bug Fixes
+
+* improving docs styling ([c032e24](https://github.com/netlify/axis/commit/c032e24f178d9b6125b3b021e890305ee7b0640c))
+
 ## [1.16.0](https://github.com/netlify/axis/compare/v1.15.4...v1.16.0) (2026-06-23)
 
 
