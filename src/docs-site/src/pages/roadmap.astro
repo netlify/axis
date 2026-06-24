@@ -1,0 +1,147 @@
+---
+import DocsLayout from "../layouts/DocsLayout.astro";
+---
+
+<DocsLayout
+  title="Roadmap"
+  description="What AXIS just shipped and what is coming next: context relevance scoring, audits, context heatmaps, interactive workflows, and more."
+  active="roadmap"
+>
+  <h1>Roadmap</h1>
+  <p class="lead">
+    AXIS is moving agent testing past pass or fail. Here is what we have recently shipped and
+    what we are building next. This page is a living document, so expect it to change as
+    priorities shift and as the community weighs in.
+  </p>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Help shape it</div>
+    <p>
+      Have a use case we are missing, or want to weigh in on what comes next? Open an issue or
+      start a discussion on <a href="https://github.com/netlify/axis">GitHub</a>. The roadmap
+      below reflects our current thinking, not a commitment to dates or ordering.
+    </p>
+  </div>
+
+  <h2 id="recently-shipped">Recently shipped</h2>
+
+  <div class="roadmap-shipped">
+    <div class="roadmap-card-head">
+      <span class="roadmap-status roadmap-status-shipped">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <path d="M2.5 6.5L5 9L9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        Shipped
+      </span>
+    </div>
+    <h3 class="roadmap-card-title">Multi-dimensional evals, not just pass or fail</h3>
+    <p class="roadmap-card-desc">
+      A green check tells you the agent finished. It does not tell you whether it thrashed,
+      called the wrong tools, or burned tokens getting there. AXIS scores the <em>quality</em>
+      of the agent experience across four independent dimensions, so a single run shows you not
+      only <em>whether</em> the agent succeeded but <em>how well</em> it worked with your system.
+    </p>
+    <div class="roadmap-dim-row">
+      <span class="roadmap-dim roadmap-dim-goal">Goal Achievement</span>
+      <span class="roadmap-dim roadmap-dim-env">Environment</span>
+      <span class="roadmap-dim roadmap-dim-svc">Service</span>
+      <span class="roadmap-dim roadmap-dim-agent">Agent</span>
+    </div>
+    <p class="roadmap-card-link">
+      <a href="/scoring">Read about the scoring framework &rarr;</a>
+    </p>
+  </div>
+
+  <h2 id="next-up">Next up</h2>
+  <p>
+    These are the capabilities we are actively designing and building. Each one extends AXIS from
+    scoring a single run toward understanding the full surface your agents touch.
+  </p>
+
+  <div class="roadmap-grid">
+    <article class="roadmap-item">
+      <div class="roadmap-card-head">
+        <span class="roadmap-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6" />
+            <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span class="roadmap-status roadmap-status-building">In progress</span>
+      </div>
+      <h3 class="roadmap-card-title">Context relevance scoring</h3>
+      <p class="roadmap-card-desc">
+        Was the context the agent pulled in actually relevant to the task? Relevance scoring looks
+        at the docs, skills, and files an agent loaded and measures how much of it mattered, so you
+        can spot context that is padding the window without earning its place.
+      </p>
+    </article>
+
+    <article class="roadmap-item">
+      <div class="roadmap-card-head">
+        <span class="roadmap-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M5 3.5h7l3 3V16.5H5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <path d="M7.5 9.5L9 11l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span class="roadmap-status roadmap-status-building">In progress</span>
+      </div>
+      <h3 class="roadmap-card-title">Audits</h3>
+      <p class="roadmap-card-desc">
+        Point AXIS at your docs and other context sources and get back a review of issues and
+        misalignment: stale instructions, contradictions, gaps, and guidance that steers agents
+        the wrong way. Audits catch problems in the material itself, before an agent ever reads it.
+      </p>
+    </article>
+
+    <article class="roadmap-item">
+      <div class="roadmap-card-head">
+        <span class="roadmap-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="3" y="3" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.5" />
+            <rect x="3" y="12.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.5" />
+            <rect x="12.5" y="3" width="4.5" height="4.5" rx="1" fill="currentColor" opacity="0.25" stroke="currentColor" stroke-width="1.5" />
+            <rect x="12.5" y="12.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </span>
+        <span class="roadmap-status roadmap-status-planned">Planned</span>
+      </div>
+      <h3 class="roadmap-card-title">Context heatmaps</h3>
+      <p class="roadmap-card-desc">
+        Across all of your scenarios and the context they exercise, which parts are actually being
+        tested and which parts are never touched by anything? Heatmaps show coverage at a glance, so
+        you can find untested surface area and dead context that no scenario relies on.
+      </p>
+    </article>
+
+    <article class="roadmap-item">
+      <div class="roadmap-card-head">
+        <span class="roadmap-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="6" cy="6" r="2.5" stroke="currentColor" stroke-width="1.5" />
+            <circle cx="14" cy="14" r="2.5" stroke="currentColor" stroke-width="1.5" />
+            <path d="M6 8.5v3.5a2 2 0 002 2h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span class="roadmap-status roadmap-status-planned">Planned</span>
+      </div>
+      <h3 class="roadmap-card-title">Interactive workflows</h3>
+      <p class="roadmap-card-desc">
+        Not every task is fully autonomous. Interactive workflows bring a human into the loop,
+        letting you pause a run for input, approve a step, or steer the agent mid-task, then score
+        the collaboration the same way AXIS scores everything else.
+      </p>
+    </article>
+  </div>
+
+  <div class="roadmap-more">
+    <span class="roadmap-more-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+    <h3 class="roadmap-more-title">And more to come</h3>
+    <p class="roadmap-more-desc">
+      This is just what is on deck. We are actively exploring more ways to measure and improve the
+      agent experience. Tell us what would help most.
+    </p>
+    <a class="roadmap-more-cta" href="https://github.com/netlify/axis">Share an idea on GitHub &rarr;</a>
+  </div>
+</DocsLayout>

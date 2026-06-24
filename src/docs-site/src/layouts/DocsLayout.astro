@@ -4,7 +4,7 @@ import "../styles/docs.css";
 interface Props {
   title: string;
   description?: string;
-  active: "overview" | "quickstart" | "scoring" | "scenarios" | "running" | "agents" | "reports" | "cli" | "configuration";
+  active: "overview" | "quickstart" | "scoring" | "scenarios" | "running" | "agents" | "reports" | "cli" | "configuration" | "roadmap";
   landing?: boolean;
 }
 
@@ -96,6 +96,7 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site).href;
             <div class="sidebar-section-label">Reference</div>
             <a href="/cli" class:list={["sidebar-link", { active: active === "cli" }]}>CLI</a>
             <a href="/configuration" class:list={["sidebar-link", { active: active === "configuration" }]}>Configuration</a>
+            <a href="/roadmap" class:list={["sidebar-link", { active: active === "roadmap" }]}>Roadmap</a>
           </nav>
         </aside>
 
