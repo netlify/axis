@@ -2854,6 +2854,10 @@ details.example-collapse .example-body pre {
 
 .lp-contrib-cta {
   margin-top: 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* ── Footer CTA ──────────────────────────────────────── */
