@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.17.0](https://github.com/netlify/axis/compare/v1.16.2...v1.17.0) (2026-06-24)
+
+
+### Features
+
+* add roadmap page ([5e8f751](https://github.com/netlify/axis/commit/5e8f751cc221366f30208ce6da8db15b4793b92f))
+* roadmap update ([a802e87](https://github.com/netlify/axis/commit/a802e878036f8521150a5842e7612ac4afbbbb04))
+
+
+### Bug Fixes
+
+* loosen up some language for contributors ([7fe6fe0](https://github.com/netlify/axis/commit/7fe6fe06f7eeb7275cdface048cc63cfc4868118))
+
 ## [1.16.2](https://github.com/netlify/axis/compare/v1.16.1...v1.16.2) (2026-06-24)
 
 
