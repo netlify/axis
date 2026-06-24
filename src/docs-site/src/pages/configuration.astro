@@ -80,10 +80,11 @@ const mcpExample = `{
 
   <h2 id="config-formats">Config File Formats</h2>
   <p>
-    AXIS resolves the config file by extension, in priority order:
+    AXIS auto-resolves the config file by extension, in priority order:
     <code>axis.config.ts</code> &rarr; <code>axis.config.js</code> &rarr;
-    <code>axis.config.mjs</code> &rarr; <code>axis.config.json</code>. Use
-    <code>--config &lt;path&gt;</code> to point at a specific file.
+    <code>axis.config.mjs</code> &rarr; <code>axis.config.json</code>. Other extensions
+    (<code>.cjs</code>, <code>.mts</code>, <code>.cts</code>) are not auto-discovered, but they load
+    correctly when pointed at explicitly with <code>--config &lt;path&gt;</code>.
   </p>
   <table class="table-fields">
     <thead>
@@ -97,17 +98,27 @@ const mcpExample = `{
       <tr>
         <td><code>.json</code></td>
         <td>Native JSON parse</td>
-        <td>Static config, no executable logic.</td>
+        <td>Auto-discovered. Static config, no executable logic.</td>
       </tr>
       <tr>
-        <td><code>.js</code> / <code>.mjs</code> / <code>.cjs</code></td>
+        <td><code>.js</code> / <code>.mjs</code></td>
         <td>Native dynamic import</td>
-        <td>ESM module. Default export is the config object or a function returning one.</td>
+        <td>Auto-discovered. ESM module; default export is the config object or a function returning one.</td>
       </tr>
       <tr>
-        <td><code>.ts</code> / <code>.mts</code> / <code>.cts</code></td>
+        <td><code>.cjs</code></td>
+        <td>Native dynamic import</td>
+        <td>Loads only via <code>--config &lt;path&gt;</code>.</td>
+      </tr>
+      <tr>
+        <td><code>.ts</code></td>
         <td>Loaded via <a href="https://github.com/unjs/jiti" target="_blank" rel="noopener">jiti</a></td>
-        <td>No build step needed. Type-only imports are stripped at runtime.</td>
+        <td>Auto-discovered. No build step needed; type-only imports are stripped at runtime.</td>
+      </tr>
+      <tr>
+        <td><code>.mts</code> / <code>.cts</code></td>
+        <td>Loaded via jiti</td>
+        <td>Loads only via <code>--config &lt;path&gt;</code>.</td>
       </tr>
     </tbody>
   </table>
@@ -128,7 +139,7 @@ const dynamicScenarios: InlineScenario[] = ["alpha", "beta", "gamma"].map((id) =
   key: "smoke-" + id,
   name: "Smoke test " + id,
   prompt: "Do thing for " + id,
-  rubric: [{ check: "Did the thing" }],
+  judge: [{ check: "Did the thing" }],
 }));
 
 export default {
@@ -201,7 +212,7 @@ export default async () => {
         <td><code>settings</code></td>
         <td><code>object</code></td>
         <td><span class="req-no">No</span></td>
-        <td>Concurrency, scoring weight, and limit overrides.</td>
+        <td>Concurrency (<code>concurrency</code>, default <code>15</code>), scoring weight (<code>scoring_weights</code>), and limit overrides (<code>limits</code>).</td>
       </tr>
       <tr>
         <td><code>env</code></td>
@@ -342,6 +353,11 @@ curl -X POST "$SLACK_WEBHOOK" \\
         <td><code>AXIS_OUTPUT</code></td>
         <td>Both</td>
         <td>Path to a per-phase markdown file. Anything written here surfaces in the CLI log.</td>
+      </tr>
+      <tr>
+        <td><code>AXIS_WORKSPACE</code></td>
+        <td>Both</td>
+        <td>Current working directory of the script. For run-level hooks this equals the config directory.</td>
       </tr>
       <tr>
         <td><code>AXIS_REPORT_DIR</code></td>
@@ -550,17 +566,17 @@ curl -X POST "$SLACK_WEBHOOK" \\
 {
   "name": "Expensive task",
   "prompt": "...",
-  "rubric": "...",
+  "judge": "...",
   "limits": { "time_minutes": 30, "tokens": 500000 }
 }`}</code></pre>
 
   <div class="callout callout-warn">
     <div class="callout-title">Token limit accuracy</div>
     <p>
-      Token limits are enforced using a conservative estimate during execution (based on streamed
-      assistant text). The actual token count may slightly exceed the limit before the job is
-      terminated. The authoritative token count from the agent's API is used for overall run
-      limit tracking.
+      Both per-scenario and overall token limits are checked against a conservative streaming
+      estimate (assistant text size during the run), so the actual token count may slightly exceed
+      the limit before the job is terminated. The authoritative token count from the agent's API
+      lands after each job finishes and is reflected in the final report.
     </p>
   </div>
 
@@ -588,8 +604,8 @@ curl -X POST "$SLACK_WEBHOOK" \\
       <tr>
         <td><code>command</code></td>
         <td><code>string</code></td>
-        <td><span class="req-yes">Yes</span></td>
-        <td>Command to start the server process (stdio only).</td>
+        <td><span class="req-yes">Yes (stdio)</span></td>
+        <td>Command to start the server process. Required when <code>type</code> is <code>"stdio"</code>.</td>
       </tr>
       <tr>
         <td><code>args</code></td>
@@ -606,8 +622,8 @@ curl -X POST "$SLACK_WEBHOOK" \\
       <tr>
         <td><code>url</code></td>
         <td><code>string</code></td>
-        <td><span class="req-yes">Yes</span></td>
-        <td>Remote server endpoint URL (http only).</td>
+        <td><span class="req-yes">Yes (http)</span></td>
+        <td>Remote server endpoint URL. Required when <code>type</code> is <code>"http"</code>.</td>
       </tr>
       <tr>
         <td><code>headers</code></td>
@@ -634,8 +650,8 @@ curl -X POST "$SLACK_WEBHOOK" \\
     <tbody>
       <tr>
         <td><code>claude-code</code></td>
-        <td><code>.mcp.json</code></td>
-        <td>Workspace root</td>
+        <td><code>mcp.json</code></td>
+        <td><code>CLAUDE_CONFIG_DIR</code> (under per-job HOME), wired via the <code>--mcp-config</code> CLI flag so the file is never written into the workspace.</td>
       </tr>
       <tr>
         <td><code>codex</code></td>
@@ -719,8 +735,7 @@ curl -X POST "$SLACK_WEBHOOK" \\
   ]
 }`}</code></pre>
   <p>
-    Remote skills are cached in <code>.axis/skills-cache/</code>. Use <code>--refresh-skills</code>
-    to force re-clone.
+    Remote skills are fetched on demand. Use <code>--refresh-skills</code> to force re-clone.
   </p>
 
   <h2>Environment Variables</h2>

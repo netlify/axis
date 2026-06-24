@@ -33,6 +33,13 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <span class="cli-flag-desc">Overwrite existing files.</span>
       </div>
       <div class="cli-flag">
+        <span class="cli-flag-name"><code>--format &lt;format&gt;</code></span>
+        <span class="cli-flag-desc">
+          Config file format: <code>json</code>, <code>js</code>, or <code>ts</code> (default: <code>json</code>).
+          JS and TS scaffolds let you compose the config programmatically.
+        </span>
+      </div>
+      <div class="cli-flag">
         <span class="cli-flag-name"><code>--no-skills</code></span>
         <span class="cli-flag-desc">
           Skip the automatic install of AXIS skills. By default, <code>init</code> runs
@@ -106,7 +113,10 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       </div>
       <div class="cli-flag">
         <span class="cli-flag-name"><code>--compare-baseline [name]</code></span>
-        <span class="cli-flag-desc">Compare against a baseline after scoring.</span>
+        <span class="cli-flag-desc">
+          Compare against a baseline after scoring (default name: <code>default</code>). Exits with
+          code 1 if any regressions are detected.
+        </span>
       </div>
     </div>
   </div>
@@ -144,6 +154,10 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   </div>
 
   <h2><code>axis baseline</code></h2>
+  <p>
+    Every <code>axis baseline</code> subcommand also accepts <code>-c, --config &lt;path&gt;</code> to
+    point at a non-default config file.
+  </p>
 
   <div class="cli-block">
     <div class="cli-command">axis baseline set [name]</div>

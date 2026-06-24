@@ -21,27 +21,29 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     <li><strong>Setup</strong> -Run setup actions defined in the scenario (if any).</li>
     <li><strong>Spawn</strong> -Start the agent process in an isolated workspace.</li>
     <li><strong>Capture</strong> -Stream and record the full interaction transcript.</li>
-    <li><strong>Score</strong> -Evaluate the transcript against the rubric and interaction signals (unless <code>--no-score</code> is set).</li>
+    <li><strong>Score</strong> -Evaluate the transcript against the judge and interaction signals (unless <code>--no-score</code> is set).</li>
     <li><strong>Teardown</strong> -Run teardown actions (if any).</li>
     <li><strong>Save</strong> -Write the result to the report.</li>
   </ol>
   <p>
-    The agent has a 10-minute timeout by default. If the agent does not finish within the timeout,
-    AXIS sends SIGTERM, waits briefly, then SIGKILL. Timed-out runs are marked as failed with a
-    timeout error.
+    Each scenario has a 15-minute timeout by default (configurable via <a href="/configuration#limits"><code>limits.scenario.time_minutes</code></a>
+    or per-scenario <code>limits</code>). If the agent does not finish in time, AXIS sends SIGTERM,
+    waits briefly, then SIGKILL. Timed-out runs are marked as failed with a timeout error.
   </p>
 
   <h2>Supported Agents</h2>
   <p>
-    AXIS supports Claude Code and Codex as default agents, plus every major AI coding agent that
-    speaks the Agent Client Protocol (ACP). See <a href="/agents">Built-in Agents</a> for the full
-    list with required environment variables.
+    AXIS ships native adapters for Claude Code, Codex, and Gemini, plus every major AI coding agent
+    that speaks the Agent Client Protocol (ACP). See <a href="/agents">Built-in Agents</a> for the
+    full list with required environment variables.
   </p>
 
   <h2>Custom Agents</h2>
   <p>
     You can test any agent by creating a custom agent module. Use the <code>createAgentAdapter()</code>
-    factory and register the module in your <a href="/configuration">config</a>.
+    factory for agents that produce NDJSON or plain text streams, or
+    <code>createAcpBasedAdapter()</code> for agents that speak the Agent Client Protocol (any CLI
+    with an <code>--acp</code> mode). Register the module in your <a href="/configuration">config</a>.
   </p>
   <pre><code>{`// adapters/my-agent.ts
 import { createAgentAdapter } from "@netlify/axis";
@@ -99,15 +101,16 @@ export default createAgentAdapter<{ stdout: string }>({
     to prevent configuration leakage and cross-run interference:
   </p>
   <ul>
-    <li><strong>HOME directory:</strong> Set to the workspace to prevent global config leakage.</li>
-    <li><strong>Agent-specific dirs:</strong> <code>CLAUDE_CONFIG_DIR</code>, <code>CODEX_HOME</code>, <code>GEMINI_CLI_HOME</code> are all set to isolated paths.</li>
+    <li><strong>HOME directory:</strong> Set to a per-job <em>sibling</em> directory of the workspace (not the workspace itself), so each agent's own config files (<code>.claude/</code>, <code>.codex/</code>, etc.) live alongside the workspace and never appear in the directory the agent is scanning.</li>
+    <li><strong>Agent-specific dirs:</strong> <code>CLAUDE_CONFIG_DIR</code>, <code>CODEX_HOME</code>, <code>GEMINI_CLI_HOME</code> are all set to isolated paths inside the per-job HOME.</li>
     <li><strong>Environment variables:</strong> Only explicitly listed vars and system essentials (<code>PATH</code>, <code>USER</code>, <code>SHELL</code>, <code>LANG</code>, <code>TERM</code>, <code>TMPDIR</code>) are passed through.</li>
-    <li><strong><code>AXIS_CONFIG_DIR</code>:</strong> Set to the absolute path of the directory containing <code>axis.config.json</code>. Lifecycle scripts and the agent process can use it to reference versioned fixtures or helper scripts. See <a href="/scenarios#lifecycle-environment-variables">Lifecycle environment variables</a>.</li>
+    <li><strong><code>AXIS_CONFIG_DIR</code>:</strong> Set to the absolute path of the directory containing <code>axis.config.&#123;json,ts,js,mjs&#125;</code>. Lifecycle scripts and the agent process can use it to reference versioned fixtures or helper scripts. See <a href="/scenarios#lifecycle-environment-variables">Lifecycle environment variables</a>.</li>
   </ul>
   <p>
-    MCP server configuration files are written into each workspace before the agent spawns, in the
-    format native to each agent CLI. See <a href="/configuration#mcp-servers">MCP Servers</a> in
-    the configuration reference.
+    For NDJSON-style agents, MCP server configuration files are written into each agent's isolated
+    config directory (under the per-job HOME) before spawn, in the format native to each CLI. ACP-
+    based adapters pass MCP servers through the ACP <code>session/new</code> call instead. See
+    <a href="/configuration#mcp-servers">MCP Servers</a> in the configuration reference.
   </p>
 
   <h2>Multi-variant Scenarios</h2>

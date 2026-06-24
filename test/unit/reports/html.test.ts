@@ -114,9 +114,9 @@ describe("generateReportHtml", () => {
 
   it("includes design system colors in CSS", () => {
     const html = generateReportHtml(makeReport());
-    expect(html).toContain("#fafbf9");
-    expect(html).toContain("#016867");
-    expect(html).toContain("#059669");
+    expect(html).toContain("#f6f6f7");
+    expect(html).toContain("#353a3e");
+    expect(html).toContain("#31a855");
     expect(html).toContain("#d97706");
   });
 

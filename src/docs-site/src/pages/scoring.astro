@@ -80,11 +80,12 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   <h2 id="goal-achievement">Goal Achievement</h2>
   <p>
     Goal Achievement is evaluated by a judge that reads the full agent transcript and compares
-    the outcome against the rubric checks you defined in the scenario. Each check receives a
-    score from 0 to 10, which is scaled to 0 to 100 and combined using the check weights.
+    the outcome against the <code>judge</code> checks you defined in the scenario. Each check
+    receives an integer score from 0 to 10. The dimension score is the weighted average of those
+    per-check scores, normalized to the 0 to 100 range.
   </p>
   <p>
-    This is the only dimension driven entirely by your rubric. The other three dimensions are
+    This is the only dimension driven entirely by your judge. The other three dimensions are
     calculated from the agent's interaction transcript using a separate evaluation pipeline.
   </p>
   <p>
@@ -167,8 +168,9 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     <p>
       Some interactions span categories. For example, running <code>curl</code> via bash is both an
       environment interaction (shell command) and a service interaction (network call). Environment
-      tools that target agent-internal paths (like <code>.claude/</code>) are reclassified as agent
-      interactions.
+      tools that target agent-internal paths (<code>.claude/</code>, <code>.codex/</code>,
+      <code>.gemini/</code>, <code>CLAUDE.md</code>, <code>AGENTS.md</code>) are reclassified as
+      agent interactions.
     </p>
   </div>
 
@@ -209,7 +211,11 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       <tr>
         <td><strong>Success</strong></td>
         <td>Judge</td>
-        <td>Did the interaction complete without errors? Were the results usable?</td>
+        <td>
+          For Environment and Service: did the interaction complete without errors? For Agent:
+          did the agent's reasoning produce a coherent next step (tool-call execution success is
+          owned by Environment/Service, so the Agent judge defaults tool-call Success to 1.0).
+        </td>
       </tr>
       <tr>
         <td><strong>Speed</strong></td>
@@ -445,36 +451,47 @@ import DocsLayout from "../layouts/DocsLayout.astro";
   </p>
 
   <h2>Interpreting Scores</h2>
+  <p>
+    Reports color each score band so a quick glance tells you where the run stands. The thresholds
+    below match the colors shown in the HTML report.
+  </p>
   <table class="table-fields">
     <thead>
       <tr>
         <th>Range</th>
+        <th>Color</th>
         <th>Interpretation</th>
       </tr>
     </thead>
     <tbody>
       <tr>
         <td><strong>90 to 100</strong></td>
+        <td>Green</td>
         <td>Excellent. Agent completed the task efficiently with minimal waste.</td>
       </tr>
       <tr>
-        <td><strong>75 to 89</strong></td>
+        <td><strong>80 to 89</strong></td>
+        <td>Yellow</td>
         <td>Good. Task completed with minor inefficiencies or missed optimizations.</td>
       </tr>
       <tr>
-        <td><strong>50 to 74</strong></td>
+        <td><strong>70 to 79</strong></td>
+        <td>Orange</td>
         <td>Fair. Notable issues in execution quality, speed, or unnecessary operations.</td>
       </tr>
       <tr>
-        <td><strong>Below 50</strong></td>
+        <td><strong>Below 70</strong></td>
+        <td>Red</td>
         <td>Poor. Significant failures, errors, or excessive waste in the execution.</td>
       </tr>
     </tbody>
   </table>
 
   <p>
-    When a category score falls below 75, the CLI displays <strong>score insights</strong> that
-    identify the weakest signal, helping you understand where the agent struggled.
+    Separately, when a category score falls below <strong>75</strong>, the CLI displays
+    <strong>score insights</strong> that identify the weakest signal, helping you understand where
+    the agent struggled. The insight threshold is intentionally tighter than the "Good" color band
+    so borderline scores still surface actionable feedback.
   </p>
 
   <script is:inline>

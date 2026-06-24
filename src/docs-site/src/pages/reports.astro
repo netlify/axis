@@ -21,11 +21,12 @@ const ciExample = `# GitHub Actions example
     directory containing a manifest and per-scenario result files.
   </p>
   <pre><code>{`.axis/reports/{reportId}/
-  report.json                          # Manifest with summary + metadata
-  report.html                          # Visual report (after scoring)
-  scenarios/{key}/{agent}.json         # Full result with transcript + scores
-  scenarios/{key}/{agent}.raw.ndjson   # Raw agent stdout
-  scenarios/{key}/{agent}.sparse-index.txt  # Compressed transcript for scoring`}</code></pre>
+  report.json                              # Manifest with summary + metadata
+  report.html                              # Visual report (after scoring)
+  scenarios/{key}/{agent}.json             # Full result with transcript + scores
+  scenarios/{key}/{agent}.raw.ndjson       # Raw agent stdout
+  scenarios/{key}/{agent}.sparse-index.txt # Compressed transcript for scoring
+  scenarios/{key}/{agent}/artifacts/       # Captured files when artifacts is configured`}</code></pre>
 
   <h3>The manifest</h3>
   <p>
@@ -38,7 +39,7 @@ const ciExample = `# GitHub Actions example
   <p>
     Each <code>{`{agent}.json`}</code> file under <code>scenarios/</code> contains the full result
     for one scenario/agent combination: the complete interaction transcript, judge evaluations,
-    per-interaction signal scores, and the rubric assessment.
+    per-interaction signal scores, and the judge assessment.
   </p>
 
   <h2>Viewing Reports</h2>
@@ -65,7 +66,7 @@ npx @netlify/axis reports latest --agent claude-code`}</code></pre>
   <ul>
     <li>Composite and per-dimension score breakdowns with visual indicators.</li>
     <li>The full interaction transcript with tool calls and results.</li>
-    <li>Judge evaluations for each rubric check and interaction signal.</li>
+    <li>Judge evaluations for each judge check and interaction signal.</li>
     <li>Score insights identifying the weakest signals for low-scoring dimensions.</li>
     <li>
       A captured-file tree per run when scenarios configure
@@ -98,8 +99,8 @@ npx @netlify/axis baseline set
 # Save with a name (for multiple baselines)
 npx @netlify/axis baseline set v1.0
 
-# Save from a specific report
-npx @netlify/axis baseline set --from 20260415-143022`}</code></pre>
+# Save from a specific report (report IDs use YYYY-MM-DD-HHMMSS format)
+npx @netlify/axis baseline set --from 2026-04-15-143022`}</code></pre>
 
   <h3>Comparing against a baseline</h3>
   <pre><code>{`# Compare during a run (automatic)
@@ -178,9 +179,9 @@ npx @netlify/axis baseline delete v1.0`}</code></pre>
     control so your team shares the same regression thresholds.
   </p>
   <p>
-    Reports and cached skills should not be committed:
+    Reports and cached remote scenarios should not be committed:
   </p>
   <pre><code>{`# .gitignore
 .axis/reports/
-.axis/skills-cache/`}</code></pre>
+.axis/remotes/`}</code></pre>
 </DocsLayout>

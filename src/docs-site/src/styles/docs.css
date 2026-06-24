@@ -2242,6 +2242,8 @@ details.example-collapse .example-body pre {
   font-weight: 500;
   color: var(--lp-text);
   flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .lp-step-content {
@@ -2259,6 +2261,14 @@ details.example-collapse .example-body pre {
   color: var(--lp-text);
   width: 60px;
   flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.lp-step-prompt {
+  user-select: none;
+  -webkit-user-select: none;
+  opacity: 0.5;
 }
 
 .lp-step-cmd {
@@ -2283,8 +2293,17 @@ details.example-collapse .example-body pre {
   color: var(--lp-text);
   cursor: pointer;
   padding: 6px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lp-step:hover .lp-step-copy,
+.lp-step-copy:focus-visible,
+.lp-step-copy.copied {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .lp-step-copy:hover { background: var(--lp-neutral-200); }

@@ -12,7 +12,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
 
   <h2>Anatomy of a Scenario</h2>
   <p>
-    A scenario is an object with a name, prompt, rubric, and optional lifecycle hooks. The same
+    A scenario is an object with a name, prompt, judge, and optional lifecycle hooks. The same
     shape applies whether you author it as JSON, a JavaScript or TypeScript module, or an inline
     entry in <code>axis.config.&#123;js,ts&#125;</code>. See
     <a href="#authoring">Authoring Scenarios</a> below for the available formats.
@@ -41,10 +41,10 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <td>The task description sent to the agent.</td>
       </tr>
       <tr>
-        <td><code>rubric</code></td>
+        <td><code>judge</code></td>
         <td><code>string | object[]</code></td>
         <td><span class="req-yes">Yes</span></td>
-        <td>Success criteria: a plain string or array of weighted checks.</td>
+        <td>Success criteria for the LLM judge: a plain string or array of weighted checks.</td>
       </tr>
       <tr>
         <td><code>setup</code></td>
@@ -97,7 +97,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
           stored under <code>.axis/reports/&lt;id&gt;/scenarios/&lt;key&gt;/&lt;agent&gt;/artifacts/</code>
           and embedded in the HTML report so they can be previewed and downloaded directly. Patterns
           support <code>*</code>, <code>**</code>, <code>?</code>, and character classes. Merged with
-          top-level <a href="/configuration"><code>artifacts</code></a>.
+          top-level <a href="/configuration"><code>artifacts</code></a> (duplicates deduplicated).
         </td>
       </tr>
       <tr>
@@ -130,7 +130,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       <pre><code>{`{
   "name": "Debug and fix a broken script",
   "prompt": "There is a JavaScript file at src/add.js that has a bug. Find it, fix it, and verify the fix by running the test.",
-  "rubric": [
+  "judge": [
     { "check": "Agent identified the bug (subtraction instead of addition)", "weight": 0.3 },
     { "check": "Agent fixed the bug so add(a, b) returns a + b", "weight": 0.4 },
     { "check": "Agent ran the test and it passed", "weight": 0.3 }
@@ -165,7 +165,7 @@ import type { ScenarioInput } from "@netlify/axis";
 export default {
   name: "Refactor a buggy add() function",
   prompt: "There is a bug in src/add.js. Find it, fix it, and verify the fix.",
-  rubric: [
+  judge: [
     { check: "Agent identified the bug", weight: 0.3 },
     { check: "Fix is correct", weight: 0.4 },
     { check: "Verification was run", weight: 0.3 },
@@ -178,7 +178,7 @@ export default {
 export default async () => ({
   name: "Dynamic scenario",
   prompt: "Run task for " + (process.env.TARGET_ENV ?? "staging"),
-  rubric: [{ check: "Task ran cleanly" }],
+  judge: [{ check: "Task ran cleanly" }],
 });`}</code></pre>
       <div class="callout callout-info">
         <div class="callout-title">Helpers and shared logic</div>
@@ -215,7 +215,7 @@ export default {
       key: "smoke-test",
       name: "Smoke test",
       prompt: "Verify the build runs cleanly.",
-      rubric: [{ check: "Build succeeded" }],
+      judge: [{ check: "Build succeeded" }],
     },
   ],
   agents: ["claude-code"],
@@ -270,7 +270,7 @@ export default {
   <pre><code>{`{
   "name": "Create an Express server",
   "prompt": "Create a working Express server that listens on port 3000.",
-  "rubric": "The agent should create a working Express server on port 3000"
+  "judge": "The agent should create a working Express server on port 3000"
 }`}</code></pre>
   <p>
     String rubrics work well for simple scenarios where you just want a holistic pass/fail judgment.
@@ -282,7 +282,7 @@ export default {
     For more granular scoring, use an array of checks. Each check is evaluated independently, so you
     can see exactly which criteria the agent met and which it missed.
   </p>
-  <pre><code>{`"rubric": [
+  <pre><code>{`"judge": [
   { "check": "Server starts on port 3000" },
   { "check": "GET / returns a 200 response" },
   { "check": "Server has error handling middleware" }
@@ -297,7 +297,7 @@ export default {
     Add <code>weight</code> to each check to control how much it contributes to the score. This is
     the recommended approach for most scenarios because it lets you express which outcomes matter most.
   </p>
-  <pre><code>{`"rubric": [
+  <pre><code>{`"judge": [
   { "check": "Server starts on port 3000", "weight": 0.4 },
   { "check": "GET / returns a 200 response", "weight": 0.3 },
   { "check": "Server has error handling middleware", "weight": 0.3 }
@@ -474,7 +474,7 @@ export default {
     <tbody>
       <tr>
         <td><code>AXIS_CONFIG_DIR</code></td>
-        <td>Absolute path to the directory containing <code>axis.config.json</code>.</td>
+        <td>Absolute path to the directory containing <code>axis.config.&#123;json,ts,js,mjs&#125;</code>. Set for per-scenario lifecycle only; not available in run-level <code>beforeAll</code>/<code>afterAll</code> hooks (those already cwd into the config directory).</td>
         <td>Referencing fixtures, helper scripts, or other files versioned alongside your project.</td>
       </tr>
       <tr>
@@ -514,8 +514,8 @@ export default {
       </tr>
       <tr>
         <td><code>HOME</code></td>
-        <td>Set to the workspace temp directory (same as <code>pwd</code>).</td>
-        <td>Workspace isolation &mdash; tools that read <code>$HOME</code> stay scoped to the run.</td>
+        <td>Set to a per-job <em>sibling</em> directory of the workspace (not the workspace itself), so the agent's own config files (<code>.claude/</code>, <code>.codex/</code>, etc.) never appear in the directory it is scanning.</td>
+        <td>Workspace isolation &mdash; tools that read <code>$HOME</code> stay scoped to the run without polluting the workspace.</td>
       </tr>
       <tr>
         <td><code>PWD</code></td>
@@ -620,7 +620,7 @@ scenarios/
   <pre><code>{`{
   "name": "Generate API summary",
   "prompt": "Fetch the docs and write summary.md.",
-  "rubric": "summary.md exists and covers the docs.",
+  "judge": "summary.md exists and covers the docs.",
   "artifacts": [
     "summary.md",
     "*.log",
@@ -702,7 +702,7 @@ scenarios/
   <pre><code>{`{
   "name": "Use Claude Code MCP integration",
   "prompt": "Use the filesystem MCP server to list files in /tmp",
-  "rubric": "Agent successfully used the MCP filesystem tool",
+  "judge": "Agent successfully used the MCP filesystem tool",
   "agents": ["claude-code"]
 }`}</code></pre>
 
@@ -719,7 +719,7 @@ scenarios/
   <pre><code>{`{
   "name": "Create a blog post",
   "prompt": "Create a new blog post titled 'Hello World' on the CMS.",
-  "rubric": [
+  "judge": [
     { "check": "Blog post was created successfully", "weight": 0.5 },
     { "check": "Title matches 'Hello World'", "weight": 0.5 }
   ],
@@ -744,9 +744,10 @@ scenarios/
   <p>
     This produces three scenario keys: <code>create-post@with-netlify-mcp</code>,
     <code>create-post@with-custom-skill</code>, and <code>create-post@alt-prompt</code>. Each
-    variant inherits the parent's <code>rubric</code>, <code>setup</code>, and other fields, then
+    variant inherits the parent's <code>judge</code>, <code>setup</code>, and other fields, then
     applies its own overrides. The variant name is appended to the scenario key with an
-    <code>@</code> separator.
+    <code>@</code> separator, and the displayed <code>name</code> in reports is suffixed with
+    <code>[&lt;variant-name&gt;]</code> (e.g. <code>"Deploy a site [baseline]"</code>).
   </p>
 
   <h3>Variant fields</h3>
@@ -774,9 +775,9 @@ scenarios/
         <td>Replaces the parent prompt.</td>
       </tr>
       <tr>
-        <td><code>rubric</code></td>
+        <td><code>judge</code></td>
         <td><code>string | object[]</code></td>
-        <td>Replaces the parent rubric.</td>
+        <td>Replaces the parent judge.</td>
       </tr>
       <tr>
         <td><code>skills</code></td>
@@ -838,7 +839,7 @@ scenarios/
       <pre><code>{`{
   "name": "Create a README",
   "prompt": "Create a README.md file for a Node.js project called 'my-api'. Include a title, description, install instructions, and usage example.",
-  "rubric": [
+  "judge": [
     { "check": "README.md exists" },
     { "check": "Contains a project title and description" },
     { "check": "Contains npm install instructions" },
@@ -857,7 +858,7 @@ scenarios/
       <pre><code>{`{
   "name": "Fix failing test",
   "prompt": "The test in test/math.test.js is failing. Find the bug in src/math.js, fix it, and verify the test passes.",
-  "rubric": [
+  "judge": [
     { "check": "Agent identified the root cause", "weight": 0.2 },
     { "check": "Agent fixed src/math.js correctly", "weight": 0.4 },
     { "check": "Agent ran the test and it passed", "weight": 0.4 }
@@ -880,7 +881,7 @@ scenarios/
       <pre><code>{`{
   "name": "Add API endpoint with tests",
   "prompt": "Add a GET /api/health endpoint to the Express app in src/app.js. It should return { status: 'ok', uptime: process.uptime() }. Write a test in test/health.test.js.",
-  "rubric": [
+  "judge": [
     { "check": "GET /api/health endpoint exists", "weight": 0.3 },
     { "check": "Returns JSON with status and uptime", "weight": 0.3 },
     { "check": "Test file exists and covers the endpoint", "weight": 0.2 },
@@ -906,7 +907,7 @@ scenarios/
       <pre><code>{`{
   "name": "Deploy a site",
   "prompt": "Deploy the project in the current directory to production.",
-  "rubric": [
+  "judge": [
     { "check": "Site was deployed successfully", "weight": 0.5 },
     { "check": "Agent confirmed the deploy URL", "weight": 0.3 },
     { "check": "No errors in the deployment log", "weight": 0.2 }
