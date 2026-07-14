@@ -67,7 +67,7 @@ For built-in adapters, register the factory in `src/adapters/registry.ts`. Exter
 
 #### Authentication: API key preferred, local CLI session as fallback
 
-`claude-code` and `codex` declare `requiredEnv` (`ANTHROPIC_API_KEY`, `CODEX_API_KEY`) AND implement `hasLocalSession`. Pre-flight in `runner.ts` checks env vars first; if missing, it calls `hasLocalSession` and only throws if both signals are absent. **API keys are the preferred path** — they're explicit, work in CI, and don't bill against an individual subscription. The local-session fallback exists for laptop ergonomics: when a developer already has `claude login` / `codex login` set up, they shouldn't have to mint an API key just to try a scenario. The `prepare` hooks in those adapters materialize `~/.claude.json` / `~/.codex/auth.json` (and on macOS, the Keychain entry for Claude Code) into the isolated `CLAUDE_CONFIG_DIR` / `CODEX_HOME` so the CLI authenticates as if it were running normally. New adapters that wrap a CLI with both API-key and login flows should follow the same pattern.
+`claude-code` and `codex` declare `requiredEnv` (`ANTHROPIC_API_KEY`, `CODEX_API_KEY`) AND implement `hasLocalSession`. Pre-flight in `runner.ts` checks env vars first; if missing, it calls `hasLocalSession` and only throws if both signals are absent. **API keys are the preferred path** — they're explicit, work in CI, and don't bill against an individual subscription. The local-session fallback exists for laptop ergonomics: when a developer already has `claude login` / `codex login` set up, they shouldn't have to mint an API key just to try a scenario. The `prepare` hooks in those adapters materialize `~/.claude.json` / `~/.codex/auth.json` (and on macOS, the Keychain entry for Claude Code) into the isolated `CLAUDE_CONFIG_DIR` / `CODEX_HOME` so the CLI authenticates as if it were running normally. For `claude-code`, the copied `~/.claude.json` is **sanitized first** — top-level `mcpServers` and every `projects[*].mcpServers` are stripped so the operator's personal MCP servers don't leak into scenario runs; only the auth anchor (`oauthAccount`) and other non-MCP fields survive. (`codex` is unaffected: it copies only `~/.codex/auth.json`, and Codex MCP config lives in `~/.codex/config.toml`, which is never copied.) New adapters that wrap a CLI with both API-key and login flows should follow the same pattern.
 
 ### Error Handling
 
@@ -120,7 +120,7 @@ Per-job temp layout (see `createWorkspace` in `runner.ts`):
 
 - Adapter `isolationEnv` MUST place `*_HOME`-style paths under `home`, never `workspace`, so the agent doesn't see its own config when scanning files
 - `HOME` is set to `home`. `AXIS_WORKSPACE` is `workspace`. Lifecycle scripts can read both
-- Claude Code's MCP config is written to `home/.claude/mcp.json` and wired with `--mcp-config <path>` (no `.mcp.json` in cwd)
+- Claude Code's MCP config is written to `home/.claude/mcp.json` and wired with `--mcp-config <path>` (no `.mcp.json` in cwd); it always runs with `--strict-mcp-config` so only AXIS-declared servers load — nothing discovered from a copied `~/.claude.json` or elsewhere on the host
 - Claude/Claude-SDK skills go to `CLAUDE_CONFIG_DIR/skills/` (under `home`); Gemini skills go to `GEMINI_CLI_HOME/skills/` (under `home`)
 - **Codex skills are the one exception**: Codex only discovers skills under `.agents/skills/` in cwd, so they live in `workspace`. Scenarios opting into Codex skills accept this limited visibility
 - Artifact capture walks `workspace` only — agent config never leaks into report artifacts

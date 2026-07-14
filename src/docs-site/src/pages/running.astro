@@ -108,8 +108,11 @@ export default createAgentAdapter<{ stdout: string }>({
   </ul>
   <p>
     For NDJSON-style agents, MCP server configuration files are written into each agent's isolated
-    config directory (under the per-job HOME) before spawn, in the format native to each CLI. ACP-
-    based adapters pass MCP servers through the ACP <code>session/new</code> call instead. See
+    config directory (under the per-job HOME) before spawn, in the format native to each CLI. Claude
+    Code additionally runs with <code>--strict-mcp-config</code>, so it loads only the servers a
+    scenario declares and ignores any MCP config discovered on the host (e.g. a local
+    <code>~/.claude.json</code>). ACP-based adapters pass MCP servers through the ACP
+    <code>session/new</code> call instead. See
     <a href="/configuration#mcp-servers">MCP Servers</a> in the configuration reference.
   </p>
 

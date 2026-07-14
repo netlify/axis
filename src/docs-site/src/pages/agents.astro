@@ -199,6 +199,13 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       Click <em>Always Allow</em> to authorize subsequent runs.
     </li>
     <li>
+      <strong>Your personal MCP servers stay out of the run.</strong> Falling back to a local
+      <code>claude login</code> session copies the OAuth anchor from your <code>~/.claude.json</code>
+      but strips its MCP configuration, and Claude Code is run with <code>--strict-mcp-config</code>.
+      Scenarios get only the MCP servers they declare — never the personal servers configured on your
+      machine.
+    </li>
+    <li>
       <strong>Only <code>claude-code</code> and <code>codex</code> support this fallback today.</strong>
       Other agents still require their configured env var.
     </li>
