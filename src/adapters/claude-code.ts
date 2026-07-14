@@ -1,13 +1,9 @@
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentAdapter, TranscriptEntry } from "../types/agent.js";
 import { createAgentAdapter } from "./base/agent-adapter.js";
-import {
-  copyHomeFile,
-  extractKeychainSecretToFile,
-  hasHomeFile,
-  homeJsonHasValue,
-} from "./utils/local-session.js";
+import { copyHomeFile, extractKeychainSecretToFile, hasHomeFile, homeJsonHasValue } from "./utils/local-session.js";
 import { writeClaudeMcpConfig } from "./utils/mcp.js";
 import { writeClaudeSkills } from "./utils/skills.js";
 
@@ -54,7 +50,11 @@ export function createClaudeCodeAdapter(): AgentAdapter {
       //     extract via `security find-generic-password -w`)
       if (configDir && !ctx.env?.ANTHROPIC_API_KEY) {
         fs.mkdirSync(configDir, { recursive: true });
-        copyHomeFile(".claude.json", configDir);
+        // Copy the OAuth anchor but STRIP the operator's personal MCP config —
+        // `.claude.json` carries top-level `mcpServers` and per-project
+        // `projects[*].mcpServers` that would otherwise leak the operator's
+        // personal servers (notion, bluesky, …) into the scenario run.
+        copyClaudeConfigWithoutMcp(configDir);
         const credsDest = path.join(configDir, ".credentials.json");
         copyHomeFile(path.join(".claude", ".credentials.json"), configDir);
         if (!fs.existsSync(credsDest)) {
@@ -81,6 +81,12 @@ export function createClaudeCodeAdapter(): AgentAdapter {
 
       if (skipPermissions) args.push("--dangerously-skip-permissions");
       if (input.config.model) args.push("--model", input.config.model);
+
+      // Use ONLY the MCP servers AXIS wires via `--mcp-config`, ignoring any
+      // other MCP config claude might discover (e.g. `mcpServers` in a copied
+      // `~/.claude.json`). Keeps scenarios hermetic: no scenario-declared
+      // servers → no MCP servers at all.
+      args.push("--strict-mcp-config");
 
       // Point Claude Code at the MCP config we wrote into HOME (if any). The
       // file is only created when the scenario configured MCP servers.
@@ -195,4 +201,56 @@ function mapMessageType(claudeType: string): TranscriptEntry["type"] {
     default:
       return "system";
   }
+}
+
+/**
+ * Copy `~/.claude.json` into an isolated config dir with all MCP server
+ * config stripped out.
+ *
+ * `claude login` writes the `oauthAccount` anchor into this file, so `prepare()`
+ * copies it to propagate the operator's OAuth session into CLAUDE_CONFIG_DIR.
+ * But the same file also carries the operator's PERSONAL MCP servers — both
+ * top-level `mcpServers` and per-project `projects[<path>].mcpServers`. Copying
+ * those verbatim leaks the operator's personal MCP tools (notion, bluesky,
+ * internal-apps, …) into every scenario run, breaking hermeticity. We delete
+ * them from a parsed copy so scenarios get only the servers they declare via
+ * ScenarioInput.
+ *
+ * The knowledge of Claude's config shape (which file, which keys are MCP, which
+ * anchor to preserve) lives here in the adapter, not in the generic
+ * local-session helpers. The operator's real `~/.claude.json` is never mutated
+ * — we read it, strip an in-memory copy, and write the sanitized result to
+ * `destDir`. No-op if the source is missing; skips (rather than copying
+ * verbatim) if it isn't a JSON object — unparseable, or valid-but-non-object
+ * JSON like `null`, an array, or a primitive — since we can't sanitize what
+ * isn't an object, and such a `.claude.json` wouldn't authenticate anyway.
+ *
+ * Exported for unit testing; not part of the package's public API.
+ */
+export function copyClaudeConfigWithoutMcp(destDir: string): void {
+  const src = path.join(os.homedir(), ".claude.json");
+  if (!fs.existsSync(src)) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(src, "utf8"));
+  } catch {
+    return;
+  }
+  // `JSON.parse` legally yields null / arrays / primitives — none of which we
+  // can sanitize, and `delete` on a null would throw out of prepare(). Skip.
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return;
+  const config = parsed as Record<string, unknown>;
+
+  delete config.mcpServers;
+  const projects = config.projects;
+  if (projects && typeof projects === "object") {
+    for (const project of Object.values(projects as Record<string, unknown>)) {
+      if (project && typeof project === "object") {
+        delete (project as Record<string, unknown>).mcpServers;
+      }
+    }
+  }
+
+  fs.mkdirSync(destDir, { recursive: true });
+  fs.writeFileSync(path.join(destDir, ".claude.json"), JSON.stringify(config, null, 2) + "\n");
 }
