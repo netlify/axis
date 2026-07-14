@@ -131,22 +131,27 @@ export function copyHomeFile(srcRelPath: string, destDir: string, destFileName?:
  *
  * The operator's real `~/.claude.json` is never mutated — we read it, strip
  * an in-memory copy, and write the sanitized result to `destDir`. No-op if the
- * source is missing; skips (rather than copying verbatim) if it isn't valid
- * JSON, since we can't sanitize what we can't parse — and an unparseable
+ * source is missing; skips (rather than copying verbatim) if it isn't a JSON
+ * object — unparseable, or valid-but-non-object JSON like `null`, an array, or
+ * a primitive — since we can't sanitize what isn't an object, and such a
  * `.claude.json` wouldn't authenticate anyway.
  */
 export function copyClaudeConfigWithoutMcp(destDir: string): void {
   const src = path.join(os.homedir(), ".claude.json");
   if (!fs.existsSync(src)) return;
-  let parsed: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(fs.readFileSync(src, "utf8")) as Record<string, unknown>;
+    parsed = JSON.parse(fs.readFileSync(src, "utf8"));
   } catch {
     return;
   }
+  // `JSON.parse` legally yields null / arrays / primitives — none of which we
+  // can sanitize, and `delete` on a null would throw out of prepare(). Skip.
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return;
+  const config = parsed as Record<string, unknown>;
 
-  delete parsed.mcpServers;
-  const projects = parsed.projects;
+  delete config.mcpServers;
+  const projects = config.projects;
   if (projects && typeof projects === "object") {
     for (const project of Object.values(projects as Record<string, unknown>)) {
       if (project && typeof project === "object") {
@@ -156,5 +161,5 @@ export function copyClaudeConfigWithoutMcp(destDir: string): void {
   }
 
   fs.mkdirSync(destDir, { recursive: true });
-  fs.writeFileSync(path.join(destDir, ".claude.json"), JSON.stringify(parsed, null, 2) + "\n");
+  fs.writeFileSync(path.join(destDir, ".claude.json"), JSON.stringify(config, null, 2) + "\n");
 }

@@ -136,6 +136,16 @@ describe("local-session", () => {
       copyClaudeConfigWithoutMcp(destDir());
       expect(fs.existsSync(path.join(destDir(), ".claude.json"))).toBe(false);
     });
+
+    it("skips valid-but-non-object JSON (null/array/primitive) without throwing", () => {
+      // `null`, arrays, and primitives are all legal JSON but can't be
+      // sanitized — and `delete null.mcpServers` would throw out of prepare().
+      for (const contents of ["null", "[1,2,3]", "42", '"a string"']) {
+        fs.writeFileSync(path.join(fakeHome, ".claude.json"), contents);
+        expect(() => copyClaudeConfigWithoutMcp(destDir())).not.toThrow();
+        expect(fs.existsSync(path.join(destDir(), ".claude.json"))).toBe(false);
+      }
+    });
   });
 
   describe("hasKeychainEntry", () => {
