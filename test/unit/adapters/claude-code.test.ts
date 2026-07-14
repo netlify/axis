@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createClaudeCodeAdapter } from "../../../src/adapters/claude-code.js";
+import { createClaudeCodeAdapter, copyClaudeConfigWithoutMcp } from "../../../src/adapters/claude-code.js";
 import type { AgentAdapter } from "../../../src/types/agent.js";
 import type { AgentInput } from "../../../src/types/agent.js";
 import type * as ChildProcess from "node:child_process";
@@ -294,5 +294,93 @@ describe("ClaudeCodeAdapter", () => {
       // Non-MCP project data survives.
       expect(staged.projects["/work/repo"].allowedTools).toEqual(["Read"]);
     });
+  });
+});
+
+// The MCP-stripping copy is owned by the claude-code adapter (it knows Claude's
+// config shape), so its granular unit tests live here rather than with the
+// generic local-session helpers.
+describe("copyClaudeConfigWithoutMcp", () => {
+  let fakeHome: string;
+  let originalHome: string | undefined;
+  let originalUserprofile: string | undefined;
+  const destDir = () => path.join(fakeHome, "isolated", ".claude");
+
+  beforeEach(() => {
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "axis-claude-config-"));
+    originalHome = process.env.HOME;
+    originalUserprofile = process.env.USERPROFILE;
+    process.env.HOME = fakeHome;
+    process.env.USERPROFILE = fakeHome;
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    if (originalUserprofile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserprofile;
+    fs.rmSync(fakeHome, { recursive: true, force: true });
+  });
+
+  it("no-ops when ~/.claude.json is missing", () => {
+    copyClaudeConfigWithoutMcp(destDir());
+    expect(fs.existsSync(path.join(destDir(), ".claude.json"))).toBe(false);
+  });
+
+  it("strips top-level and per-project mcpServers while keeping oauthAccount", () => {
+    const projectPath = "/some/project";
+    fs.writeFileSync(
+      path.join(fakeHome, ".claude.json"),
+      JSON.stringify({
+        oauthAccount: { emailAddress: "op@example.com", accountUuid: "uuid-123" },
+        mcpServers: { notion: { type: "http", url: "https://notion.example" } },
+        numStartups: 42,
+        projects: {
+          [projectPath]: {
+            mcpServers: { bluesky: { command: "bsky" } },
+            allowedTools: ["Read"],
+          },
+        },
+      }),
+    );
+
+    copyClaudeConfigWithoutMcp(destDir());
+
+    const staged = JSON.parse(fs.readFileSync(path.join(destDir(), ".claude.json"), "utf8"));
+    expect(staged.oauthAccount).toEqual({ emailAddress: "op@example.com", accountUuid: "uuid-123" });
+    expect(staged.numStartups).toBe(42);
+    expect(staged.mcpServers).toBeUndefined();
+    expect(staged.projects[projectPath].mcpServers).toBeUndefined();
+    // Non-MCP per-project data is preserved
+    expect(staged.projects[projectPath].allowedTools).toEqual(["Read"]);
+  });
+
+  it("does not mutate the operator's real ~/.claude.json", () => {
+    const original = {
+      oauthAccount: { emailAddress: "op@example.com" },
+      mcpServers: { notion: { type: "http", url: "https://notion.example" } },
+    };
+    fs.writeFileSync(path.join(fakeHome, ".claude.json"), JSON.stringify(original));
+
+    copyClaudeConfigWithoutMcp(destDir());
+
+    const realStill = JSON.parse(fs.readFileSync(path.join(fakeHome, ".claude.json"), "utf8"));
+    expect(realStill.mcpServers).toEqual(original.mcpServers);
+  });
+
+  it("skips (does not copy) an unparseable ~/.claude.json rather than leaking it", () => {
+    fs.writeFileSync(path.join(fakeHome, ".claude.json"), "{ not valid json");
+    copyClaudeConfigWithoutMcp(destDir());
+    expect(fs.existsSync(path.join(destDir(), ".claude.json"))).toBe(false);
+  });
+
+  it("skips valid-but-non-object JSON (null/array/primitive) without throwing", () => {
+    // `null`, arrays, and primitives are all legal JSON but can't be
+    // sanitized — and `delete null.mcpServers` would throw out of prepare().
+    for (const contents of ["null", "[1,2,3]", "42", '"a string"']) {
+      fs.writeFileSync(path.join(fakeHome, ".claude.json"), contents);
+      expect(() => copyClaudeConfigWithoutMcp(destDir())).not.toThrow();
+      expect(fs.existsSync(path.join(destDir(), ".claude.json"))).toBe(false);
+    }
   });
 });
