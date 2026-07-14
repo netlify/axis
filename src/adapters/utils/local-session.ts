@@ -115,3 +115,46 @@ export function copyHomeFile(srcRelPath: string, destDir: string, destFileName?:
   const dest = path.join(destDir, destFileName ?? path.basename(srcRelPath));
   fs.copyFileSync(src, dest);
 }
+
+/**
+ * Copy `~/.claude.json` into an isolated config dir with all MCP server
+ * config stripped out.
+ *
+ * `claude login` writes the `oauthAccount` anchor into this file, so the
+ * claude-code adapter copies it to propagate the operator's OAuth session
+ * into CLAUDE_CONFIG_DIR. But the same file also carries the operator's
+ * PERSONAL MCP servers — both top-level `mcpServers` and per-project
+ * `projects[<path>].mcpServers`. Copying those verbatim leaks the operator's
+ * personal MCP tools (notion, bluesky, internal-apps, …) into every scenario
+ * run, breaking hermeticity. We delete them from a parsed copy so scenarios
+ * get only the servers they declare via ScenarioInput.
+ *
+ * The operator's real `~/.claude.json` is never mutated — we read it, strip
+ * an in-memory copy, and write the sanitized result to `destDir`. No-op if the
+ * source is missing; skips (rather than copying verbatim) if it isn't valid
+ * JSON, since we can't sanitize what we can't parse — and an unparseable
+ * `.claude.json` wouldn't authenticate anyway.
+ */
+export function copyClaudeConfigWithoutMcp(destDir: string): void {
+  const src = path.join(os.homedir(), ".claude.json");
+  if (!fs.existsSync(src)) return;
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(fs.readFileSync(src, "utf8")) as Record<string, unknown>;
+  } catch {
+    return;
+  }
+
+  delete parsed.mcpServers;
+  const projects = parsed.projects;
+  if (projects && typeof projects === "object") {
+    for (const project of Object.values(projects as Record<string, unknown>)) {
+      if (project && typeof project === "object") {
+        delete (project as Record<string, unknown>).mcpServers;
+      }
+    }
+  }
+
+  fs.mkdirSync(destDir, { recursive: true });
+  fs.writeFileSync(path.join(destDir, ".claude.json"), JSON.stringify(parsed, null, 2) + "\n");
+}

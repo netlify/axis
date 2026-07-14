@@ -3,6 +3,7 @@ import * as path from "node:path";
 import type { AgentAdapter, TranscriptEntry } from "../types/agent.js";
 import { createAgentAdapter } from "./base/agent-adapter.js";
 import {
+  copyClaudeConfigWithoutMcp,
   copyHomeFile,
   extractKeychainSecretToFile,
   hasHomeFile,
@@ -54,7 +55,11 @@ export function createClaudeCodeAdapter(): AgentAdapter {
       //     extract via `security find-generic-password -w`)
       if (configDir && !ctx.env?.ANTHROPIC_API_KEY) {
         fs.mkdirSync(configDir, { recursive: true });
-        copyHomeFile(".claude.json", configDir);
+        // Copy the OAuth anchor but STRIP the operator's personal MCP config —
+        // `.claude.json` carries top-level `mcpServers` and per-project
+        // `projects[*].mcpServers` that would otherwise leak the operator's
+        // personal servers (notion, bluesky, …) into the scenario run.
+        copyClaudeConfigWithoutMcp(configDir);
         const credsDest = path.join(configDir, ".credentials.json");
         copyHomeFile(path.join(".claude", ".credentials.json"), configDir);
         if (!fs.existsSync(credsDest)) {
@@ -81,6 +86,12 @@ export function createClaudeCodeAdapter(): AgentAdapter {
 
       if (skipPermissions) args.push("--dangerously-skip-permissions");
       if (input.config.model) args.push("--model", input.config.model);
+
+      // Use ONLY the MCP servers AXIS wires via `--mcp-config`, ignoring any
+      // other MCP config claude might discover (e.g. `mcpServers` in a copied
+      // `~/.claude.json`). Keeps scenarios hermetic: no scenario-declared
+      // servers → no MCP servers at all.
+      args.push("--strict-mcp-config");
 
       // Point Claude Code at the MCP config we wrote into HOME (if any). The
       // file is only created when the scenario configured MCP servers.

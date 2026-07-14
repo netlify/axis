@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { createClaudeCodeAdapter } from "../../../src/adapters/claude-code.js";
 import type { AgentAdapter } from "../../../src/types/agent.js";
 import type { AgentInput } from "../../../src/types/agent.js";
@@ -214,5 +217,82 @@ describe("ClaudeCodeAdapter", () => {
     const output = await adapter.run(makeInput());
 
     expect(output.rawOutput).toBeUndefined();
+  });
+
+  it("passes --strict-mcp-config so only AXIS-declared MCP servers are used", async () => {
+    let capturedArgs: string[] = [];
+
+    mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
+      capturedArgs = args as string[];
+      return createMockProcess([JSON.stringify({ type: "result", result: "ok" })]);
+    }) as any);
+
+    await adapter.run(makeInput());
+
+    expect(capturedArgs).toContain("--strict-mcp-config");
+    // No scenario-declared servers → no --mcp-config path
+    expect(capturedArgs).not.toContain("--mcp-config");
+  });
+
+  // Tool-isolation: when propagating the operator's local OAuth session (no
+  // ANTHROPIC_API_KEY), prepare() must strip the operator's personal MCP
+  // config out of the copied `.claude.json` so it doesn't leak into the run.
+  describe("prepare() OAuth session propagation", () => {
+    let fakeHome: string;
+    let configDir: string;
+    let originalHome: string | undefined;
+    let originalUserprofile: string | undefined;
+
+    beforeEach(() => {
+      fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "axis-claude-prepare-"));
+      configDir = path.join(fakeHome, "isolated", ".claude");
+      originalHome = process.env.HOME;
+      originalUserprofile = process.env.USERPROFILE;
+      process.env.HOME = fakeHome;
+      process.env.USERPROFILE = fakeHome;
+
+      // A logged-in `.claude.json`: OAuth anchor + operator's personal MCP config.
+      fs.writeFileSync(
+        path.join(fakeHome, ".claude.json"),
+        JSON.stringify({
+          oauthAccount: { emailAddress: "op@example.com", accountUuid: "uuid-123" },
+          mcpServers: {
+            notion: { type: "http", url: "https://notion.example" },
+            bluesky: { command: "bsky" },
+          },
+          projects: {
+            "/work/repo": { mcpServers: { "internal-apps": { command: "internal" } }, allowedTools: ["Read"] },
+          },
+        }),
+      );
+      // Pre-create `.credentials.json` so prepare copies it and skips the
+      // macOS Keychain extraction path (no real `security` call in tests).
+      fs.mkdirSync(path.join(fakeHome, ".claude"), { recursive: true });
+      fs.writeFileSync(path.join(fakeHome, ".claude", ".credentials.json"), '{"token":"x"}');
+    });
+
+    afterEach(() => {
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      if (originalUserprofile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserprofile;
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+    });
+
+    it("stages a `.claude.json` that keeps oauthAccount but has no MCP config", async () => {
+      const input = makeInput();
+      // No ANTHROPIC_API_KEY in env → OAuth propagation path runs.
+      input.env = { CLAUDE_CONFIG_DIR: configDir };
+      input.homeDirectory = path.join(fakeHome, "isolated-home");
+
+      await adapter.run(input);
+
+      const staged = JSON.parse(fs.readFileSync(path.join(configDir, ".claude.json"), "utf8"));
+      expect(staged.oauthAccount).toEqual({ emailAddress: "op@example.com", accountUuid: "uuid-123" });
+      expect(staged.mcpServers).toBeUndefined();
+      expect(staged.projects["/work/repo"].mcpServers).toBeUndefined();
+      // Non-MCP project data survives.
+      expect(staged.projects["/work/repo"].allowedTools).toEqual(["Read"]);
+    });
   });
 });

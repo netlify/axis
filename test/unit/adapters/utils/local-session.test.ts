@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { copyHomeFile, hasHomeFile, hasKeychainEntry } from "../../../../src/adapters/utils/local-session.js";
+import {
+  copyClaudeConfigWithoutMcp,
+  copyHomeFile,
+  hasHomeFile,
+  hasKeychainEntry,
+} from "../../../../src/adapters/utils/local-session.js";
 
 describe("local-session", () => {
   let fakeHome: string;
@@ -74,6 +79,62 @@ describe("local-session", () => {
       copyHomeFile(".codex/auth.json", destDir);
 
       expect(fs.existsSync(path.join(destDir, "auth.json"))).toBe(true);
+    });
+  });
+
+  describe("copyClaudeConfigWithoutMcp", () => {
+    const destDir = () => path.join(fakeHome, "isolated", ".claude");
+
+    it("no-ops when ~/.claude.json is missing", () => {
+      copyClaudeConfigWithoutMcp(destDir());
+      expect(fs.existsSync(path.join(destDir(), ".claude.json"))).toBe(false);
+    });
+
+    it("strips top-level and per-project mcpServers while keeping oauthAccount", () => {
+      const projectPath = "/some/project";
+      fs.writeFileSync(
+        path.join(fakeHome, ".claude.json"),
+        JSON.stringify({
+          oauthAccount: { emailAddress: "op@example.com", accountUuid: "uuid-123" },
+          mcpServers: { notion: { type: "http", url: "https://notion.example" } },
+          numStartups: 42,
+          projects: {
+            [projectPath]: {
+              mcpServers: { bluesky: { command: "bsky" } },
+              allowedTools: ["Read"],
+            },
+          },
+        }),
+      );
+
+      copyClaudeConfigWithoutMcp(destDir());
+
+      const staged = JSON.parse(fs.readFileSync(path.join(destDir(), ".claude.json"), "utf8"));
+      expect(staged.oauthAccount).toEqual({ emailAddress: "op@example.com", accountUuid: "uuid-123" });
+      expect(staged.numStartups).toBe(42);
+      expect(staged.mcpServers).toBeUndefined();
+      expect(staged.projects[projectPath].mcpServers).toBeUndefined();
+      // Non-MCP per-project data is preserved
+      expect(staged.projects[projectPath].allowedTools).toEqual(["Read"]);
+    });
+
+    it("does not mutate the operator's real ~/.claude.json", () => {
+      const original = {
+        oauthAccount: { emailAddress: "op@example.com" },
+        mcpServers: { notion: { type: "http", url: "https://notion.example" } },
+      };
+      fs.writeFileSync(path.join(fakeHome, ".claude.json"), JSON.stringify(original));
+
+      copyClaudeConfigWithoutMcp(destDir());
+
+      const realStill = JSON.parse(fs.readFileSync(path.join(fakeHome, ".claude.json"), "utf8"));
+      expect(realStill.mcpServers).toEqual(original.mcpServers);
+    });
+
+    it("skips (does not copy) an unparseable ~/.claude.json rather than leaking it", () => {
+      fs.writeFileSync(path.join(fakeHome, ".claude.json"), "{ not valid json");
+      copyClaudeConfigWithoutMcp(destDir());
+      expect(fs.existsSync(path.join(destDir(), ".claude.json"))).toBe(false);
     });
   });
 
