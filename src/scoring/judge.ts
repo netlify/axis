@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { getAdapter } from "../adapters/registry.js";
+import { buildAgentBaseName } from "../runner/agent-name.js";
 import type { AgentConfig } from "../types/config.js";
 import type { RunResult } from "../types/output.js";
 
@@ -40,7 +41,7 @@ export function resolveJudgeAgent(runResult: RunResult, judging: AgentConfig[] |
  * line up.
  */
 export function formatJudgeLabel(judging: AgentConfig): string {
-  return judging.model ? `${judging.agent}|${judging.model}` : judging.agent;
+  return buildAgentBaseName(judging.agent, judging.model);
 }
 
 /**

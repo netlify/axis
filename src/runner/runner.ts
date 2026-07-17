@@ -11,6 +11,7 @@ import { silentLogger as defaultLogger, formatError, isFailedRun } from "../type
 import type { Scenario } from "../types/scenario.js";
 import type { AgentConfig, AxisConfig, ResolvedSkill, ScenarioLimitsConfig } from "../types/config.js";
 import { resolveSkills } from "../skills/resolver.js";
+import { buildAgentBaseName } from "./agent-name.js";
 
 // ---------------------------------------------------------------------------
 // Limit resolution
@@ -795,6 +796,10 @@ export function buildJobEnv(config: AxisConfig): Record<string, string> {
  *   - `{agent}` otherwise
  *   - `-N` numeric suffix appended only as a tie-breaker if the rules above
  *     still produce duplicates (e.g. two entries with the same agent and no model)
+ *
+ * The model portion is sanitized (see `sanitizeModelForName`) so provider-prefixed
+ * models like "anthropic/claude-3.5-sonnet" don't break report file paths. The raw
+ * model is still passed verbatim to the agent CLI via `config.model`.
  */
 function normalizeAgents(agents: (string | AgentConfig)[]): Array<{ name: string; config: AgentConfig }> {
   const result: Array<{ name: string; config: AgentConfig }> = [];
@@ -803,7 +808,7 @@ function normalizeAgents(agents: (string | AgentConfig)[]): Array<{ name: string
   for (const entry of agents) {
     const config: AgentConfig = typeof entry === "string" ? { agent: entry } : entry;
 
-    const baseName = config.model ? `${config.agent}|${config.model}` : config.agent;
+    const baseName = buildAgentBaseName(config.agent, config.model);
     const count = (nameCounts.get(baseName) ?? 0) + 1;
     nameCounts.set(baseName, count);
 

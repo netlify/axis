@@ -504,6 +504,23 @@ describe("run", () => {
       const names = output.results.map((r) => r.agentName).sort();
       expect(names).toEqual(["mock-agent|opus", "mock-agent|sonnet"]);
     });
+
+    it("sanitizes provider/model names but passes the raw model to the adapter", async () => {
+      const mockAdapter = createMockAdapter();
+      mockGetAdapter.mockReturnValue(mockAdapter);
+
+      const output = await run({
+        configPath: writeConfig([{ agent: "mock-agent", model: "anthropic/claude-3.5-sonnet" }]),
+        logger: silentLogger,
+      });
+
+      // Derived agent name is filesystem-safe (no slashes).
+      expect(output.results[0].agentName).toBe("mock-agent|anthropic-claude-3.5-sonnet");
+
+      // The adapter still receives the raw provider/model string.
+      const input = mockAdapter.run.mock.calls[0][0];
+      expect(input.config.model).toBe("anthropic/claude-3.5-sonnet");
+    });
   });
 
   it("fails early when adapter requiredEnv vars are missing", async () => {

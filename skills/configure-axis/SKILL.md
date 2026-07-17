@@ -163,6 +163,10 @@ Full annotated shape:
       "skills": ["./skills/my-conventions"], // per-agent skills
       "flags": { "debug": true, "max-turns": "5" },
     },
+    // Provider-prefixed models (e.g. OpenRouter) are supported. The raw string
+    // is passed verbatim to the CLI via --model; the derived agent name slugifies
+    // the slashes, so this becomes "claude-code|anthropic-claude-3.5-sonnet".
+    { "agent": "claude-code", "model": "anthropic/claude-3.5-sonnet" },
   ],
 
   // Agents used to score runs. When omitted, each agent judges itself
