@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.2](https://github.com/netlify/axis/compare/v1.17.1...v1.17.2) (2026-07-17)
+
+
+### Bug Fixes
+
+* docs homepage link ([6c16831](https://github.com/netlify/axis/commit/6c168318202f9fb7f895a7ff9fae2df7394fb256))
+
 ## [1.17.1](https://github.com/netlify/axis/compare/v1.17.0...v1.17.1) (2026-07-17)
 
 
