@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.17.1](https://github.com/netlify/axis/compare/v1.17.0...v1.17.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* **claude-code:** guard non-object JSON in copyClaudeConfigWithoutMcp ([8f1bcdd](https://github.com/netlify/axis/commit/8f1bcdd44123c23d1f68d4846a989c82f5ae991b))
+* **claude-code:** stop personal MCP servers leaking into scenario runs ([f3839c7](https://github.com/netlify/axis/commit/f3839c7c312bbd9297ebb647c98fbdbd9514bc55))
+* **claude-code:** strip operator MCP config from copied .claude.json ([00738d1](https://github.com/netlify/axis/commit/00738d18b3690813601cf0a7c0359ca1d747a73a))
+* support slah names in models ([3306ea5](https://github.com/netlify/axis/commit/3306ea5130fd3c19c349a33726875a00c442da3f))
+* support slah names in models ([2d386db](https://github.com/netlify/axis/commit/2d386db4aaa9889b92eac82d95afcd528ab21125))
+
 ## [1.17.0](https://github.com/netlify/axis/compare/v1.16.2...v1.17.0) (2026-06-24)
 
 
