@@ -127,6 +127,18 @@ export function formatError(err: unknown): string {
 }
 
 /**
+ * True when a run produced neither a transcript nor a final result: the
+ * "empty-work signature". The agent process may have exited cleanly (a silent
+ * no-op), but there is nothing to grade. Requiring BOTH an empty transcript
+ * and an empty result keeps legitimate result-only runs (e.g. ACP agents that
+ * return a final answer with no tool use) from being flagged.
+ */
+export function hasEmptyOutput(output: AgentOutput): boolean {
+  const hasResult = output.result !== null && output.result.trim() !== "";
+  return output.transcript.length === 0 && !hasResult;
+}
+
+/**
  * Determine whether an agent run should be treated as failed for scoring and
  * reporting purposes.
  *
@@ -138,9 +150,15 @@ export function formatError(err: unknown): string {
  *
  * Runs without a result are failed when either `exitCode` is non-zero or an
  * explicit `error` is present (timeouts, crashes, mid-run kills, …).
+ *
+ * A run that produced no output at all (empty transcript AND no result) is
+ * always failed, even on a clean exit; grading "nothing" would otherwise
+ * yield a fake ~57 composite indistinguishable from a mediocre run.
  */
 export function isFailedRun(output: AgentOutput): boolean {
   const { exitCode, error } = output.metadata;
-  if (output.result !== null) return Boolean(error);
-  return exitCode !== 0 || Boolean(error);
+  if (error) return true;
+  if (hasEmptyOutput(output)) return true;
+  if (output.result !== null) return false;
+  return exitCode !== 0;
 }

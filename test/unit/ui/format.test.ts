@@ -66,8 +66,11 @@ describe("friendlyError", () => {
 
 function makeResult(overrides: Partial<{ error: string; exitCode: number }>): RunResult {
   const output: AgentOutput = {
-    transcript: [],
-    result: null,
+    // A normal run produces work; keep the fixture non-empty so a clean exit
+    // reads as a pass. (An empty transcript AND null result is the failure
+    // signature that isFailedRun now catches.)
+    transcript: [{ type: "assistant", timestamp: "2026-01-01T00:00:00Z", content: { text: "done" } }],
+    result: "Task completed",
     metadata: {
       startTime: "2026-01-01T00:00:00Z",
       endTime: "2026-01-01T00:01:00Z",

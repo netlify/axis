@@ -5,6 +5,7 @@ vi.mock("../../../src/adapters/registry.js", () => ({
 }));
 
 import { scoreGoalAchievement } from "../../../src/scoring/goal-achievement.js";
+import { ScoringError } from "../../../src/scoring/errors.js";
 import { normalizeTranscript } from "../../../src/transcript/normalize.js";
 import { getAdapter } from "../../../src/adapters/registry.js";
 import type { RunResult } from "../../../src/types/output.js";
@@ -22,6 +23,24 @@ function createMockAdapter(resultText: string) {
         endTime: new Date().toISOString(),
         durationMs: 100,
         exitCode: 0,
+      },
+    }),
+  };
+}
+
+/** A judge adapter whose invocation died (crash/quota/timeout) with no result. */
+function createDeadAdapter(error = "API quota exceeded") {
+  return {
+    name: "mock-judge",
+    run: vi.fn().mockResolvedValue({
+      transcript: [],
+      result: null,
+      metadata: {
+        startTime: new Date().toISOString(),
+        endTime: new Date().toISOString(),
+        durationMs: 100,
+        exitCode: 1,
+        error,
       },
     }),
   };
@@ -95,16 +114,26 @@ describe("scoreGoalAchievement", () => {
       expect(result.score).toBe(80);
     });
 
-    it("returns zero scores on invalid JSON", async () => {
+    it("throws ScoringError (withholds) on unparseable judge response", async () => {
       const adapter = createMockAdapter("I cannot evaluate this properly.");
       mockGetAdapter.mockReturnValue(adapter);
 
       const runResult = makeRunResult([{ check: "Did it", weight: 1.0 }]);
-      const result = await scoreGoalAchievement(runResult, getNormalizedEntries(runResult));
+      // A judge response we can't parse must NOT be graded as a genuine zero;
+      // it withholds instead, so the run is treated as failed and retryable.
+      await expect(scoreGoalAchievement(runResult, getNormalizedEntries(runResult))).rejects.toBeInstanceOf(
+        ScoringError,
+      );
+    });
 
-      expect(result.criteria[0].score).toBe(0);
-      expect(result.criteria[0].rationale).toContain("Failed to parse");
-      expect(result.score).toBe(0);
+    it("throws ScoringError (withholds) when the judge invocation dies", async () => {
+      const adapter = createDeadAdapter("API quota exceeded");
+      mockGetAdapter.mockReturnValue(adapter);
+
+      const runResult = makeRunResult([{ check: "Did it", weight: 1.0 }]);
+      await expect(scoreGoalAchievement(runResult, getNormalizedEntries(runResult))).rejects.toBeInstanceOf(
+        ScoringError,
+      );
     });
 
     it("returns score 0 for empty judge", async () => {
@@ -144,15 +173,14 @@ describe("scoreGoalAchievement", () => {
       expect(result.score).toBe(80);
     });
 
-    it("returns zero on invalid response for string judge", async () => {
+    it("throws ScoringError (withholds) on unparseable string-judge response", async () => {
       const adapter = createMockAdapter("Unable to evaluate.");
       mockGetAdapter.mockReturnValue(adapter);
 
       const runResult = makeRunResult("Evaluate the agent");
-      const result = await scoreGoalAchievement(runResult, getNormalizedEntries(runResult));
-
-      expect(result.score).toBe(0);
-      expect(result.criteria[0].rationale).toContain("Failed to parse");
+      await expect(scoreGoalAchievement(runResult, getNormalizedEntries(runResult))).rejects.toBeInstanceOf(
+        ScoringError,
+      );
     });
   });
 
@@ -193,7 +221,10 @@ describe("scoreGoalAchievement", () => {
     mockGetAdapter.mockReturnValue(adapter);
 
     const runResult = makeRunResult([{ check: "Test criterion", weight: 1.0 }]);
-    const judging = [{ agent: "claude-code", model: "opus" }, { agent: "claude-code", model: "sonnet" }];
+    const judging = [
+      { agent: "claude-code", model: "opus" },
+      { agent: "claude-code", model: "sonnet" },
+    ];
     await scoreGoalAchievement(runResult, getNormalizedEntries(runResult), judging);
 
     expect(mockGetAdapter).toHaveBeenCalledWith("claude-code");

@@ -278,6 +278,19 @@ describe("createAgentAdapter", () => {
     expect(out.metadata.error).toBeUndefined();
   });
 
+  it("flags the empty-work signature: no transcript and no result → error even on a clean exit", async () => {
+    // A process that exits 0 but produced nothing is a silent no-op. Without an
+    // error, scoring would grade "nothing" as a mediocre ~57 instead of failing.
+    mockSpawn.mockImplementation((() => createMockProcess({ stdout: [], exitCode: 0 })) as any);
+    const adapter = createLinesTestAdapter();
+    const out = await adapter.run(makeInput());
+
+    expect(out.result).toBeNull();
+    expect(out.transcript).toHaveLength(0);
+    expect(out.metadata.exitCode).toBe(0);
+    expect(out.metadata.error).toBe("Agent produced no output");
+  });
+
   it("timeout path: getResult not called, error set", async () => {
     mockSpawn.mockImplementation((() => {
       const stdout = new Readable({ read() {} });

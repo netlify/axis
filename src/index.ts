@@ -13,6 +13,7 @@ export type {
 export { createAcpBasedAdapter } from "./adapters/base/acp-adapter.js";
 export type { AcpAdapterSpec } from "./adapters/base/acp-adapter.js";
 export { scoreResults, scoreRunResult, buildScoredOutput } from "./scoring/index.js";
+export { ScoringError } from "./scoring/errors.js";
 export { buildSparseIndex } from "./scoring/sparse-index.js";
 export { getPromptTemplates, interpolate } from "./scoring/prompt-templates.js";
 export type { PromptTemplate, PromptVariable } from "./scoring/prompt-templates.js";

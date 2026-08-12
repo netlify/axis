@@ -10,9 +10,10 @@ import type {
   ScoreResult,
   ScoringOptions,
 } from "../types/scoring.js";
-import { isFailedRun } from "../types/output.js";
+import { isFailedRun, hasEmptyOutput } from "../types/output.js";
 import { normalizeTranscript, toTranscriptAnalysis } from "../transcript/normalize.js";
 import { writeScenarioRawData } from "../reports/writer.js";
+import { ScoringError } from "./errors.js";
 import { scoreGoalAchievement } from "./goal-achievement.js";
 import { resolveJudgeAgent, formatJudgeLabel } from "./judge.js";
 import { buildSparseIndex, populateInteractionContent } from "./sparse-index.js";
@@ -58,12 +59,9 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
     writeScenarioRawData(options.reportDir, result, sparseIndex);
   }
 
-  // Short-circuit: runs that failed entirely shouldn't be graded on process
-  // quality — there's no process to grade. Without this, empty-transcript runs
-  // get perfect-score defaults in env/service/agent because nothing was audited.
-  if (isFailedRun(result.output)) {
-    const score = buildZeroScore(result, weights, sparseIndex.lines.length > 0 ? sparseIndex : undefined, judgeAgent);
-    options?.onProgress?.(result.scenarioKey, result.agentName, "failed");
+  // Stamp transcript analysis onto the output so it flows into reports, and
+  // package a finished ScoredRunResult around a computed (or withheld) score.
+  const finish = (score: ScoreResult): ScoredRunResult => {
     result.output.transcriptAnalysis = toTranscriptAnalysis(normalized);
     return {
       scenarioKey: result.scenarioKey,
@@ -78,80 +76,93 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
       ...(result.resolvedConfig !== undefined ? { resolvedConfig: result.resolvedConfig } : {}),
       ...(result.artifacts !== undefined ? { artifacts: result.artifacts } : {}),
     };
+  };
+
+  const sparseIndexIfAny = sparseIndex.lines.length > 0 ? sparseIndex : undefined;
+
+  // Short-circuit: runs that failed entirely shouldn't be graded on process
+  // quality — there's no process to grade. Without this, empty-transcript runs
+  // get perfect-score defaults in env/service/agent because nothing was audited.
+  if (isFailedRun(result.output)) {
+    options?.onProgress?.(result.scenarioKey, result.agentName, "failed");
+    return finish(buildZeroScore(result, weights, sparseIndexIfAny, judgeAgent));
   }
 
-  // Step 4: Deep eval + goal achievement in parallel
-  const [deepEvalResult, goalAchievement] = await Promise.all([
-    runDeepEval(result, sparseIndex, normalized, {
+  try {
+    // Step 4: Deep eval + goal achievement in parallel
+    const [deepEvalResult, goalAchievement] = await Promise.all([
+      runDeepEval(result, sparseIndex, normalized, {
+        weights,
+        reportDir: options?.reportDir,
+        judging: resolvedJudging,
+      }),
+      scoreGoalAchievement(result, normalized.entries, resolvedJudging),
+    ]);
+
+    // Step 5: Compute category scores
+    const necessityMap = new Map(deepEvalResult.necessity.map((n) => [n.category, n]));
+    const defaultNecessity = (category: "environment" | "service" | "agent") => ({
+      category,
+      score: 1.0,
+      unnecessaryIds: [] as number[],
+      rationale: "default",
+    });
+
+    const environment = computeCategoryScore(
+      "environment",
+      deepEvalResult.audits,
+      necessityMap.get("environment") ?? defaultNecessity("environment"),
+      sparseIndex.interactions,
+    );
+
+    const service = computeCategoryScore(
+      "service",
+      deepEvalResult.audits,
+      necessityMap.get("service") ?? defaultNecessity("service"),
+      sparseIndex.interactions,
+    );
+
+    const agent = computeCategoryScore(
+      "agent",
+      deepEvalResult.audits,
+      necessityMap.get("agent") ?? defaultNecessity("agent"),
+      sparseIndex.interactions,
+    );
+
+    // Step 7: Compute composite AXIS score
+    const axisScore = computeComposite(goalAchievement.score, environment.score, service.score, agent.score, weights);
+
+    const score: ScoreResult = {
+      axisScore,
+      goalAchievement,
+      environment,
+      service,
+      agent,
       weights,
-      reportDir: options?.reportDir,
-      judging: resolvedJudging,
-    }),
-    scoreGoalAchievement(result, normalized.entries, resolvedJudging),
-  ]);
+      sparseIndex,
+      judging: judgeAgent,
+    };
 
-  // Step 5: Compute category scores
-  const necessityMap = new Map(deepEvalResult.necessity.map((n) => [n.category, n]));
-  const defaultNecessity = (category: "environment" | "service" | "agent") => ({
-    category,
-    score: 1.0,
-    unnecessaryIds: [] as number[],
-    rationale: "default",
-  });
+    options?.onProgress?.(result.scenarioKey, result.agentName, "done");
+    return finish(score);
+  } catch (err) {
+    // A ScoringError means the judges couldn't be trusted (died with no output,
+    // or returned something unparseable). Withhold the composite instead of
+    // emitting a fabricated ~57: mark the run failed so it's excluded from the
+    // gate, counted as failed, and retryable. Unexpected errors propagate.
+    if (!(err instanceof ScoringError)) throw err;
 
-  const environment = computeCategoryScore(
-    "environment",
-    deepEvalResult.audits,
-    necessityMap.get("environment") ?? defaultNecessity("environment"),
-    sparseIndex.interactions,
-  );
-
-  const service = computeCategoryScore(
-    "service",
-    deepEvalResult.audits,
-    necessityMap.get("service") ?? defaultNecessity("service"),
-    sparseIndex.interactions,
-  );
-
-  const agent = computeCategoryScore(
-    "agent",
-    deepEvalResult.audits,
-    necessityMap.get("agent") ?? defaultNecessity("agent"),
-    sparseIndex.interactions,
-  );
-
-  // Step 7: Compute composite AXIS score
-  const axisScore = computeComposite(goalAchievement.score, environment.score, service.score, agent.score, weights);
-
-  const score: ScoreResult = {
-    axisScore,
-    goalAchievement,
-    environment,
-    service,
-    agent,
-    weights,
-    sparseIndex,
-    judging: judgeAgent,
-  };
-
-  options?.onProgress?.(result.scenarioKey, result.agentName, "done");
-
-  // Stamp transcript analysis onto the output so it flows into reports.
-  result.output.transcriptAnalysis = toTranscriptAnalysis(normalized);
-
-  return {
-    scenarioKey: result.scenarioKey,
-    scenarioName: result.scenarioName,
-    agentName: result.agentName,
-    prompt: result.prompt,
-    judge: result.judge,
-    agentConfig: result.agentConfig,
-    output: result.output,
-    score,
-    ...(result.workingDirectory !== undefined ? { workingDirectory: result.workingDirectory } : {}),
-    ...(result.resolvedConfig !== undefined ? { resolvedConfig: result.resolvedConfig } : {}),
-    ...(result.artifacts !== undefined ? { artifacts: result.artifacts } : {}),
-  };
+    const reason = `Score withheld: ${err.message}`;
+    // Stamp the reason as the run error so every downstream consumer
+    // (isFailedRun, report manifest, --failed/--retry, live UI) treats it
+    // uniformly as a failure. Preserve any pre-existing agent error.
+    if (!result.output.metadata.error) {
+      result.output.metadata.error = reason;
+    }
+    logger?.verbose?.(`Withholding score for ${label}: ${err.message}`);
+    options?.onProgress?.(result.scenarioKey, result.agentName, "failed");
+    return finish(buildZeroScore(result, weights, sparseIndexIfAny, judgeAgent));
+  }
 }
 
 /**
@@ -164,6 +175,14 @@ export function buildScoredOutput(runOutput: RunOutput, scoredResults: ScoredRun
       ? completedResults.reduce((sum, r) => sum + r.score.axisScore, 0) / completedResults.length
       : 0;
 
+  // Recompute completed/failed from the SCORED results rather than trusting the
+  // runner's pre-scoring summary: scoring can withhold a score (unparseable or
+  // dead judge), flipping a run that exited cleanly into a failure. Deriving
+  // `failed` from the run total keeps `completed + failed === total` even if a
+  // fill-in scoring pass dropped a result entirely.
+  const completed = completedResults.length;
+  const failed = runOutput.summary.total - completed;
+
   return {
     version: runOutput.version,
     timestamp: runOutput.timestamp,
@@ -171,8 +190,8 @@ export function buildScoredOutput(runOutput: RunOutput, scoredResults: ScoredRun
     results: scoredResults,
     summary: {
       total: runOutput.summary.total,
-      completed: runOutput.summary.completed,
-      failed: runOutput.summary.failed,
+      completed,
+      failed,
       ...(runOutput.summary.skipped ? { skipped: runOutput.summary.skipped } : {}),
       averageAxisScore: Math.round(averageAxisScore),
     },
@@ -196,7 +215,9 @@ function buildZeroScore(
 ): ScoreResult {
   const reason = result.output.metadata.error
     ? `Run failed: ${result.output.metadata.error}`
-    : `Run failed with exit code ${result.output.metadata.exitCode}`;
+    : hasEmptyOutput(result.output)
+      ? "Run produced no output"
+      : `Run failed with exit code ${result.output.metadata.exitCode}`;
 
   return {
     axisScore: 0,

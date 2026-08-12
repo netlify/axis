@@ -23,7 +23,7 @@ import {
   renderBaselineShow,
   renderBaselineComparison,
 } from "./ui/format.js";
-import { formatError } from "./types/output.js";
+import { formatError, isFailedRun } from "./types/output.js";
 import type { Logger, JobState, RunResult, RunOutput } from "./types/output.js";
 import type { ScoredRunResult, ScoredOutput } from "./types/scoring.js";
 import type { AgentConfig, AxisConfig } from "./types/config.js";
@@ -643,7 +643,12 @@ program
         (scored) => {
           const job = lastJobs.find((j) => j.scenarioKey === scored.scenarioKey && j.agentName === scored.agentName);
           if (job) {
-            if (job.status !== "failed") {
+            // Scoring can withhold a score (dead/unparseable judge), flipping a
+            // run that finished cleanly into a failure. Reflect that in the row
+            // rather than showing a fabricated composite as "done".
+            if (isFailedRun(scored.output)) {
+              job.status = "failed";
+            } else if (job.status !== "failed") {
               job.status = "done";
             }
             job.axisScore = scored.score.axisScore;

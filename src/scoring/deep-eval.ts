@@ -14,6 +14,7 @@ import type {
 import { DEFAULT_AUDIT_SCORES } from "./category-score.js";
 import { callJudge } from "./judge.js";
 import { parseJsonFromText } from "./parse-json.js";
+import { ScoringError } from "./errors.js";
 import { CATEGORY_GUIDANCE, getPromptTemplates, interpolate } from "./prompt-templates.js";
 
 /** Max characters of full content to include per interaction. */
@@ -147,6 +148,14 @@ async function runCategoryEval(
     judging,
   });
 
+  // A response with no parseable JSON means the judge didn't grade anything.
+  // Withhold rather than silently defaulting every interaction to a high score
+  // (which would inflate the category and hide the failure). A parsed response
+  // that omits some interactions is fine; those get per-interaction defaults.
+  if (!parseJsonFromText(responseText)) {
+    throw new ScoringError(`Could not parse ${category} evaluation judge response`);
+  }
+
   return parseCategoryEvalResponse(responseText, category, sparseIndex);
 }
 
@@ -163,7 +172,9 @@ function buildCategoryEvalPrompt(
   // The agent judge audits EVERY interaction (every tool call is an agent decision).
   // Env/service judges audit only their own category's interactions.
   const categoryInteractions =
-    category === "agent" ? sparseIndex.interactions : sparseIndex.interactions.filter((i) => i.categories.includes(category));
+    category === "agent"
+      ? sparseIndex.interactions
+      : sparseIndex.interactions.filter((i) => i.categories.includes(category));
   const interactionContent = buildCategoryInteractionContent(categoryInteractions, normalized);
 
   // Build data dir reference
@@ -342,7 +353,9 @@ export function parseCategoryEvalResponse(
   const parsed = parseJsonFromText(responseText);
 
   const categoryInteractions =
-    category === "agent" ? sparseIndex.interactions : sparseIndex.interactions.filter((i) => i.categories.includes(category));
+    category === "agent"
+      ? sparseIndex.interactions
+      : sparseIndex.interactions.filter((i) => i.categories.includes(category));
 
   if (!parsed) {
     return buildDefaultCategoryResult(category, categoryInteractions);
@@ -545,7 +558,9 @@ function parseCategoryAudits(
   // Agent judge can audit ANY interaction (it's auditing decisions across all categories).
   // Env/service judges only audit their own category.
   const candidateInteractions =
-    category === "agent" ? sparseIndex.interactions : sparseIndex.interactions.filter((i) => i.categories.includes(category));
+    category === "agent"
+      ? sparseIndex.interactions
+      : sparseIndex.interactions.filter((i) => i.categories.includes(category));
   const interactionMap = new Map(candidateInteractions.map((i) => [i.id, i]));
   const audits: InteractionAudit[] = [];
 

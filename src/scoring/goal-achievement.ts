@@ -6,6 +6,7 @@ import type { AgentConfig } from "../types/config.js";
 import type { GoalAchievementScore, CriterionGrade } from "../types/scoring.js";
 import { callJudge } from "./judge.js";
 import { parseJsonFromText } from "./parse-json.js";
+import { ScoringError } from "./errors.js";
 import { getPromptTemplates, interpolate } from "./prompt-templates.js";
 
 export async function scoreGoalAchievement(
@@ -43,17 +44,9 @@ async function scoreStringJudge(
 
   const parsed = parseJsonFromText(responseText);
   if (!parsed || typeof parsed.score !== "number") {
-    return {
-      score: 0,
-      criteria: [
-        {
-          check: judge,
-          weight: 1.0,
-          score: 0,
-          rationale: "Failed to parse judge response",
-        },
-      ],
-    };
+    // The judge produced something we can't grade against. Withhold rather than
+    // fabricate a zero that would look like a genuine failure to meet the goal.
+    throw new ScoringError("Could not parse goal-achievement judge response");
   }
 
   const score = Math.max(0, Math.min(10, Math.round(parsed.score)));
@@ -219,12 +212,9 @@ function truncate(text: string, maxLen: number): string {
 function parseArrayJudgeResponse(responseText: string, judge: JudgeCriterion[]): CriterionGrade[] {
   const parsed = parseJsonFromText(responseText);
   if (!parsed || !Array.isArray(parsed.grades)) {
-    return judge.map((r) => ({
-      check: r.check,
-      weight: r.weight!,
-      score: 0,
-      rationale: "Failed to parse judge response",
-    }));
+    // Total parse failure: withhold the score. (A parsed response that merely
+    // omits some criteria is handled below: those get a per-criterion default.)
+    throw new ScoringError("Could not parse goal-achievement judge response");
   }
 
   const grades = parsed.grades as Array<{

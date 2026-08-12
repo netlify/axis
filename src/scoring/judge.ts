@@ -5,6 +5,8 @@ import { getAdapter } from "../adapters/registry.js";
 import { buildAgentBaseName } from "../runner/agent-name.js";
 import type { AgentConfig } from "../types/config.js";
 import type { RunResult } from "../types/output.js";
+import { isFailedRun } from "../types/output.js";
+import { ScoringError } from "./errors.js";
 
 export interface JudgeCallOptions {
   /** Scenario key for the judge run (e.g., "__env_eval__"). */
@@ -78,7 +80,21 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
       workingDirectory: workspace,
       homeDirectory: home,
     });
-    return output.result ?? "";
+
+    // A judge that died (crash, timeout, quota) or returned nothing can't be
+    // trusted to have graded anything. Surface it as a ScoringError so the
+    // caller withholds the score instead of parsing an empty response into a
+    // fabricated zero.
+    if (isFailedRun(output)) {
+      throw new ScoringError(
+        `Judge invocation failed (${formatJudgeLabel(judgeConfig)}): ${output.metadata.error ?? "no output"}`,
+      );
+    }
+    const text = output.result ?? "";
+    if (text.trim() === "") {
+      throw new ScoringError(`Judge invocation returned no output (${formatJudgeLabel(judgeConfig)})`);
+    }
+    return text;
   } finally {
     try {
       fs.rmSync(home, { recursive: true, force: true });

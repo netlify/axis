@@ -86,11 +86,13 @@ vi.mock("../../../src/scoring/category-score.js", () => ({
   DEFAULT_AUDIT_SCORES: { success: 1.0, speed: 0.8, weight: 0.8, contextRelevance: 0.8 },
 }));
 
-import { scoreResults, scoreRunResult } from "../../../src/scoring/index.js";
+import { scoreResults, scoreRunResult, buildScoredOutput } from "../../../src/scoring/index.js";
 import { buildSparseIndex } from "../../../src/scoring/sparse-index.js";
 import { runDeepEval } from "../../../src/scoring/deep-eval.js";
 import { computeCategoryScore } from "../../../src/scoring/category-score.js";
 import { scoreGoalAchievement } from "../../../src/scoring/goal-achievement.js";
+import { ScoringError } from "../../../src/scoring/errors.js";
+import { isFailedRun } from "../../../src/types/output.js";
 import type { RunOutput } from "../../../src/types/output.js";
 
 function makeRunOutput(overrides: Partial<RunOutput> = {}): RunOutput {
@@ -337,6 +339,81 @@ describe("scoreResults", () => {
       expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "start");
       expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "failed");
       expect(onProgress).not.toHaveBeenCalledWith("test-scenario", "claude-code", "done");
+    });
+
+    it("short-circuits an empty-work run (no transcript, no result) without invoking judges", async () => {
+      const output = makeRunOutput();
+      output.results[0].output.transcript = [];
+      output.results[0].output.result = null;
+      output.results[0].output.metadata.exitCode = 0;
+
+      const scored = await scoreResults(output);
+
+      expect(scored.results[0].score.axisScore).toBe(0);
+      expect(scoreGoalAchievement).not.toHaveBeenCalled();
+      expect(runDeepEval).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("withheld scoring", () => {
+    it("withholds the composite when a judge throws ScoringError", async () => {
+      vi.mocked(scoreGoalAchievement).mockRejectedValueOnce(new ScoringError("Could not parse judge response"));
+      const onProgress = vi.fn();
+
+      const scored = await scoreRunResult(makeRunOutput().results[0], { onProgress });
+
+      // No fabricated ~57; the run is marked failed and its score withheld.
+      expect(scored.score.axisScore).toBe(0);
+      expect(isFailedRun(scored.output)).toBe(true);
+      expect(scored.output.metadata.error).toContain("Score withheld");
+      expect(scored.output.metadata.error).toContain("Could not parse judge response");
+      expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "failed");
+      expect(onProgress).not.toHaveBeenCalledWith("test-scenario", "claude-code", "done");
+    });
+
+    it("counts a withheld run as failed in the summary (fails loud)", async () => {
+      vi.mocked(scoreGoalAchievement).mockRejectedValueOnce(new ScoringError("dead judge"));
+
+      const scored = await scoreResults(makeRunOutput());
+
+      expect(scored.summary.total).toBe(1);
+      expect(scored.summary.completed).toBe(0);
+      expect(scored.summary.failed).toBe(1);
+      expect(scored.summary.averageAxisScore).toBe(0);
+    });
+
+    it("rethrows non-ScoringError failures instead of withholding", async () => {
+      vi.mocked(scoreGoalAchievement).mockRejectedValueOnce(new Error("unexpected boom"));
+
+      await expect(scoreRunResult(makeRunOutput().results[0])).rejects.toThrow("unexpected boom");
+    });
+  });
+
+  describe("buildScoredOutput summary", () => {
+    it("recomputes completed/failed from scored results, not the pre-scoring summary", () => {
+      const runOutput = makeRunOutput();
+      runOutput.summary = { total: 1, completed: 1, failed: 0 };
+      // Simulate a run that scoring flipped to failed (withheld) after the runner
+      // had already counted it as completed.
+      const withheld = {
+        ...runOutput.results[0],
+        output: {
+          ...runOutput.results[0].output,
+          metadata: { ...runOutput.results[0].output.metadata, error: "Score withheld: dead judge" },
+        },
+        score: {
+          axisScore: 0,
+          goalAchievement: { score: 0, criteria: [] },
+          environment: makeCategoryScore(),
+          service: makeCategoryScore(),
+          agent: makeCategoryScore(),
+          weights: { goal_achievement: 0.4, environment: 0.2, service: 0.2, agent: 0.2 },
+        },
+      };
+
+      const out = buildScoredOutput(runOutput, [withheld as never]);
+      expect(out.summary.completed).toBe(0);
+      expect(out.summary.failed).toBe(1);
     });
   });
 });

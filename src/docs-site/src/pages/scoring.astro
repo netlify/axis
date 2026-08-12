@@ -494,6 +494,31 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     so borderline scores still surface actionable feedback.
   </p>
 
+  <h2 id="withheld">Failed and Withheld Scores</h2>
+  <p>
+    A score is only meaningful when there is real work to grade. AXIS refuses to
+    manufacture a composite in two cases, marking the run <strong>failed</strong> instead so it is
+    excluded from the average, counted in the failure total (a non-zero exit code), and re-runnable
+    with <code>axis run --failed</code>:
+  </p>
+  <ul>
+    <li>
+      <strong>No output.</strong> A run that produced neither a transcript nor a final result is a
+      silent no-op, even if the process exited cleanly. Grading "nothing" would otherwise yield a
+      middling composite indistinguishable from a genuinely mediocre run.
+    </li>
+    <li>
+      <strong>Untrustworthy judge.</strong> If a judge invocation dies (crash, quota, timeout) or
+      returns a response AXIS cannot parse, the score is withheld rather than recorded as a real
+      zero. A judge response that merely omits some interactions is fine -those fall back to neutral
+      defaults; only a wholly unusable response withholds.
+    </li>
+  </ul>
+  <p>
+    Withholding keeps a transient infrastructure failure from polluting your gate: the run fails
+    loudly and can be retried, instead of quietly dragging an average down with a fabricated number.
+  </p>
+
   <script is:inline>
     const wheel = document.querySelector(".dimension-wheel");
     if (wheel) {

@@ -411,6 +411,16 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
         error = stderr || "Agent process exited with non-zero code";
       }
 
+      // 14b. Empty-work signature: the process exited (often cleanly) but
+      // produced no transcript and no result, a silent no-op. Flag it as an
+      // error so the run is treated as failed and its score is withheld;
+      // otherwise scoring grades "nothing" as a mediocre ~57 (goal 0 + default
+      // category scores), indistinguishable from a real low-quality run.
+      const producedNoResult = extracted.result === null || extracted.result.trim() === "";
+      if (!error && transcript.length === 0 && producedNoResult) {
+        error = stderr || "Agent produced no output";
+      }
+
       // 15. Merge metadata
       const metadata: AgentMetadata = {
         startTime: startTime.toISOString(),

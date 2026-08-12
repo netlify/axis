@@ -77,6 +77,15 @@ For built-in adapters, register the factory in `src/adapters/registry.ts`. Exter
 - Error display: `↳ friendly message` below failed rows in tables, `Error:` line in detail views
 - Scoring callbacks in `cli.ts` preserve `"failed"` status -never overwrite to `"done"`
 
+#### Withheld scores (don't grade what you can't trust)
+
+Two silent-failure modes used to leak a fabricated composite (goal 0 + default category scores ≈ 57) that was indistinguishable from a mediocre run. Both are now **withheld**: the run is marked failed instead of scored, so it's excluded from the average, counted as failed (exit 1), retryable via `--failed`, and surfaced loudly.
+
+- **Empty-work signature**: a run that produced no transcript AND no result. `hasEmptyOutput()` in `types/output.ts` defines it; `isFailedRun()` treats it as failed even on a clean exit; the base adapter (`agent-adapter.ts`) stamps `"Agent produced no output"` so the error column is descriptive.
+- **Judge death / unparseable judge response**: `callJudge()` throws `ScoringError` when the judge invocation failed or returned nothing; `goal-achievement.ts` and `deep-eval.ts` throw `ScoringError` when a judge response can't be parsed at all (a parsed-but-incomplete response still gets per-item defaults). `scoreRunResult()` catches `ScoringError`, stamps `"Score withheld: …"` on the run, and returns a zero/failed result. Non-`ScoringError` throws propagate (real bugs should fail loud).
+
+`buildScoredOutput()` recomputes `completed`/`failed` from the scored results, so a run that scoring flips to failed is reflected in the summary and exit code.
+
 ### Debug Mode
 
 `--debug` enables raw output capture:
