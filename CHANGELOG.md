@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.3](https://github.com/netlify/axis/compare/v1.17.2...v1.17.3) (2026-08-12)
+
+
+### Bug Fixes
+
+* judging and general failures contributing to lower scores ([81a3008](https://github.com/netlify/axis/commit/81a3008bc70688f4c117b159e6dd45ddc656c71c))
+
 ## [1.17.2](https://github.com/netlify/axis/compare/v1.17.1...v1.17.2) (2026-07-17)
 
 
