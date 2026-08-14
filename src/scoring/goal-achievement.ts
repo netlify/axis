@@ -42,8 +42,6 @@ async function scoreStringJudge(
     judging,
   });
 
-  // The shape check rides into extraction: judges quote example objects in
-  // prose, and only the schema separates a quoted example from the verdict.
   const parsed = parseJsonFromText(responseText, (c) => typeof c.score === "number");
   if (!parsed || typeof parsed.score !== "number") {
     // The judge produced something we can't grade against. Withhold rather than

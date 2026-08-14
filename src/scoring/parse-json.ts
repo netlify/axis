@@ -1,19 +1,11 @@
 /**
- * Extract and parse a JSON object from LLM judge output.
+ * Extract the JSON verdict from a judge reply that may also contain prose,
+ * quoted code, and example objects.
  *
- * Judges are instructed to reply with "ONLY valid JSON on its own line", but
- * in practice they add prose — and when the material being graded contains
- * code, that prose quotes brace-laden snippets (`{ modified, etag }`) or
- * whole fenced JSON examples. A first-`{`-to-last-`}` regex spans from the
- * quoted code to the verdict and captures garbage, so the score is withheld
- * even though a valid verdict is sitting in the reply.
- *
- * Instead: one string-aware pass collects every MATCHED `{…}` span (a stack
- * pairs each close with its open; a lone prose brace never pops, so it
- * poisons nothing). Outermost parseable spans become candidates alongside
- * fenced blocks, and the LAST candidate the caller's schema accepts wins:
- * the reply format puts the verdict at the end, and the schema check stops a
- * quoted example from shadowing a real verdict.
+ * Finds every real `{…}` object in the reply and returns the last one that
+ * matches the caller's expected shape (`isVerdict`). Judges put their verdict
+ * at the end, so "last matching object" is the verdict even when earlier
+ * prose quotes code or JSON examples.
  */
 export function parseJsonFromText(
   text: string,
@@ -21,16 +13,12 @@ export function parseJsonFromText(
 ): Record<string, unknown> | null {
   if (!text) return null;
   const candidates: { at: number; value: Record<string, unknown> }[] = [];
-  // Fenced blocks: the fence bounds the object exactly — no brace ambiguity.
   for (const fence of text.matchAll(/```(?:json)?\s*\n?([\s\S]*?)```/g)) {
     const parsed = tryParseObject(fence[1].trim());
     if (parsed) candidates.push({ at: fence.index, value: parsed });
   }
-  // Bare objects: outermost parseable matched spans. Larger spans are tried
-  // first so a verdict's inner objects never pose as candidates; an
-  // unparseable outer span (prose braces around real JSON) lets its inner
-  // spans through. The parse budget only bounds adversarial towers of large
-  // unparseable spans — legitimate replies never approach it.
+  // Try larger spans first: if a whole object parses, its nested objects are
+  // part of it and are skipped as candidates.
   const spans = matchedSpans(text);
   spans.sort((a, b) => b.end - b.start - (a.end - a.start));
   const accepted: { start: number; end: number }[] = [];
@@ -38,8 +26,6 @@ export function parseJsonFromText(
   for (const span of spans) {
     if (parseBudget <= 0) break;
     if (accepted.some((a) => a.start <= span.start && a.end >= span.end)) continue;
-    // A span larger than the remaining budget is skipped, not parsed — the
-    // budget is a hard cap — and later (smaller) spans still get their turn.
     if (span.end - span.start > parseBudget) continue;
     parseBudget -= span.end - span.start;
     const parsed = tryParseObject(text.slice(span.start, span.end + 1));
@@ -48,10 +34,9 @@ export function parseJsonFromText(
       candidates.push({ at: span.start, value: parsed });
     }
   }
-  // Last resort — the original first-{-to-last-} extraction. A stray
-  // unpaired quote in prose can corrupt string-parity for the span scan
-  // above; this floor guarantees the rewrite is never worse than the
-  // behavior it replaced.
+  // Fallback: the extraction this function used historically. Keeps behavior
+  // from ever being worse than the old parser (e.g. when an unpaired quote in
+  // prose confuses the string-aware scan above).
   if (candidates.length === 0) {
     const greedy = text.match(/\{[\s\S]*\}/);
     if (greedy) {
@@ -69,11 +54,9 @@ export function parseJsonFromText(
   return candidates.length ? candidates[candidates.length - 1].value : null;
 }
 
-/** Total characters JSON.parse may be fed across candidate attempts. */
+/** Max characters JSON.parse may consume in total per reply. */
 const PARSE_BUDGET = 8_000_000;
-/** Matched spans retained per reply, evicting the oldest-CLOSED first. An
- * adversarial reply closing >10k spans after the verdict can evict it —
- * bounded memory at no-worse-than-the-old-parser fidelity. */
+/** Max candidate objects remembered per reply (keeps the most recent). */
 const SPAN_LIMIT = 10_000;
 
 function tryParseObject(candidate: string): Record<string, unknown> | null {
@@ -84,18 +67,18 @@ function tryParseObject(candidate: string): Record<string, unknown> | null {
       return parsed as Record<string, unknown>;
     }
   } catch {
-    // fall through — other candidates may still parse
+    return null;
   }
   return null;
 }
 
-/** Every `{…}` span whose braces genuinely pair, found in one string-aware
- * pass: push on `{`, pop on `}`. Braces inside JSON string values don't
- * count, and an unmatched open simply never pops. */
+/**
+ * Find every `{…}` whose braces genuinely pair up, in one pass. A stack pairs
+ * each `}` with its `{`; braces inside string values are ignored; an
+ * unmatched brace in prose pairs with nothing and is dropped. Results are
+ * kept in a fixed-size ring buffer so pathological inputs stay O(n).
+ */
 function matchedSpans(text: string): { start: number; end: number }[] {
-  // Ring buffer: keeps the last SPAN_LIMIT spans in O(1) per span (shift()
-  // re-indexes the whole array and turns a {}{}{} flood quadratic) and caps
-  // memory on span-heavy replies.
   const ring: ({ start: number; end: number } | undefined)[] = new Array(SPAN_LIMIT);
   let count = 0;
   const stack: number[] = [];
