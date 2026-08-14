@@ -45,10 +45,7 @@ describe("parseJsonFromText", () => {
   });
 
   it("survives brace-quoting prose before the verdict (judge grading code answers)", () => {
-    // The production failure: grading a Netlify Blobs answer, the judge
-    // quotes `{ modified, etag }` in its prose. A first-{-to-last-} regex
-    // spans from the quoted code to the verdict and parses garbage — the
-    // score was withheld on every attempt despite a valid verdict.
+    // A judge grading code quotes braces in its prose before the verdict.
     const input = `The answer correctly uses store.set(key, value, { onlyIfNew: true }) and checks the returned { modified, etag } object.
 
 {"score": 1, "grades": [{"check": "Uses onlyIfNew", "score": 1}]}`;
@@ -93,8 +90,6 @@ describe("parseJsonFromText", () => {
   });
 
   it("schema validator picks the verdict over a LATER quoted example", () => {
-    // Review finding: "last parseable wins" alone is schema-blind — a valid
-    // verdict followed by a quoted example object would select the example.
     const input = `{"score": 8, "grades": [{"check": "a", "score": 8}]}\n\nFor reference, a full-credit grade looks like {"example": true}.`;
     const result = parseJsonFromText(input, (c) => typeof c.score === "number");
     expect(result).toEqual({ score: 8, grades: [{ check: "a", score: 8 }] });
@@ -106,14 +101,13 @@ describe("parseJsonFromText", () => {
   });
 
   it("a bare verdict AFTER a fenced example wins (position order, not fence priority)", () => {
-    // Review finding: fence-first contradicted verdict-comes-last.
     const input = '```json\n{"example": true}\n```\nFinal verdict: {"score": 10}';
     expect(parseJsonFromText(input)).toEqual({ score: 10 });
   });
 
   it("parses a legitimate verdict far larger than any tail window", () => {
-    // Review finding: a deep-eval verdict carries one audit per interaction
-    // and can legitimately exceed 100KB — size must never cause withholding.
+    // Deep-eval verdicts carry one audit per interaction; size must never
+    // cause withholding.
     const audits = Array.from({ length: 500 }, (_, n) => ({
       interactionId: `i${n}`,
       category: "environment",
@@ -128,9 +122,6 @@ describe("parseJsonFromText", () => {
   });
 
   it("recovers a large verdict AFTER a brace flood (combined pathological case)", () => {
-    // Review finding: flood-recovery and large-verdict handling must compose —
-    // an earlier revision passed each test separately and withheld on both
-    // together.
     const audits = Array.from({ length: 500 }, (_, n) => ({
       interactionId: `i${n}`,
       category: "environment",
@@ -180,9 +171,6 @@ describe("parseJsonFromText hardening (review follow-ups)", () => {
   });
 
   it("a span larger than the parse budget is skipped, smaller later spans still parse", () => {
-    // 9MB of digits inside one balanced unparseable span exceeds the 8M
-    // budget — it must be skipped without being fed to JSON.parse, and the
-    // small verdict after it must still be found.
     const big = `{${"9".repeat(9_000_000)} not json}`;
     const input = `${big}\n{"score": 4}`;
     expect(parseJsonFromText(input)).toEqual({ score: 4 });

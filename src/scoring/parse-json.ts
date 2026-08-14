@@ -1,11 +1,7 @@
 /**
  * Extract the JSON verdict from a judge reply that may also contain prose,
- * quoted code, and example objects.
- *
- * Finds every real `{…}` object in the reply and returns the last one that
- * matches the caller's expected shape (`isVerdict`). Judges put their verdict
- * at the end, so "last matching object" is the verdict even when earlier
- * prose quotes code or JSON examples.
+ * quoted code, and example objects. Returns the last object matching
+ * `isVerdict` — judges emit their verdict last.
  */
 export function parseJsonFromText(
   text: string,
@@ -17,8 +13,7 @@ export function parseJsonFromText(
     const parsed = tryParseObject(fence[1].trim());
     if (parsed) candidates.push({ at: fence.index, value: parsed });
   }
-  // Try larger spans first: if a whole object parses, its nested objects are
-  // part of it and are skipped as candidates.
+  // Largest first, so nested objects defer to their parent.
   const spans = matchedSpans(text);
   spans.sort((a, b) => b.end - b.start - (a.end - a.start));
   const accepted: { start: number; end: number }[] = [];
@@ -34,9 +29,7 @@ export function parseJsonFromText(
       candidates.push({ at: span.start, value: parsed });
     }
   }
-  // Fallback: the extraction this function used historically. Keeps behavior
-  // from ever being worse than the old parser (e.g. when an unpaired quote in
-  // prose confuses the string-aware scan above).
+  // Historical extraction as a floor — never worse than the old parser.
   if (candidates.length === 0) {
     const greedy = text.match(/\{[\s\S]*\}/);
     if (greedy) {
@@ -72,12 +65,8 @@ function tryParseObject(candidate: string): Record<string, unknown> | null {
   return null;
 }
 
-/**
- * Find every `{…}` whose braces genuinely pair up, in one pass. A stack pairs
- * each `}` with its `{`; braces inside string values are ignored; an
- * unmatched brace in prose pairs with nothing and is dropped. Results are
- * kept in a fixed-size ring buffer so pathological inputs stay O(n).
- */
+/** Every `{…}` with genuinely paired braces, in one pass. Braces inside
+ * string values don't count; unmatched braces pair with nothing. */
 function matchedSpans(text: string): { start: number; end: number }[] {
   const ring: ({ start: number; end: number } | undefined)[] = new Array(SPAN_LIMIT);
   let count = 0;
