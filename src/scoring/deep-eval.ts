@@ -348,7 +348,16 @@ function formatFullEntry(entry: NormalizedEntry): string {
 // A judge reply can quote example objects in prose; only the schema tells the
 // verdict apart. Any of the three known sections marks an eval verdict.
 function isEvalVerdict(c: Record<string, unknown>): boolean {
-  return "audits" in c || "necessity" in c || "patterns" in c;
+  // Key presence alone lets a quoted example like {"audits": "..."} shadow a
+  // real verdict — the section values must carry usable shapes: arrays for
+  // audits/patterns; necessity is an array (legacy all-category eval) or a
+  // single object (per-category eval).
+  return (
+    Array.isArray(c.audits) ||
+    Array.isArray(c.patterns) ||
+    Array.isArray(c.necessity) ||
+    (typeof c.necessity === "object" && c.necessity !== null)
+  );
 }
 
 export function parseCategoryEvalResponse(

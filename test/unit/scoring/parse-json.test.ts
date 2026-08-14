@@ -170,3 +170,21 @@ End.`;
     expect(result).toEqual({ flaggedInteractions: [], patterns: [] });
   });
 });
+
+describe("parseJsonFromText hardening (review follow-ups)", () => {
+  it("a {}{}{} pair flood stays fast and keeps the trailing verdict", () => {
+    const input = `${"{}".repeat(500_000)}{"score": 7}`;
+    const started = Date.now();
+    expect(parseJsonFromText(input, (c) => typeof c.score === "number")).toEqual({ score: 7 });
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("a span larger than the parse budget is skipped, smaller later spans still parse", () => {
+    // 9MB of digits inside one balanced unparseable span exceeds the 8M
+    // budget — it must be skipped without being fed to JSON.parse, and the
+    // small verdict after it must still be found.
+    const big = `{${"9".repeat(9_000_000)} not json}`;
+    const input = `${big}\n{"score": 4}`;
+    expect(parseJsonFromText(input)).toEqual({ score: 4 });
+  });
+});

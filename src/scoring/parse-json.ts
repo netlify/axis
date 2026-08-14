@@ -38,6 +38,9 @@ export function parseJsonFromText(
   for (const span of spans) {
     if (parseBudget <= 0) break;
     if (accepted.some((a) => a.start <= span.start && a.end >= span.end)) continue;
+    // A span larger than the remaining budget is skipped, not parsed — the
+    // budget is a hard cap — and later (smaller) spans still get their turn.
+    if (span.end - span.start > parseBudget) continue;
     parseBudget -= span.end - span.start;
     const parsed = tryParseObject(text.slice(span.start, span.end + 1));
     if (parsed) {
@@ -90,7 +93,11 @@ function tryParseObject(candidate: string): Record<string, unknown> | null {
  * pass: push on `{`, pop on `}`. Braces inside JSON string values don't
  * count, and an unmatched open simply never pops. */
 function matchedSpans(text: string): { start: number; end: number }[] {
-  const spans: { start: number; end: number }[] = [];
+  // Ring buffer: keeps the last SPAN_LIMIT spans in O(1) per span (shift()
+  // re-indexes the whole array and turns a {}{}{} flood quadratic) and caps
+  // memory on span-heavy replies.
+  const ring: ({ start: number; end: number } | undefined)[] = new Array(SPAN_LIMIT);
+  let count = 0;
   const stack: number[] = [];
   let inString = false;
   for (let i = 0; i < text.length; i += 1) {
@@ -105,10 +112,13 @@ function matchedSpans(text: string): { start: number; end: number }[] {
     else if (ch === "}") {
       const start = stack.pop();
       if (start !== undefined) {
-        spans.push({ start, end: i });
-        if (spans.length > SPAN_LIMIT) spans.shift();
+        ring[count % SPAN_LIMIT] = { start, end: i };
+        count += 1;
       }
     }
   }
+  const spans: { start: number; end: number }[] = [];
+  const from = Math.max(0, count - SPAN_LIMIT);
+  for (let n = from; n < count; n += 1) spans.push(ring[n % SPAN_LIMIT]!);
   return spans;
 }
