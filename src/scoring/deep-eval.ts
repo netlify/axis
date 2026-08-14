@@ -152,7 +152,7 @@ async function runCategoryEval(
   // Withhold rather than silently defaulting every interaction to a high score
   // (which would inflate the category and hide the failure). A parsed response
   // that omits some interactions is fine; those get per-interaction defaults.
-  if (!parseJsonFromText(responseText)) {
+  if (!parseJsonFromText(responseText, isEvalVerdict)) {
     throw new ScoringError(`Could not parse ${category} evaluation judge response`);
   }
 
@@ -345,12 +345,25 @@ function formatFullEntry(entry: NormalizedEntry): string {
  * with that judge's category in `audit.categories`, so downstream filters in
  * `computeCategoryScore` route them to the right category-score.
  */
+// A judge reply can quote example objects in prose; only the schema tells the
+// verdict apart. Any of the three known sections marks an eval verdict.
+/** True when the object carries at least one usable eval section — necessity
+ * is an array in the legacy all-category eval, an object in per-category. */
+function isEvalVerdict(c: Record<string, unknown>): boolean {
+  return (
+    Array.isArray(c.audits) ||
+    Array.isArray(c.patterns) ||
+    Array.isArray(c.necessity) ||
+    (typeof c.necessity === "object" && c.necessity !== null)
+  );
+}
+
 export function parseCategoryEvalResponse(
   responseText: string,
   category: InteractionCategory,
   sparseIndex: SparseIndex,
 ): CategoryEvalResult {
-  const parsed = parseJsonFromText(responseText);
+  const parsed = parseJsonFromText(responseText, isEvalVerdict);
 
   const categoryInteractions =
     category === "agent"
@@ -393,7 +406,7 @@ export function parseCategoryEvalResponse(
  * Kept for backward compatibility with existing tests and any code that uses it.
  */
 export function parseDeepEvalResponse(responseText: string, sparseIndex: SparseIndex): DeepEvalResult {
-  const parsed = parseJsonFromText(responseText);
+  const parsed = parseJsonFromText(responseText, isEvalVerdict);
 
   let llmAudits: InteractionAudit[] = [];
   let llmNecessity: NecessityJudgment[] = [];

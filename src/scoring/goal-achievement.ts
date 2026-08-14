@@ -42,7 +42,7 @@ async function scoreStringJudge(
     judging,
   });
 
-  const parsed = parseJsonFromText(responseText);
+  const parsed = parseJsonFromText(responseText, (c) => typeof c.score === "number");
   if (!parsed || typeof parsed.score !== "number") {
     // The judge produced something we can't grade against. Withhold rather than
     // fabricate a zero that would look like a genuine failure to meet the goal.
@@ -210,7 +210,7 @@ function truncate(text: string, maxLen: number): string {
 }
 
 function parseArrayJudgeResponse(responseText: string, judge: JudgeCriterion[]): CriterionGrade[] {
-  const parsed = parseJsonFromText(responseText);
+  const parsed = parseJsonFromText(responseText, (c) => Array.isArray(c.grades));
   if (!parsed || !Array.isArray(parsed.grades)) {
     // Total parse failure: withhold the score. (A parsed response that merely
     // omits some criteria is handled below: those get a per-criterion default.)
