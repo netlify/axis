@@ -44,6 +44,119 @@ describe("parseJsonFromText", () => {
     expect(parseJsonFromText("[1, 2, 3]")).toBeNull();
   });
 
+  it("survives brace-quoting prose before the verdict (judge grading code answers)", () => {
+    // The production failure: grading a Netlify Blobs answer, the judge
+    // quotes `{ modified, etag }` in its prose. A first-{-to-last-} regex
+    // spans from the quoted code to the verdict and parses garbage — the
+    // score was withheld on every attempt despite a valid verdict.
+    const input = `The answer correctly uses store.set(key, value, { onlyIfNew: true }) and checks the returned { modified, etag } object.
+
+{"score": 1, "grades": [{"check": "Uses onlyIfNew", "score": 1}]}`;
+    expect(parseJsonFromText(input)).toEqual({
+      score: 1,
+      grades: [{ check: "Uses onlyIfNew", score: 1 }],
+    });
+  });
+
+  it("survives trailing prose with braces after the verdict", () => {
+    const input = `{"score": 0.5, "grades": []}\n\nNote: the answer's { onlyIfMatch } usage was incorrect.`;
+    expect(parseJsonFromText(input)).toEqual({ score: 0.5, grades: [] });
+  });
+
+  it("prefers the last object when several parse (verdict comes last)", () => {
+    const input = `Working example: {"example": true}\nFinal verdict: {"score": 0.75}`;
+    expect(parseJsonFromText(input)).toEqual({ score: 0.75 });
+  });
+
+  it("recovers the verdict after a lone unbalanced brace in prose", () => {
+    const input = `An unmatched { brace in prose.\n{"score": 1, "grades": []}`;
+    expect(parseJsonFromText(input)).toEqual({ score: 1, grades: [] });
+  });
+
+  it("ignores braces inside JSON string values", () => {
+    const input = `{"rationale": "uses set(k, v, { onlyIfNew: true }) correctly", "score": 1}`;
+    expect(parseJsonFromText(input)).toEqual({
+      rationale: "uses set(k, v, { onlyIfNew: true }) correctly",
+      score: 1,
+    });
+  });
+
+  it("prefers the last fenced block when the verdict is fenced after quoted code", () => {
+    const input =
+      'Quoted code:\n```ts\nawait store.set(k, v, { onlyIfNew: true });\n```\n\n```json\n{"score": 1, "grades": []}\n```';
+    expect(parseJsonFromText(input)).toEqual({ score: 1, grades: [] });
+  });
+
+  it("falls back past an unparseable fenced block to a bare verdict", () => {
+    const input = '```ts\nconst x = { a: 1 };\n```\n{"score": 0.25}';
+    expect(parseJsonFromText(input)).toEqual({ score: 0.25 });
+  });
+
+  it("schema validator picks the verdict over a LATER quoted example", () => {
+    // Review finding: "last parseable wins" alone is schema-blind — a valid
+    // verdict followed by a quoted example object would select the example.
+    const input = `{"score": 8, "grades": [{"check": "a", "score": 8}]}\n\nFor reference, a full-credit grade looks like {"example": true}.`;
+    const result = parseJsonFromText(input, (c) => typeof c.score === "number");
+    expect(result).toEqual({ score: 8, grades: [{ check: "a", score: 8 }] });
+  });
+
+  it("schema validator returns null when nothing matches the shape", () => {
+    const input = `{"example": true} and {"another": 1}`;
+    expect(parseJsonFromText(input, (c) => typeof c.score === "number")).toBeNull();
+  });
+
+  it("a bare verdict AFTER a fenced example wins (position order, not fence priority)", () => {
+    // Review finding: fence-first contradicted verdict-comes-last.
+    const input = '```json\n{"example": true}\n```\nFinal verdict: {"score": 10}';
+    expect(parseJsonFromText(input)).toEqual({ score: 10 });
+  });
+
+  it("parses a legitimate verdict far larger than any tail window", () => {
+    // Review finding: a deep-eval verdict carries one audit per interaction
+    // and can legitimately exceed 100KB — size must never cause withholding.
+    const audits = Array.from({ length: 500 }, (_, n) => ({
+      interactionId: `i${n}`,
+      category: "environment",
+      score: 8,
+      rationale: "adequate handling of the interaction with reasonable latency and correct output ".repeat(2),
+    }));
+    const verdict = { audits, necessity: [], patterns: [] };
+    const input = `The transcript { was long }.\n\n${JSON.stringify(verdict)}`;
+    const result = parseJsonFromText(input, (c) => "audits" in c);
+    expect(result).toEqual(verdict);
+    expect(JSON.stringify(verdict).length).toBeGreaterThan(100_000);
+  });
+
+  it("recovers a large verdict AFTER a brace flood (combined pathological case)", () => {
+    // Review finding: flood-recovery and large-verdict handling must compose —
+    // an earlier revision passed each test separately and withheld on both
+    // together.
+    const audits = Array.from({ length: 500 }, (_, n) => ({
+      interactionId: `i${n}`,
+      category: "environment",
+      score: 8,
+      rationale: "adequate handling of the interaction with reasonable latency and correct output ".repeat(2),
+    }));
+    const verdict = { audits, necessity: [], patterns: [] };
+    const input = `${"{ ".repeat(60_000)}\n${JSON.stringify(verdict)}`;
+    const started = Date.now();
+    expect(parseJsonFromText(input, (c) => "audits" in c)).toEqual(verdict);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("falls back to greedy extraction when a stray prose quote corrupts string parity", () => {
+    const input = 'He said "never\n{"score": 1, "grades": []}';
+    expect(parseJsonFromText(input)).toEqual({ score: 1, grades: [] });
+  });
+
+  it("bounds work on pathological brace floods and still finds the trailing verdict", () => {
+    const flood = "{ ".repeat(60_000);
+    const input = `${flood}\n{"score": 3}`;
+    const started = Date.now();
+    expect(parseJsonFromText(input)).toEqual({ score: 3 });
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
   it("handles multiline JSON wrapped in fences", () => {
     const input = `Some explanation:
 \`\`\`
