@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.17.4](https://github.com/netlify/axis/compare/v1.17.3...v1.17.4) (2026-08-14)
+
+
+### Bug Fixes
+
+* judge verdict extraction survives braces and quoted examples in prose ([fed9818](https://github.com/netlify/axis/commit/fed9818be9d067d7ac87fc48814d2535a3da71eb))
+* judge verdict extraction survives braces and quoted examples in prose ([69991cf](https://github.com/netlify/axis/commit/69991cf2ce4013539120af9c03ad729a7aaaacae))
+* review follow-ups — verdict value-type validation, hard parse budget, O(1) span eviction ([7f815b9](https://github.com/netlify/axis/commit/7f815b9d16f3f2357eb8da15a8eed9842db575b1))
+
 ## [1.17.3](https://github.com/netlify/axis/compare/v1.17.2...v1.17.3) (2026-08-12)
 
 
