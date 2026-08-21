@@ -52,14 +52,17 @@ export function createCodexAdapter(): AgentAdapter {
     buildArgs: (input) => {
       const flags = input.config.flags ?? {};
 
-      // Default --full-auto for headless execution
+      // Headless execution: Codex 0.20+ dropped `--full-auto` from `codex exec`.
+      // `--approve-for-me` is the replacement — auto-approves every action under
+      // a workspace-write sandbox (writes stay confined to the temp workspace).
+      // It implies the sandbox itself, so passing `--sandbox` too is rejected.
       const fullAuto = flags["full-auto"] ?? true;
       // AXIS workspaces are fresh temp directories, not git repos
       const skipGitCheck = flags["skip-git-repo-check"] ?? true;
 
       const args = ["exec", "--json"];
 
-      if (fullAuto) args.push("--full-auto");
+      if (fullAuto) args.push("--approve-for-me");
       if (skipGitCheck) args.push("--skip-git-repo-check");
       if (input.config.model) args.push("--model", input.config.model);
 

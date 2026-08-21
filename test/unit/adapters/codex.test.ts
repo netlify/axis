@@ -187,7 +187,7 @@ describe("CodexAdapter", () => {
     expect(output.result).toBeNull();
   });
 
-  it("includes --full-auto by default", async () => {
+  it("includes --approve-for-me by default", async () => {
     let capturedArgs: string[] = [];
 
     mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
@@ -201,10 +201,12 @@ describe("CodexAdapter", () => {
 
     expect(capturedArgs).toContain("exec");
     expect(capturedArgs).toContain("--json");
-    expect(capturedArgs).toContain("--full-auto");
+    expect(capturedArgs).toContain("--approve-for-me");
+    // --approve-for-me implies the sandbox; passing --sandbox too is rejected by Codex
+    expect(capturedArgs).not.toContain("--sandbox");
   });
 
-  it("omits --full-auto when explicitly set to false", async () => {
+  it("omits --approve-for-me when full-auto is explicitly set to false", async () => {
     let capturedArgs: string[] = [];
 
     mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
@@ -218,7 +220,7 @@ describe("CodexAdapter", () => {
     input.config.flags = { "full-auto": false };
     await adapter.run(input);
 
-    expect(capturedArgs).not.toContain("--full-auto");
+    expect(capturedArgs).not.toContain("--approve-for-me");
   });
 
   it("passes --model flag when config specifies model", async () => {
