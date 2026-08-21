@@ -53,16 +53,18 @@ export function createCodexAdapter(): AgentAdapter {
       const flags = input.config.flags ?? {};
 
       // Headless execution: Codex 0.20+ dropped `--full-auto` from `codex exec`.
-      // `--approve-for-me` is the replacement — auto-approves every action under
-      // a workspace-write sandbox (writes stay confined to the temp workspace).
-      // It implies the sandbox itself, so passing `--sandbox` too is rejected.
+      // Run fully autonomously with no sandbox and no approval prompts, parity
+      // with the claude-code adapter's `--dangerously-skip-permissions`. This
+      // avoids the workspace-write sandbox blocking network and writes to the
+      // agent's HOME. Isolation comes from the temp workspace + remapped HOME,
+      // not from Codex's own sandbox. Opt out via flags["full-auto"] = false.
       const fullAuto = flags["full-auto"] ?? true;
       // AXIS workspaces are fresh temp directories, not git repos
       const skipGitCheck = flags["skip-git-repo-check"] ?? true;
 
       const args = ["exec", "--json"];
 
-      if (fullAuto) args.push("--approve-for-me");
+      if (fullAuto) args.push("--dangerously-bypass-approvals-and-sandbox");
       if (skipGitCheck) args.push("--skip-git-repo-check");
       if (input.config.model) args.push("--model", input.config.model);
 

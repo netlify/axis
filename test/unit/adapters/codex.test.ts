@@ -187,7 +187,7 @@ describe("CodexAdapter", () => {
     expect(output.result).toBeNull();
   });
 
-  it("includes --approve-for-me by default", async () => {
+  it("runs fully autonomous (bypass approvals + sandbox) by default", async () => {
     let capturedArgs: string[] = [];
 
     mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
@@ -201,12 +201,12 @@ describe("CodexAdapter", () => {
 
     expect(capturedArgs).toContain("exec");
     expect(capturedArgs).toContain("--json");
-    expect(capturedArgs).toContain("--approve-for-me");
-    // --approve-for-me implies the sandbox; passing --sandbox too is rejected by Codex
-    expect(capturedArgs).not.toContain("--sandbox");
+    expect(capturedArgs).toContain("--dangerously-bypass-approvals-and-sandbox");
+    // --full-auto no longer exists in codex exec and must not be emitted
+    expect(capturedArgs).not.toContain("--full-auto");
   });
 
-  it("omits --approve-for-me when full-auto is explicitly set to false", async () => {
+  it("omits the bypass flag when full-auto is explicitly set to false", async () => {
     let capturedArgs: string[] = [];
 
     mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
@@ -220,7 +220,7 @@ describe("CodexAdapter", () => {
     input.config.flags = { "full-auto": false };
     await adapter.run(input);
 
-    expect(capturedArgs).not.toContain("--approve-for-me");
+    expect(capturedArgs).not.toContain("--dangerously-bypass-approvals-and-sandbox");
   });
 
   it("passes --model flag when config specifies model", async () => {
