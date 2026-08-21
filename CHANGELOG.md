@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.5](https://github.com/netlify/axis/compare/v1.17.4...v1.17.5) (2026-08-21)
+
+
+### Bug Fixes
+
+* codex auto args ([d533665](https://github.com/netlify/axis/commit/d533665d235432151ff7a280da35daad3cba9fb8))
+* codex auto args ([c40e943](https://github.com/netlify/axis/commit/c40e9436fd06cc8a576c27e5ed7b4f32520e9c09))
+
 ## [1.17.4](https://github.com/netlify/axis/compare/v1.17.3...v1.17.4) (2026-08-14)
 
 
