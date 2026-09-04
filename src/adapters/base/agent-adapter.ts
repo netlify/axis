@@ -192,11 +192,6 @@ export type AgentAdapterSpec<State> = {
  * SIGTERM → SIGKILL (with proper timer cleanup), exit promise ordering, raw
  * output capture, token estimator wiring, and the three outcome branches
  * (timed-out / non-zero exit with no result / success).
- *
- * Error precedence on failure:
- *   1. `getResult(...).metadata.error` — wins if set
- *   2. `stderr` — if non-empty
- *   3. Generic `"Agent process exited with non-zero code"`
  */
 export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentAdapter {
   const timeoutMs = spec.timeoutMs ?? DEFAULT_TIMEOUT_MS;

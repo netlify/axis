@@ -20,8 +20,10 @@ function createMockProcess(opts: {
   exitCode?: number;
   delayMs?: number;
   hang?: boolean;
+  /** When set, emit an "error" event instead of "close" after the streams end (e.g. ENOENT). */
+  error?: Error;
 }) {
-  const { stdout: stdoutLines = [], stderr: stderrLines = [], exitCode = 0, delayMs = 0, hang = false } = opts;
+  const { stdout: stdoutLines = [], stderr: stderrLines = [], exitCode = 0, delayMs = 0, hang = false, error } = opts;
   const stdout = new Readable({ read() {} });
   const stderr = new Readable({ read() {} });
   const stdin = { end: vi.fn() };
@@ -32,7 +34,11 @@ function createMockProcess(opts: {
     for (const line of stderrLines) stderr.push(line);
     stdout.push(null);
     stderr.push(null);
-    if (!hang) proc.emit("close", exitCode);
+    if (error) {
+      proc.emit("error", error);
+    } else if (!hang) {
+      proc.emit("close", exitCode);
+    }
   }, delayMs);
 
   return proc;
@@ -439,22 +445,8 @@ describe("createAgentAdapter", () => {
   });
 
   it("a child error event (e.g. ENOENT) fails the run instead of hanging", async () => {
-    mockSpawn.mockImplementation((() => {
-      const stdout = new Readable({ read() {} });
-      const stderr = new Readable({ read() {} });
-      const proc = Object.assign(new EventEmitter(), {
-        stdout,
-        stderr,
-        stdin: { end: vi.fn() },
-        kill: vi.fn(),
-      });
-      setTimeout(() => {
-        stdout.push(null);
-        stderr.push(null);
-        proc.emit("error", new Error("spawn test-bin ENOENT"));
-      }, 5);
-      return proc;
-    }) as any);
+    mockSpawn.mockImplementation((() =>
+      createMockProcess({ stdout: [], error: new Error("spawn test-bin ENOENT") })) as any);
 
     const adapter = createLinesTestAdapter();
     const out = await adapter.run(makeInput());
