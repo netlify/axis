@@ -20,6 +20,22 @@ export const MAX_STDERR_BYTES = 100_000;
 /** Grace period between SIGTERM and SIGKILL for non-responsive processes. */
 export const SIGTERM_TO_SIGKILL_MS = 5_000;
 
+/** Failed `AgentOutput` for a process that never started (`spawn()` threw synchronously). */
+function failedToStart(startTime: Date, message: string): AgentOutput {
+  const endTime = new Date();
+  return {
+    result: null,
+    transcript: [],
+    metadata: {
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      durationMs: endTime.getTime() - startTime.getTime(),
+      exitCode: 1,
+      error: message,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Context types passed to adapter callbacks
 // ---------------------------------------------------------------------------
@@ -244,11 +260,18 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       };
 
       // 5. Spawn
-      const child: ChildProcess = spawn(command, [...prefixArgs, ...args], {
-        cwd: input.workingDirectory,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: input.env ?? { ...process.env },
-      });
+      let child: ChildProcess;
+      try {
+        child = spawn(command, [...prefixArgs, ...args], {
+          cwd: input.workingDirectory,
+          stdio: ["pipe", "pipe", "pipe"],
+          env: input.env ?? { ...process.env },
+        });
+      } catch (err) {
+        // spawn() throws synchronously for unusable arguments (e.g. a null
+        // byte in an arg) — fail the run instead of crashing the process.
+        return failedToStart(startTime, (err as Error).message);
+      }
 
       child.stdin?.end();
 

@@ -424,6 +424,20 @@ describe("createAgentAdapter", () => {
     expect(out.metadata.error?.length).toBeLessThan(200_000);
   });
 
+  it("a synchronous spawn throw fails the run instead of crashing it", async () => {
+    mockSpawn.mockImplementation(() => {
+      throw new TypeError("The argument 'args[1]' must be a string without null bytes");
+    });
+    const adapter = createLinesTestAdapter();
+
+    const out = await adapter.run(makeInput());
+
+    expect(out.result).toBeNull();
+    expect(out.transcript).toEqual([]);
+    expect(out.metadata.exitCode).not.toBe(0);
+    expect(out.metadata.error).toContain("null bytes");
+  });
+
   it("custom resolveCommand overrides default resolution", async () => {
     let usedCmd = "";
     mockSpawn.mockImplementation(((cmd: string) => {
