@@ -72,7 +72,7 @@ export default createAgentAdapter<{ stdout: string }>({
     length, and agent transcripts can contain either.
   </p>
   <pre><code>{`promptVia: "stdin",
-buildArgs: (input) => [/* prompt omitted -delivered via stdin */],`}</code></pre>
+buildArgs: () => [],`}</code></pre>
   <p>
     Register it in <code>axis.config.json</code>:
   </p>

@@ -42,9 +42,10 @@ export interface PromptTemplate {
 // ---------------------------------------------------------------------------
 
 /**
- * C0 control characters (except `\t`, `\n`, `\r`) and DEL. Substituted values
- * are agent output — a judge CLI can't render raw control bytes, and argv
- * rejects null bytes outright — so they're stripped before interpolation.
+ * C0 control characters (except `\t`, `\n`, `\r`) and DEL. Some substituted
+ * values carry agent output, which can contain raw control bytes; a judge
+ * CLI can't render them and argv rejects null bytes outright, so they're
+ * stripped from every value at interpolation.
  */
 // eslint-disable-next-line no-control-regex -- intentionally matching control characters
 const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;

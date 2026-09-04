@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter, Readable } from "node:stream";
 import type { AgentAdapter, AgentInput, AgentMetadata } from "../../../../src/types/agent.js";
-import { createAgentAdapter, type SetupContext } from "../../../../src/adapters/base/agent-adapter.js";
+import {
+  createAgentAdapter,
+  type AgentAdapterSpec,
+  type SetupContext,
+} from "../../../../src/adapters/base/agent-adapter.js";
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
@@ -62,7 +66,9 @@ let setupCalls: SetupContext[] = [];
 let getResultCalls = 0;
 let resultOverride: Partial<AgentMetadata> | null = null;
 
-function createLinesTestAdapter(): AgentAdapter {
+function createLinesTestAdapter(
+  overrides: Partial<AgentAdapterSpec<{ lines: string[]; result: string | null }>> = {},
+): AgentAdapter {
   setupCalls = [];
   getResultCalls = 0;
   resultOverride = null;
@@ -96,6 +102,8 @@ function createLinesTestAdapter(): AgentAdapter {
         metadata: resultOverride ?? {},
       };
     },
+
+    ...overrides,
   });
 }
 
@@ -428,15 +436,7 @@ describe("createAgentAdapter", () => {
     const fakeChild = createMockProcess({ stdout: ["ok\n"] });
     mockSpawn.mockImplementation((() => fakeChild) as any);
 
-    const adapter = createAgentAdapter<{ r: string | null }>({
-      name: "stdin-test",
-      cliCommand: "test-bin",
-      buildArgs: () => ["--flag"],
-      promptVia: "stdin",
-      initialState: () => ({ r: null }),
-      streamConfig: { mode: "lines", onLine: (line, ctx) => (ctx.state.r = line) },
-      getResult: (ctx) => ({ result: ctx.state.r }),
-    });
+    const adapter = createLinesTestAdapter({ promptVia: "stdin" });
 
     const prompt = "hello\0world";
     await expect(adapter.run(makeInput({ prompt }))).resolves.not.toThrow();
@@ -452,14 +452,7 @@ describe("createAgentAdapter", () => {
       return fakeChild;
     }) as any);
 
-    const adapter = createAgentAdapter<{ r: string | null }>({
-      name: "argv-test",
-      cliCommand: "test-bin",
-      buildArgs: () => ["--flag"],
-      initialState: () => ({ r: null }),
-      streamConfig: { mode: "lines", onLine: (line, ctx) => (ctx.state.r = line) },
-      getResult: (ctx) => ({ result: ctx.state.r }),
-    });
+    const adapter = createLinesTestAdapter();
 
     await adapter.run(makeInput({ prompt: "hello\0world" }));
 
