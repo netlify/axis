@@ -26,7 +26,7 @@ const mockSpawn = vi.mocked(spawn);
 function createMockProcess(lines: string[], exitCode = 0) {
   const stdout = new Readable({ read() {} });
   const stderr = new Readable({ read() {} });
-  const stdin = { end: vi.fn() };
+  const stdin = { end: vi.fn(), on: vi.fn() };
   const proc = Object.assign(new EventEmitter(), { stdout, stderr, stdin });
 
   // Push lines async so readline can consume them
@@ -217,6 +217,25 @@ describe("ClaudeCodeAdapter", () => {
     const output = await adapter.run(makeInput());
 
     expect(output.rawOutput).toBeUndefined();
+  });
+
+  it("sends the prompt over stdin instead of argv", async () => {
+    let capturedArgs: string[] = [];
+    let proc: ReturnType<typeof createMockProcess>;
+
+    mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
+      capturedArgs = args as string[];
+      proc = createMockProcess([JSON.stringify({ type: "result", result: "ok" })]);
+      return proc;
+    }) as any);
+
+    const prompt = "do the thing\0with a null byte";
+    await adapter.run(makeInput(prompt));
+
+    expect(capturedArgs[0]).toBe("-p");
+    expect(capturedArgs[1]).toBe("--output-format");
+    expect(capturedArgs).not.toContain(prompt);
+    expect(proc!.stdin.end).toHaveBeenCalledWith(prompt);
   });
 
   it("passes --strict-mcp-config so only AXIS-declared MCP servers are used", async () => {
