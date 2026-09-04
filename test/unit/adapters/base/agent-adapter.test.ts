@@ -438,6 +438,31 @@ describe("createAgentAdapter", () => {
     expect(out.metadata.error).toContain("null bytes");
   });
 
+  it("a child error event (e.g. ENOENT) fails the run instead of hanging", async () => {
+    mockSpawn.mockImplementation((() => {
+      const stdout = new Readable({ read() {} });
+      const stderr = new Readable({ read() {} });
+      const proc = Object.assign(new EventEmitter(), {
+        stdout,
+        stderr,
+        stdin: { end: vi.fn() },
+        kill: vi.fn(),
+      });
+      setTimeout(() => {
+        stdout.push(null);
+        stderr.push(null);
+        proc.emit("error", new Error("spawn test-bin ENOENT"));
+      }, 5);
+      return proc;
+    }) as any);
+
+    const adapter = createLinesTestAdapter();
+    const out = await adapter.run(makeInput());
+
+    expect(out.metadata.error).toContain("ENOENT");
+    expect(out.metadata.exitCode).not.toBe(0);
+  });
+
   it("custom resolveCommand overrides default resolution", async () => {
     let usedCmd = "";
     mockSpawn.mockImplementation(((cmd: string) => {

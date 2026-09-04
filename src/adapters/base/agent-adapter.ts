@@ -281,8 +281,15 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       });
 
       // 7. Register close listener BEFORE reading stdout (ordering matters)
+      // `error` fires when the child can't be started at all (e.g. ENOENT);
+      // a promise resolves once, so a later `close` is harmless.
+      let spawnError: Error | undefined;
       const exitPromise = new Promise<number>((resolve) => {
         child.on("close", (code) => resolve(code ?? 1));
+        child.on("error", (err) => {
+          spawnError = err;
+          resolve(1);
+        });
       });
 
       // 8. Buffer stderr with a size cap (and mirror to debug callback if any)
@@ -429,7 +436,7 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       });
 
       // 14. Error precedence
-      let error = extracted.metadata?.error;
+      let error = extracted.metadata?.error ?? spawnError?.message;
       if (!error && exitCode !== 0 && extracted.result === null) {
         error = stderr || "Agent process exited with non-zero code";
       }
