@@ -11,11 +11,19 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
+# The job only reads the repo. Anything unlisted here is unavailable to it.
+permissions:
+  contents: read
+
 jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
+      # No step needs authenticated git, so don't leave the token in the
+      # checkout for npm lifecycle scripts and the test suite to reach.
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
