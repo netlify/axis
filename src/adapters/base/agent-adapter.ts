@@ -260,7 +260,7 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       });
 
       if (spec.promptVia === "stdin") {
-        child.stdin?.on("error", () => {}); // child exited before reading; exit path reports it
+        child.stdin?.on("error", () => {}); // Prevent an unhandled stream error if the child closes stdin early.
         child.stdin?.end(input.prompt);
       } else {
         child.stdin?.end();
