@@ -24,7 +24,7 @@ function createMockProcess(opts: {
   const { stdout: stdoutLines = [], stderr: stderrLines = [], exitCode = 0, delayMs = 0, hang = false } = opts;
   const stdout = new Readable({ read() {} });
   const stderr = new Readable({ read() {} });
-  const stdin = { end: vi.fn() };
+  const stdin = { end: vi.fn(), on: vi.fn() };
   const proc = Object.assign(new EventEmitter(), { stdout, stderr, stdin, kill: vi.fn() });
 
   setTimeout(() => {
@@ -422,6 +422,49 @@ describe("createAgentAdapter", () => {
     const out = await adapter.run(makeInput());
 
     expect(out.metadata.error?.length).toBeLessThan(200_000);
+  });
+
+  it("promptVia: stdin writes the prompt to child.stdin and resolves without throwing", async () => {
+    const fakeChild = createMockProcess({ stdout: ["ok\n"] });
+    mockSpawn.mockImplementation((() => fakeChild) as any);
+
+    const adapter = createAgentAdapter<{ r: string | null }>({
+      name: "stdin-test",
+      cliCommand: "test-bin",
+      buildArgs: () => ["--flag"],
+      promptVia: "stdin",
+      initialState: () => ({ r: null }),
+      streamConfig: { mode: "lines", onLine: (line, ctx) => (ctx.state.r = line) },
+      getResult: (ctx) => ({ result: ctx.state.r }),
+    });
+
+    const prompt = "hello\0world";
+    await expect(adapter.run(makeInput({ prompt }))).resolves.not.toThrow();
+
+    expect(fakeChild.stdin.end).toHaveBeenCalledWith(prompt);
+  });
+
+  it("promptVia omitted: stdin.end is called with no data and argv is untouched", async () => {
+    const fakeChild = createMockProcess({ stdout: ["ok\n"] });
+    let captured: string[] = [];
+    mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
+      captured = args;
+      return fakeChild;
+    }) as any);
+
+    const adapter = createAgentAdapter<{ r: string | null }>({
+      name: "argv-test",
+      cliCommand: "test-bin",
+      buildArgs: () => ["--flag"],
+      initialState: () => ({ r: null }),
+      streamConfig: { mode: "lines", onLine: (line, ctx) => (ctx.state.r = line) },
+      getResult: (ctx) => ({ result: ctx.state.r }),
+    });
+
+    await adapter.run(makeInput({ prompt: "hello\0world" }));
+
+    expect(fakeChild.stdin.end).toHaveBeenCalledWith();
+    expect(captured).toEqual(["--flag"]);
   });
 
   it("custom resolveCommand overrides default resolution", async () => {
