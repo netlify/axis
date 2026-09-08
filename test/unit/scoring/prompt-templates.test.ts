@@ -37,6 +37,14 @@ describe("interpolate", () => {
   it("handles empty string variable value", () => {
     expect(interpolate("before{{gap}}after", { gap: "" })).toBe("beforeafter");
   });
+
+  it("strips control characters from a substituted value", () => {
+    expect(interpolate("{{v}}", { v: "a\0b\x01c\x7F" })).toBe("abc");
+  });
+
+  it("preserves tab, newline, and carriage return in a substituted value", () => {
+    expect(interpolate("{{v}}", { v: "x\ny\tz\r" })).toBe("x\ny\tz\r");
+  });
 });
 
 describe("getPromptTemplates", () => {

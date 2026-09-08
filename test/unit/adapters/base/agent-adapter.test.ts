@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter, Readable } from "node:stream";
 import type { AgentAdapter, AgentInput, AgentMetadata } from "../../../../src/types/agent.js";
-import { createAgentAdapter, type SetupContext } from "../../../../src/adapters/base/agent-adapter.js";
+import {
+  createAgentAdapter,
+  type AgentAdapterSpec,
+  type SetupContext,
+} from "../../../../src/adapters/base/agent-adapter.js";
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
@@ -26,7 +30,7 @@ function createMockProcess(opts: {
   const { stdout: stdoutLines = [], stderr: stderrLines = [], exitCode = 0, delayMs = 0, hang = false, error } = opts;
   const stdout = new Readable({ read() {} });
   const stderr = new Readable({ read() {} });
-  const stdin = { end: vi.fn() };
+  const stdin = { end: vi.fn(), on: vi.fn() };
   const proc = Object.assign(new EventEmitter(), { stdout, stderr, stdin, kill: vi.fn() });
 
   setTimeout(() => {
@@ -68,7 +72,9 @@ let setupCalls: SetupContext[] = [];
 let getResultCalls = 0;
 let resultOverride: Partial<AgentMetadata> | null = null;
 
-function createLinesTestAdapter(): AgentAdapter {
+function createLinesTestAdapter(
+  overrides: Partial<AgentAdapterSpec<{ lines: string[]; result: string | null }>> = {},
+): AgentAdapter {
   setupCalls = [];
   getResultCalls = 0;
   resultOverride = null;
@@ -102,6 +108,8 @@ function createLinesTestAdapter(): AgentAdapter {
         metadata: resultOverride ?? {},
       };
     },
+
+    ...overrides,
   });
 }
 
@@ -453,6 +461,34 @@ describe("createAgentAdapter", () => {
 
     expect(out.metadata.error).toContain("ENOENT");
     expect(out.metadata.exitCode).not.toBe(0);
+  });
+
+  it("promptVia: stdin writes the prompt to child.stdin and resolves without throwing", async () => {
+    const fakeChild = createMockProcess({ stdout: ["ok\n"] });
+    mockSpawn.mockImplementation((() => fakeChild) as any);
+
+    const adapter = createLinesTestAdapter({ promptVia: "stdin" });
+
+    const prompt = "hello\0world";
+    await expect(adapter.run(makeInput({ prompt }))).resolves.not.toThrow();
+
+    expect(fakeChild.stdin.end).toHaveBeenCalledWith(prompt);
+  });
+
+  it("promptVia omitted: stdin.end is called with no data and argv is untouched", async () => {
+    const fakeChild = createMockProcess({ stdout: ["ok\n"] });
+    let captured: string[] = [];
+    mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
+      captured = args;
+      return fakeChild;
+    }) as any);
+
+    const adapter = createLinesTestAdapter();
+
+    await adapter.run(makeInput({ prompt: "hello\0world" }));
+
+    expect(fakeChild.stdin.end).toHaveBeenCalledWith();
+    expect(captured).toEqual(["--flag"]);
   });
 
   it("custom resolveCommand overrides default resolution", async () => {
