@@ -8,7 +8,7 @@ import {
   renderBaselineList,
   renderBaselineComparison,
 } from "../../../src/ui/format.js";
-import type { CategoryScore, ScoreResult } from "../../../src/types/scoring.js";
+import type { CategoryScore, InteractionAudit, ScoreResult } from "../../../src/types/scoring.js";
 import type { RunOutput, RunResult } from "../../../src/types/output.js";
 import type { AgentOutput } from "../../../src/types/agent.js";
 import type { Baseline, BaselineComparison } from "../../../src/types/baseline.js";
@@ -387,5 +387,151 @@ describe("renderBaselineComparison", () => {
 
     const output = renderBaselineComparison(diff);
     expect(output).not.toContain("New (not in baseline)");
+  });
+});
+
+// --- Score breakdown table (verbose scored output) ---
+
+function makeAudit(overrides: Partial<InteractionAudit> & { id: number }): InteractionAudit {
+  return {
+    categories: ["agent"],
+    success: 1,
+    speed: 1,
+    weight: 1,
+    contextRelevance: 1,
+    rationale: "Looked fine.",
+    ...overrides,
+  };
+}
+
+/** A scored result whose Agent category carries the given audits and necessity judgment. */
+function makeScoredResult(agentCat: Partial<CategoryScore>): RunResult {
+  const agent: CategoryScore = {
+    ...makeCategory(60),
+    auditedCount: 3,
+    necessity: { category: "agent", score: 1, unnecessaryIds: [], rationale: "default" },
+    ...agentCat,
+  };
+  return {
+    ...makeResult({ exitCode: 0 }),
+    score: makeScoreResult({ agent }),
+  } as RunResult;
+}
+
+describe("renderScenarioDetail score breakdown", () => {
+  it("renders a table row per imperfect audit with its sub-perfect dimensions", () => {
+    const out = renderScenarioDetail(
+      makeScoredResult({
+        audits: [
+          makeAudit({ id: 3, success: 0.5, speed: 0.8, rationale: "Install failed once." }),
+          makeAudit({ id: 7, speed: 0.6, rationale: "Slow directory scan." }),
+        ],
+      }),
+    );
+
+    expect(out).toContain("Score breakdown");
+    expect(out).toContain("Interaction");
+    expect(out).toMatch(/#3\s+Success: 50\s+Speed: 80\s+Install failed once\./);
+    expect(out).toMatch(/#7\s+Speed: 60\s+Slow directory scan\./);
+  });
+
+  it("omits dimensions that are already perfect", () => {
+    const out = renderScenarioDetail(makeScoredResult({ audits: [makeAudit({ id: 1, speed: 0.4 })] }));
+    expect(out).toMatch(/#1\s+Speed: 40/);
+    expect(out).not.toContain("Success: 100");
+  });
+
+  it("counts passing audits instead of listing them", () => {
+    const out = renderScenarioDetail(
+      makeScoredResult({
+        audits: [
+          makeAudit({ id: 1, success: 0.5 }),
+          makeAudit({ id: 2 }),
+          makeAudit({ id: 3 }),
+          makeAudit({ id: 4, rationale: "default" }),
+        ],
+      }),
+    );
+    expect(out).toContain("2 other passing interactions not shown");
+    expect(out).not.toMatch(/^\s+#2\s/m);
+  });
+
+  it("singularizes the passing-interaction count", () => {
+    const out = renderScenarioDetail(
+      makeScoredResult({ audits: [makeAudit({ id: 1, success: 0.5 }), makeAudit({ id: 2 })] }),
+    );
+    expect(out).toContain("1 other passing interaction not shown");
+  });
+
+  it("renders a necessity row with the flagged interaction ids", () => {
+    const out = renderScenarioDetail(
+      makeScoredResult({
+        audits: [makeAudit({ id: 1, success: 0.5 })],
+        necessity: { category: "agent", score: 0.7, unnecessaryIds: [4, 12], rationale: "Redundant greps." },
+      }),
+    );
+    expect(out).toMatch(/Necessity\s+Unnecessary: #4, #12\s+Redundant greps\./);
+  });
+
+  it("spills a long flagged-id list into a +N more suffix", () => {
+    const out = renderScenarioDetail(
+      makeScoredResult({
+        audits: [makeAudit({ id: 1, success: 0.5 })],
+        necessity: {
+          category: "agent",
+          score: 0.1,
+          unnecessaryIds: [1, 2, 3, 4, 5, 6, 7],
+          rationale: "Many redundant calls.",
+        },
+      }),
+    );
+    expect(out).toContain("Unnecessary: #1, #2, #3, #4, +3 more");
+  });
+
+  it("omits the table when every audit is a default placeholder", () => {
+    const out = renderScenarioDetail(
+      makeScoredResult({ audits: [makeAudit({ id: 1, success: 0.5, rationale: "default" })] }),
+    );
+    expect(out).not.toContain("Score breakdown");
+  });
+
+  it("omits the table when all audits pass and necessity is default", () => {
+    const out = renderScenarioDetail(makeScoredResult({ audits: [makeAudit({ id: 1 })] }));
+    expect(out).not.toContain("Score breakdown");
+  });
+
+  it("ignores context relevance outside the Agent category", () => {
+    const envAudit = makeAudit({ id: 1, categories: ["environment"], contextRelevance: 0.2 });
+    const env: CategoryScore = { ...makeCategory(60), auditedCount: 1, audits: [envAudit] };
+    const out = renderScenarioDetail({ ...makeResult({ exitCode: 0 }), score: makeScoreResult({ env }) } as RunResult);
+
+    // Relevance does not feed Env's score, so this audit counts as passing.
+    expect(out).not.toMatch(/#1\s+Relevance: 20/);
+  });
+
+  it("keeps every line within the 102-column table footprint", () => {
+    const out = renderScenarioDetail(
+      makeScoredResult({
+        audits: [
+          makeAudit({
+            id: 1,
+            success: 0.99,
+            speed: 0.99,
+            contextRelevance: 0.99,
+            rationale: "A ".repeat(200),
+          }),
+        ],
+        necessity: {
+          category: "agent",
+          score: 0.1,
+          unnecessaryIds: Array.from({ length: 40 }, (_, i) => i + 100),
+          rationale: "Long rationale. ".repeat(40),
+        },
+      }),
+    );
+
+    for (const line of out.split("\n")) {
+      expect([...line].length).toBeLessThanOrEqual(102);
+    }
   });
 });
