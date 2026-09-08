@@ -133,6 +133,15 @@ export type AgentAdapterSpec<State> = {
   /** Build the CLI arguments for the agent process. Prefix args from command resolution are prepended automatically. */
   buildArgs: (input: AgentInput) => string[];
 
+  /**
+   * How the prompt reaches the CLI.
+   * - "argv" (default): `buildArgs` places `input.prompt` on the command line.
+   * - "stdin": the base writes `input.prompt` to the child's stdin and closes it;
+   *   `buildArgs` must NOT include the prompt. Use this for CLIs that read the
+   *   prompt from a pipe — argv rejects null bytes and caps argument length.
+   */
+  promptVia?: "argv" | "stdin";
+
   /** Per-run mutable state. Called once per run to create a fresh state bag for `streamConfig` handlers and `getResult`. */
   initialState: () => State;
 
@@ -250,7 +259,12 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
         env: input.env ?? { ...process.env },
       });
 
-      child.stdin?.end();
+      if (spec.promptVia === "stdin") {
+        child.stdin?.on("error", () => {}); // Prevent an unhandled stream error if the child closes stdin early.
+        child.stdin?.end(input.prompt);
+      } else {
+        child.stdin?.end();
+      }
 
       // 6. Cleanup handler for Ctrl-C
       input.registerCleanup?.(() => {

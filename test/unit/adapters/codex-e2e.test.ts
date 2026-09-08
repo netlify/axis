@@ -24,7 +24,7 @@ const mockSpawn = vi.mocked(spawn);
 function createMockProcess(lines: string[], exitCode = 0) {
   const stdout = new Readable({ read() {} });
   const stderr = new Readable({ read() {} });
-  const stdin = { end: vi.fn() };
+  const stdin = { end: vi.fn(), on: vi.fn() };
   const proc = Object.assign(new EventEmitter(), { stdout, stderr, stdin, kill: vi.fn() });
 
   setTimeout(() => {

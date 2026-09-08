@@ -23,7 +23,7 @@ const mockSpawn = vi.mocked(spawn);
 function createMockProcess(lines: string[], exitCode = 0) {
   const stdout = new Readable({ read() {} });
   const stderr = new Readable({ read() {} });
-  const stdin = { end: vi.fn() };
+  const stdin = { end: vi.fn(), on: vi.fn() };
   const proc = Object.assign(new EventEmitter(), { stdout, stderr, stdin, kill: vi.fn() });
 
   setTimeout(() => {
@@ -265,21 +265,25 @@ describe("CodexAdapter", () => {
     expect(capturedArgs).not.toContain("--color");
   });
 
-  it("puts prompt as last positional argument after exec --json", async () => {
+  it("sends the prompt over stdin instead of argv", async () => {
     let capturedArgs: string[] = [];
+    let proc: ReturnType<typeof createMockProcess>;
 
     mockSpawn.mockImplementation(((_cmd: string, args: string[]) => {
       capturedArgs = args as string[];
-      return createMockProcess([
+      proc = createMockProcess([
         JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "ok" } }),
       ]);
+      return proc;
     }) as any);
 
-    await adapter.run(makeInput("do the thing"));
+    const prompt = "do the thing\0with a null byte";
+    await adapter.run(makeInput(prompt));
 
     expect(capturedArgs[0]).toBe("exec");
     expect(capturedArgs[1]).toBe("--json");
-    expect(capturedArgs[capturedArgs.length - 1]).toBe("do the thing");
+    expect(capturedArgs).not.toContain(prompt);
+    expect(proc!.stdin.end).toHaveBeenCalledWith(prompt);
   });
 
   it("uses last agent_message when multiple are emitted", async () => {
