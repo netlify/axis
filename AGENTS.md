@@ -38,7 +38,7 @@ Built-in adapters split into two factories. NDJSON-style adapters (`claude-code`
 - Raw output capture (NDJSON lines for `lines` mode, raw chunks for `aggregate`)
 - Token estimator wiring via `StreamContext.feedAssistantText`
 - CLI resolution (direct command → `npx --yes <pkg>` fallback)
-- Error precedence: `extracted.metadata.error` → `stderr` → `"Agent process exited with non-zero code"`
+- Error precedence: `extracted.metadata.error` → spawn error → `stderr` → `"Agent process exited with non-zero code"`
 
 The NDJSON-style adapters (`claude-code`, `codex`) use `lines` mode for NDJSON parsing. Custom adapters can use either `lines` or `aggregate` mode (raw stdout capture). ACP-based adapters bypass `streamConfig` entirely - the ACP SDK handles framing.
 
@@ -73,6 +73,7 @@ For built-in adapters, register the factory in `src/adapters/registry.ts`. Exter
 ### Error Handling
 
 - `AgentMetadata.error` is the canonical error field for failed runs
+- A process that fails to start — `spawn()` throwing synchronously, or the child emitting `error` (e.g. `ENOENT`) — is a failed run with `metadata.error` set, never a thrown error; the runner and scoring treat it like any other failed run
 - Runner checks both `exitCode !== 0` and `metadata.error` for failure status
 - Friendly error classification in `src/ui/format.ts` via `friendlyError()` -maps common patterns (quota, rate limit, auth, timeout, network) to one-line messages
 - Error display: `↳ friendly message` below failed rows in tables, `Error:` line in detail views

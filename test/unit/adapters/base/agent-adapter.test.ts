@@ -24,8 +24,10 @@ function createMockProcess(opts: {
   exitCode?: number;
   delayMs?: number;
   hang?: boolean;
+  /** When set, emit an "error" event instead of "close" after the streams end (e.g. ENOENT). */
+  error?: Error;
 }) {
-  const { stdout: stdoutLines = [], stderr: stderrLines = [], exitCode = 0, delayMs = 0, hang = false } = opts;
+  const { stdout: stdoutLines = [], stderr: stderrLines = [], exitCode = 0, delayMs = 0, hang = false, error } = opts;
   const stdout = new Readable({ read() {} });
   const stderr = new Readable({ read() {} });
   const stdin = { end: vi.fn(), on: vi.fn() };
@@ -36,7 +38,11 @@ function createMockProcess(opts: {
     for (const line of stderrLines) stderr.push(line);
     stdout.push(null);
     stderr.push(null);
-    if (!hang) proc.emit("close", exitCode);
+    if (error) {
+      proc.emit("error", error);
+    } else if (!hang) {
+      proc.emit("close", exitCode);
+    }
   }, delayMs);
 
   return proc;
@@ -430,6 +436,31 @@ describe("createAgentAdapter", () => {
     const out = await adapter.run(makeInput());
 
     expect(out.metadata.error?.length).toBeLessThan(200_000);
+  });
+
+  it("a synchronous spawn throw fails the run instead of crashing it", async () => {
+    mockSpawn.mockImplementation(() => {
+      throw new TypeError("The argument 'args[1]' must be a string without null bytes");
+    });
+    const adapter = createLinesTestAdapter();
+
+    const out = await adapter.run(makeInput());
+
+    expect(out.result).toBeNull();
+    expect(out.transcript).toEqual([]);
+    expect(out.metadata.exitCode).not.toBe(0);
+    expect(out.metadata.error).toContain("null bytes");
+  });
+
+  it("a child error event (e.g. ENOENT) fails the run instead of hanging", async () => {
+    mockSpawn.mockImplementation((() =>
+      createMockProcess({ stdout: [], error: new Error("spawn test-bin ENOENT") })) as any);
+
+    const adapter = createLinesTestAdapter();
+    const out = await adapter.run(makeInput());
+
+    expect(out.metadata.error).toContain("ENOENT");
+    expect(out.metadata.exitCode).not.toBe(0);
   });
 
   it("promptVia: stdin writes the prompt to child.stdin and resolves without throwing", async () => {
