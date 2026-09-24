@@ -1,0 +1,39 @@
+{
+  "name": "Honor option-picker selections",
+  "about": "A short typed request plus the choices the user clicked in the option picker. Recall: were the selections honored? Precision: were unselected sections added?",
+  "prompt": ["Site for my yoga studio, Still Point Yoga"],
+  "picker": [
+    { "question": "What kind of site is this?", "answer": "Local business" },
+    { "question": "Pick a style", "answer": "Warm & organic" },
+    { "question": "Color mood", "answer": "Earth tones" },
+    { "question": "Which sections do you need?", "answer": "Class schedule, Instructors, Pricing, Contact" },
+    { "question": "Primary action for visitors", "answer": "Book a class" }
+  ],
+  "rubric": {
+    "recall": {
+      "content": ["The studio name \"Still Point Yoga\" in the hero and the page `<title>`"],
+      "input-handling": [
+        "A class schedule section",
+        "An instructors section",
+        "A pricing section",
+        "A contact section",
+        "A \"Book a class\" call to action (or close wording) as the most prominent action on the page"
+      ]
+    },
+    "precision": [
+      {
+        "vertical": "input-handling",
+        "items": "page sections (top-level blocks of content below the header)",
+        "supported": "one of the selected sections (class schedule, instructors, pricing, contact), the hero, or the footer",
+        "unsupported": "any other section, e.g. a blog, testimonials, gallery, FAQ, or newsletter signup"
+      },
+      "facts"
+    ],
+    "pass": {
+      "input-handling": [
+        "The visual style reads as \"Warm & organic\": soft shapes, natural textures or imagery, relaxed typography",
+        "The palette is earth tones (browns, terracottas, sage, sand) with no cool or neon brand colors"
+      ]
+    }
+  }
+}

@@ -1,0 +1,145 @@
+---
+name: site-generation-evals
+
+# Manual only: each run calls real agents and a judge model, so it costs
+# tokens. Nothing here touches the `test` workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: "Scenario filter, e.g. 'hard-input/*' or 'table-stakes/bakery' (blank = all)"
+        required: false
+        default: ""
+      agents:
+        description: "Agent filter, e.g. 'claude-code' (blank = all in axis.config.ts)"
+        required: false
+        default: ""
+      baseline:
+        description: "Compare against evals/site-generation/baselines/<name>.json and fail on regressions (blank = skip)"
+        required: false
+        default: ""
+      pairwise:
+        description: "Also run pairwise visual judging, claude-code vs codex"
+        type: boolean
+        default: false
+
+concurrency:
+  group: site-generation-evals-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+      EVALS: evals/site-generation
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit
+
+      # dist/cli.js is the axis binary; the eval configs import from src/ via jiti.
+      - name: Build
+        run: npm run build
+
+      - name: Install agent CLIs
+        run: npm install -g @anthropic-ai/claude-code @openai/codex
+
+      # axis exits 1 if any job failed, but afterAll (metrics) has already run by
+      # then. Keep going so the summary and reports are still published; the
+      # last step fails the job.
+      - name: Run evals
+        id: run
+        continue-on-error: true
+        env:
+          SCENARIOS: ${{ inputs.scenarios }}
+          AGENTS: ${{ inputs.agents }}
+        run: |
+          args=(run -c "$EVALS/axis.config.ts")
+          if [ -n "$SCENARIOS" ]; then args+=(-s "$SCENARIOS"); fi
+          if [ -n "$AGENTS" ]; then args+=(-a "$AGENTS"); fi
+          node dist/cli.js "${args[@]}"
+
+      - name: Metrics summary
+        if: always()
+        run: |
+          {
+            echo "## Site generation metrics"
+            echo '```'
+            npx jiti "$EVALS/lib/metrics.ts" latest
+            echo '```'
+            echo "By scenario:"
+            echo '```'
+            npx jiti "$EVALS/lib/metrics.ts" latest --by-scenario
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Compare against baseline
+        if: inputs.baseline != ''
+        env:
+          BASELINE: ${{ inputs.baseline }}
+        run: |
+          if [ ! -f "$EVALS/baselines/$BASELINE.json" ]; then
+            echo "::error::No baseline at $EVALS/baselines/$BASELINE.json. Save and commit one first."
+            exit 1
+          fi
+          set -o pipefail
+          {
+            echo "## Against baseline \`$BASELINE\`"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          npx jiti "$EVALS/lib/metrics.ts" latest --compare "$BASELINE" | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Pairwise visual judging
+        if: inputs.pairwise
+        env:
+          PAIRWISE_A: latest:claude-code
+          PAIRWISE_B: latest:codex
+        run: |
+          node dist/cli.js run -c "$EVALS/pairwise.config.ts" --no-score
+          {
+            echo "## Pairwise: A=claude-code vs B=codex"
+            echo '```'
+            npx jiti "$EVALS/lib/pairwise.ts" latest
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Agents with a pinned model write files like 'claude-code|claude-opus-5-5.json',
+      # and upload-artifact rejects '|' in paths, so ship the tree as one tarball.
+      - name: Archive reports
+        if: always()
+        run: |
+          if [ -d "$EVALS/.axis/reports" ]; then
+            tar -czf "site-generation-reports-${GITHUB_RUN_ID}.tar.gz" -C "$EVALS/.axis" reports
+          fi
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-generation-reports-${{ github.run_id }}
+          path: site-generation-reports-${{ github.run_id }}.tar.gz
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail if any eval job failed
+        if: steps.run.outcome == 'failure'
+        run: |
+          echo "::error::One or more scenario/agent jobs failed. See the uploaded reports."
+          exit 1

@@ -1,0 +1,44 @@
+{
+  "name": "Extract requirements from a long, noisy prompt",
+  "about": "The real requirements are buried in a rambling message. Recall asks whether the signal made it onto the site; precision asks whether the noise stayed off it.",
+  "site_type": "local-business",
+  "prompt": [
+    "Ok so bit of background first. I've been meaning to do this for ages, my nephew set up a site for me in 2019 on some builder thing but I lost the password and honestly it was purple, which I never liked.",
+    "My neighbor Doug says I should just use Instagram but I think that's for young people. Anyway.",
+    "I run a bike repair shop, it's called Spoke Doctor, it's just me and sometimes my friend Priya helps on weekends.",
+    "We've been open since 2011, before that I was an accountant which was fine but I hated the commute, took the 43 bus every day and it was always late.",
+    "Customers mostly want tune-ups ($65), flat fixes ($15), and full overhauls ($180), we also do e-bikes now but only basic stuff, no motor repairs, I get asked about motor repairs constantly so maybe make that clear.",
+    "The weather here has been awful lately, by the way, which is actually good for business because everyone gets flats.",
+    "We're at 88 Canal Road. Open Mon–Sat 10 to 6. Phone is (555) 014-2290.",
+    "Oh and my cat Biscuit lives at the shop, people love her, but I don't know if that belongs on a website.",
+    "I watched a video that said websites need to be 'SEO optimized' and have a blog, I don't have time for a blog though.",
+    "Mostly I just want people to know what I do, what it costs, and how to reach me. Thanks!!"
+  ],
+  "rubric": {
+    "recall": {
+      "content": [
+        "The shop name \"Spoke Doctor\"",
+        "The address 88 Canal Road",
+        "Hours Mon–Sat 10–6",
+        "The phone number (555) 014-2290 as a `tel:` link",
+        "Tune-ups at $65",
+        "Flat fixes at $15",
+        "Full overhauls at $180",
+        "That basic e-bike service is offered",
+        "A clear statement that motor repairs are not offered"
+      ]
+    },
+    "precision": [
+      {
+        "vertical": "input-handling",
+        "items": "statements in the site copy (headings, paragraphs, captions, list items)",
+        "supported": "a service, price, or contact/business fact from the prompt, the shop's founding year or Priya's weekend help, Biscuit the cat as a small detail, or generic marketing copy that makes no factual claim",
+        "unsupported": "backstory or asides from the prompt turned into copy (the nephew, the old purple site, Doug, Instagram, the accounting career, the 43 bus, the weather, SEO), or facts not in the prompt"
+      },
+      "facts"
+    ],
+    "pass": {
+      "input-handling": ["The site has no blog section or blog link, since the owner said they don't have time for one"]
+    }
+  }
+}

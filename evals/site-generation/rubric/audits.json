@@ -1,0 +1,9 @@
+{
+  "$comment": "Reusable precision audits. A spec lists one by id in `rubric.precision`, or writes its own inline. The judge lists every matching item on the site and labels it SUPPORTED, PLACEHOLDER, or UNSUPPORTED. Precision = supported / (supported + unsupported); placeholders are left out.",
+  "facts": {
+    "vertical": "content",
+    "items": "factual claims: business or person names, contact details, addresses, hours, dates, times, prices, products, services, staff, reviews, testimonials, awards, and statistics",
+    "supported": "stated in the prompt (or its picker selections)",
+    "unsupported": "presented as real but not given in the prompt, or contradicting it"
+  }
+}
