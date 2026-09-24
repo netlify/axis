@@ -31,14 +31,14 @@ AXIS (Agent Experience Index Score) is a synthetic testing framework for AI agen
 
 Built-in adapters split into two factories. NDJSON-style adapters (`claude-code`, `codex`) are created via `createAgentAdapter(spec)` from `src/adapters/base/agent-adapter.ts`. ACP-based adapters (`claude-sdk`, `codex-sdk`, `gemini`, `goose`, `opencode`, `qwen-code`, `stakpak`, `blackbox`, `fast-agent`, `mistral-vibe`, `factory-droid`, `poolside`, `vtcode`, `cursor-agent`, `auggie`, `kimi`, `openhands`, `cline`, `kiro-cli`, `kilo`, `qoder`) are created via `createAcpBasedAdapter(spec)` from `src/adapters/base/acp-adapter.ts`. Each adapter is a plain factory function (e.g. `createGeminiAdapter()`) that returns an `AgentAdapter` -no classes, no inheritance. The factory owns the shared plumbing:
 
-- Spawn + stdin.end + cleanup registration (SIGTERM on Ctrl-C)
+- Spawn + cleanup registration (SIGTERM on Ctrl-C); stdin is closed immediately by default, or written with the prompt then closed when `promptVia: "stdin"`
 - 10-minute timeout → SIGTERM → SIGKILL after 5s grace (timer cleared on clean exit)
 - stderr capped at 100 KB
 - `close` event listener registered BEFORE stdout stream to avoid missing it
 - Raw output capture (NDJSON lines for `lines` mode, raw chunks for `aggregate`)
 - Token estimator wiring via `StreamContext.feedAssistantText`
 - CLI resolution (direct command → `npx --yes <pkg>` fallback)
-- Error precedence: `extracted.metadata.error` → `stderr` → `"Agent process exited with non-zero code"`
+- Error precedence: `extracted.metadata.error` → spawn error → `stderr` → `"Agent process exited with non-zero code"`
 
 The NDJSON-style adapters (`claude-code`, `codex`) use `lines` mode for NDJSON parsing. Custom adapters can use either `lines` or `aggregate` mode (raw stdout capture). ACP-based adapters bypass `streamConfig` entirely - the ACP SDK handles framing.
 
@@ -46,20 +46,21 @@ The NDJSON-style adapters (`claude-code`, `codex`) use `lines` mode for NDJSON p
 
 Call `createAgentAdapter(spec)` with an `AgentAdapterSpec<State>`. The spec is a single typed object -no class inheritance, no protected hooks:
 
-| Spec field         | Purpose                                                                                                                                                                           |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`             | Adapter name (registered in `src/adapters/registry.ts`)                                                                                                                           |
-| `cliCommand?`      | CLI binary for `resolveCommand`; omit if user-supplied                                                                                                                            |
-| `timeoutMs?`       | Execution timeout (default 10 min)                                                                                                                                                |
-| `requiredEnv?`     | Env vars validated by the runner pre-flight (e.g. `ANTHROPIC_API_KEY`)                                                                                                            |
-| `hasLocalSession?` | Detect a usable local CLI login (e.g. `claude login`, `codex login`). Runner calls this only when `requiredEnv` is missing — explicit API keys always win                         |
-| `isolationEnv?`    | Isolation vars (e.g. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`). Signature: `({ workspace, home }) => Record<string, string>`. Point `*_HOME`-style paths under `home`, never `workspace` |
-| `prepare?`         | Side effects (mkdir, MCP / skills writers) before spawn                                                                                                                           |
-| `resolveCommand?`  | Override how the CLI command is resolved                                                                                                                                          |
-| `buildArgs`        | Build CLI arguments (prefix args from command resolution prepended automatically)                                                                                                 |
-| `initialState`     | Per-run mutable state used by `streamConfig` handlers and `getResult`                                                                                                             |
-| `streamConfig`     | How to process agent stdout. Discriminated union: `{ mode: "lines", onLine, onEnd? }` or `{ mode: "aggregate", onChunk, onEnd? }`                                                 |
-| `getResult`        | Build final `{ result, metadata? }` from accumulated state after exit                                                                                                             |
+| Spec field         | Purpose                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`             | Adapter name (registered in `src/adapters/registry.ts`)                                                                                                                                                                                                                                                                                                            |
+| `cliCommand?`      | CLI binary for `resolveCommand`; omit if user-supplied                                                                                                                                                                                                                                                                                                             |
+| `timeoutMs?`       | Execution timeout (default 10 min)                                                                                                                                                                                                                                                                                                                                 |
+| `requiredEnv?`     | Env vars validated by the runner pre-flight (e.g. `ANTHROPIC_API_KEY`)                                                                                                                                                                                                                                                                                             |
+| `hasLocalSession?` | Detect a usable local CLI login (e.g. `claude login`, `codex login`). Runner calls this only when `requiredEnv` is missing — explicit API keys always win                                                                                                                                                                                                          |
+| `isolationEnv?`    | Isolation vars (e.g. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`). Signature: `({ workspace, home }) => Record<string, string>`. Point `*_HOME`-style paths under `home`, never `workspace`                                                                                                                                                                                  |
+| `prepare?`         | Side effects (mkdir, MCP / skills writers) before spawn                                                                                                                                                                                                                                                                                                            |
+| `resolveCommand?`  | Override how the CLI command is resolved                                                                                                                                                                                                                                                                                                                           |
+| `buildArgs`        | Build CLI arguments (prefix args from command resolution prepended automatically)                                                                                                                                                                                                                                                                                  |
+| `promptVia?`       | How the prompt reaches the CLI: `"argv"` (default) -`buildArgs` places `input.prompt` on the command line; `"stdin"` -the base writes `input.prompt` to the child's stdin and closes it, and `buildArgs` must omit the prompt. `claude-code` and `codex` use `"stdin"`: argv rejects null bytes and caps argument length, and agent transcripts can contain either |
+| `initialState`     | Per-run mutable state used by `streamConfig` handlers and `getResult`                                                                                                                                                                                                                                                                                              |
+| `streamConfig`     | How to process agent stdout. Discriminated union: `{ mode: "lines", onLine, onEnd? }` or `{ mode: "aggregate", onChunk, onEnd? }`                                                                                                                                                                                                                                  |
+| `getResult`        | Build final `{ result, metadata? }` from accumulated state after exit                                                                                                                                                                                                                                                                                              |
 
 The `streamConfig` field uses a discriminated union so the mode and its handler can never get out of sync -no runtime assertions needed. `getResult` returns `null` for "no result" (never `""`). Metadata overrides (e.g. upstream `durationMs`) are spread on top of base-computed fields.
 
@@ -72,6 +73,7 @@ For built-in adapters, register the factory in `src/adapters/registry.ts`. Exter
 ### Error Handling
 
 - `AgentMetadata.error` is the canonical error field for failed runs
+- A process that fails to start — `spawn()` throwing synchronously, or the child emitting `error` (e.g. `ENOENT`) — is a failed run with `metadata.error` set, never a thrown error; the runner and scoring treat it like any other failed run
 - Runner checks both `exitCode !== 0` and `metadata.error` for failure status
 - Friendly error classification in `src/ui/format.ts` via `friendlyError()` -maps common patterns (quota, rate limit, auth, timeout, network) to one-line messages
 - Error display: `↳ friendly message` below failed rows in tables, `Error:` line in detail views

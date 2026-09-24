@@ -15,6 +15,7 @@ export function createClaudeCodeAdapter(): AgentAdapter {
   return createAgentAdapter<ClaudeState>({
     name: "claude-code",
     cliCommand: "claude",
+    promptVia: "stdin",
 
     requiredEnv: () => ["ANTHROPIC_API_KEY"],
 
@@ -77,7 +78,7 @@ export function createClaudeCodeAdapter(): AgentAdapter {
       // Default dangerously-skip-permissions to true — AXIS runs agents headlessly
       const skipPermissions = flags["dangerously-skip-permissions"] ?? true;
 
-      const args = ["-p", input.prompt, "--output-format", "stream-json", "--verbose"];
+      const args = ["-p", "--output-format", "stream-json", "--verbose"];
 
       if (skipPermissions) args.push("--dangerously-skip-permissions");
       if (input.config.model) args.push("--model", input.config.model);

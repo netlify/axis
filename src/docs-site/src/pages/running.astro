@@ -64,6 +64,16 @@ export default createAgentAdapter<{ stdout: string }>({
   }),
 });`}</code></pre>
   <p>
+    The example above uses the default <code>promptVia: "argv"</code> behavior: <code>buildArgs</code>
+    places <code>input.prompt</code> on the command line. Set <code>promptVia: "stdin"</code> and AXIS
+    writes the prompt to the process's stdin and closes it instead -in that mode
+    <code>buildArgs</code> must omit the prompt. The built-in <code>claude-code</code> and
+    <code>codex</code> adapters use <code>"stdin"</code>: argv rejects null bytes and caps argument
+    length, and agent transcripts can contain either.
+  </p>
+  <pre><code>{`promptVia: "stdin",
+buildArgs: () => [],`}</code></pre>
+  <p>
     Register it in <code>axis.config.json</code>:
   </p>
   <pre><code>{`{

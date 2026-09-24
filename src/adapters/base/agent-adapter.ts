@@ -20,6 +20,22 @@ export const MAX_STDERR_BYTES = 100_000;
 /** Grace period between SIGTERM and SIGKILL for non-responsive processes. */
 export const SIGTERM_TO_SIGKILL_MS = 5_000;
 
+/** Failed `AgentOutput` for a process that never started (`spawn()` threw synchronously). */
+function failedToStart(startTime: Date, message: string): AgentOutput {
+  const endTime = new Date();
+  return {
+    result: null,
+    transcript: [],
+    metadata: {
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      durationMs: endTime.getTime() - startTime.getTime(),
+      exitCode: 1,
+      error: message,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Context types passed to adapter callbacks
 // ---------------------------------------------------------------------------
@@ -133,6 +149,15 @@ export type AgentAdapterSpec<State> = {
   /** Build the CLI arguments for the agent process. Prefix args from command resolution are prepended automatically. */
   buildArgs: (input: AgentInput) => string[];
 
+  /**
+   * How the prompt reaches the CLI.
+   * - "argv" (default): `buildArgs` places `input.prompt` on the command line.
+   * - "stdin": the base writes `input.prompt` to the child's stdin and closes it;
+   *   `buildArgs` must NOT include the prompt. Use this for CLIs that read the
+   *   prompt from a pipe — argv rejects null bytes and caps argument length.
+   */
+  promptVia?: "argv" | "stdin";
+
   /** Per-run mutable state. Called once per run to create a fresh state bag for `streamConfig` handlers and `getResult`. */
   initialState: () => State;
 
@@ -176,11 +201,6 @@ export type AgentAdapterSpec<State> = {
  * SIGTERM → SIGKILL (with proper timer cleanup), exit promise ordering, raw
  * output capture, token estimator wiring, and the three outcome branches
  * (timed-out / non-zero exit with no result / success).
- *
- * Error precedence on failure:
- *   1. `getResult(...).metadata.error` — wins if set
- *   2. `stderr` — if non-empty
- *   3. Generic `"Agent process exited with non-zero code"`
  */
 export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentAdapter {
   const timeoutMs = spec.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -244,13 +264,25 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       };
 
       // 5. Spawn
-      const child: ChildProcess = spawn(command, [...prefixArgs, ...args], {
-        cwd: input.workingDirectory,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: input.env ?? { ...process.env },
-      });
+      let child: ChildProcess;
+      try {
+        child = spawn(command, [...prefixArgs, ...args], {
+          cwd: input.workingDirectory,
+          stdio: ["pipe", "pipe", "pipe"],
+          env: input.env ?? { ...process.env },
+        });
+      } catch (err) {
+        // spawn() throws synchronously for unusable arguments (e.g. a null
+        // byte in an arg) — fail the run instead of crashing the process.
+        return failedToStart(startTime, (err as Error).message);
+      }
 
-      child.stdin?.end();
+      if (spec.promptVia === "stdin") {
+        child.stdin?.on("error", () => {}); // Prevent an unhandled stream error if the child closes stdin early.
+        child.stdin?.end(input.prompt);
+      } else {
+        child.stdin?.end();
+      }
 
       // 6. Cleanup handler for Ctrl-C
       input.registerCleanup?.(() => {
@@ -258,8 +290,15 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       });
 
       // 7. Register close listener BEFORE reading stdout (ordering matters)
+      // `error` fires when the child can't be started at all (e.g. ENOENT);
+      // a promise resolves once, so a later `close` is harmless.
+      let spawnError: Error | undefined;
       const exitPromise = new Promise<number>((resolve) => {
         child.on("close", (code) => resolve(code ?? 1));
+        child.on("error", (err) => {
+          spawnError = err;
+          resolve(1);
+        });
       });
 
       // 8. Buffer stderr with a size cap (and mirror to debug callback if any)
@@ -406,7 +445,7 @@ export function createAgentAdapter<State>(spec: AgentAdapterSpec<State>): AgentA
       });
 
       // 14. Error precedence
-      let error = extracted.metadata?.error;
+      let error = extracted.metadata?.error ?? spawnError?.message;
       if (!error && exitCode !== 0 && extracted.result === null) {
         error = stderr || "Agent process exited with non-zero code";
       }

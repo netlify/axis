@@ -42,6 +42,15 @@ export interface PromptTemplate {
 // ---------------------------------------------------------------------------
 
 /**
+ * C0 control characters (except `\t`, `\n`, `\r`) and DEL. Some substituted
+ * values carry agent output, which can contain raw control bytes; a judge
+ * CLI can't render them and argv rejects null bytes outright, so they're
+ * stripped from every value at interpolation.
+ */
+// eslint-disable-next-line no-control-regex -- intentionally matching control characters
+const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+
+/**
  * Replace `{{key}}` placeholders in `template` with values from `vars`.
  *
  * Throws if any placeholder in the template has no corresponding key in
@@ -52,7 +61,7 @@ export function interpolate(template: string, vars: Record<string, string | numb
     if (!(key in vars)) {
       throw new Error(`Missing template variable: {{${key}}}`);
     }
-    return String(vars[key]);
+    return String(vars[key]).replace(CONTROL_CHARS, "");
   });
 }
 

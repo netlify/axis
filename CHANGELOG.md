@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.17.6](https://github.com/netlify/axis/compare/v1.17.5...v1.17.6) (2026-09-08)
+
+
+### Bug Fixes
+
+* **adapters:** a child that fails to start fails the run instead of crashing axis ([b0e7b48](https://github.com/netlify/axis/commit/b0e7b48664ec21446f42c87f497d11f336b0450d))
+* **adapters:** a process that fails to start fails its cell, not the run ([c1b6991](https://github.com/netlify/axis/commit/c1b69910aa65ed9b2b61f80cb11d03ee7f071b0e))
+* **adapters:** a spawn that throws fails the run instead of crashing axis ([022ae6f](https://github.com/netlify/axis/commit/022ae6ff8297e4343d67d55bbb342b89ea78821b))
+* **adapters:** add promptVia so a spec can deliver the prompt over stdin ([f59e492](https://github.com/netlify/axis/commit/f59e49286449ac3d9a91164e9c29a338f5fae9c6))
+* **adapters:** claude-code and codex deliver the prompt over stdin ([2779279](https://github.com/netlify/axis/commit/27792790a5bf6da43149cad773c351b33ca068c3))
+* **adapters:** deliver the prompt over stdin so a null byte can't crash the judge ([2cd440f](https://github.com/netlify/axis/commit/2cd440fcc98826bb2d88b8eff6b7d6167ed84186))
+* **scoring:** strip control characters from judge prompt values ([d99d231](https://github.com/netlify/axis/commit/d99d23174b7610cb6104faddcbcd4a19a2378835))
+
 ## [1.17.5](https://github.com/netlify/axis/compare/v1.17.4...v1.17.5) (2026-08-21)
 
 

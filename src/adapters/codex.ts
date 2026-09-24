@@ -15,6 +15,7 @@ export function createCodexAdapter(): AgentAdapter {
   return createAgentAdapter<CodexState>({
     name: "codex",
     cliCommand: "codex",
+    promptVia: "stdin",
 
     requiredEnv: () => ["CODEX_API_KEY"],
 
@@ -77,8 +78,6 @@ export function createCodexAdapter(): AgentAdapter {
         }
       }
 
-      // Prompt is the final positional argument
-      args.push(input.prompt);
       return args;
     },
 

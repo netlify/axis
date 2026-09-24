@@ -1,0 +1,43 @@
+---
+name: test
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# A new push supersedes the run in flight for the same ref.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+# The job only reads the repo. Anything unlisted here is unavailable to it.
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      # No step needs authenticated git, so don't leave the token in the
+      # checkout for npm lifecycle scripts and the test suite to reach.
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit
+
+      # test/unit/reports/html.test.ts reads dist/report-ui/index.html, so the
+      # report UI has to be built before the suite runs. The rest of the tests
+      # run against src/ directly, so a full `npm run build` isn't needed.
+      - name: Build report UI
+        run: npm run build:report-ui
+
+      - name: Run unit tests
+        run: npm test
