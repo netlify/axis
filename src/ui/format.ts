@@ -147,25 +147,19 @@ export function buildScoreInsight(score: ScoreResult): string | null {
   return parts.join("  |  ");
 }
 
-// --- Score breakdown table ---
-// Terminal counterpart of the HTML report's "Score breakdown" section. The row
-// selection here mirrors renderCategoryBreakdown() in
-// src/report-ui/src/scripts/render.ts — keep the two in sync.
+// --- Score breakdown ---
+// Compact terminal summary of the HTML report's "Score breakdown" section: only
+// the worst few interactions, each with its single weakest dimension. The full
+// per-interaction table lives in the HTML report (renderCategoryBreakdown() in
+// src/report-ui/src/scripts/render.ts), which decides what counts as imperfect.
 
-/** Total width of the breakdown table, excluding its 4-space indent. Matches SEP_SCORED's 102-column footprint. */
-const SEP_BREAKDOWN = 98;
-/** Gutter between the id/dimensions columns and the next column. */
-const BREAKDOWN_GUTTER = 2;
-/** Never squeeze the rationale below this, even if the dimensions column is wide. */
-const BREAKDOWN_RATIONALE_MIN = 30;
-/**
- * Hard cap on the dimensions column. The widest audit cell is fixed
- * ("Success: 99  Speed: 99  Relevance: 99" = 37), but a necessity row's flagged-id
- * list is unbounded, so cap the column rather than let one row widen the table.
- */
-const COL_BREAKDOWN_DIMS_MAX = 46;
-/** Flagged ids listed inline on a necessity row before spilling into "+N more". */
-const BREAKDOWN_MAX_FLAGGED_IDS = 4;
+/** Total line width, including the 4-space indent. Fits an 80-column terminal / Actions log. */
+const BREAKDOWN_WIDTH = 80;
+/** Interactions listed per category; the rest are summarized in a count. */
+const BREAKDOWN_MAX_ROWS = 3;
+/** Width of the id column ("#12", "Necessity") and metric column ("Relevance 40", "12 unnecessary"). */
+const COL_BREAKDOWN_ID = 11;
+const COL_BREAKDOWN_METRIC = 16;
 
 /** Scale a 0-1 audit dimension onto the 0-100 scale used everywhere else. Mirrors fmt01() in the HTML report. */
 function fmt01(value: number): string {
@@ -177,117 +171,98 @@ function categoryShowsRelevance(label: string): boolean {
   return label === "Agent";
 }
 
-/** An audit is "imperfect" when a dimension that feeds this category's score is below 1. */
-function isImperfectAudit(audit: InteractionAudit, showRelevance: boolean): boolean {
-  return audit.success < 1 || audit.speed < 1 || (showRelevance && audit.contextRelevance < 1);
-}
-
-/** The sub-perfect dimensions of one audit, formatted as "Success: 50  Speed: 80". */
-function formatAuditDims(audit: InteractionAudit, showRelevance: boolean): string {
-  const dims: Array<{ label: string; value: number }> = [
+/** The lowest dimension of one audit that feeds this category's score. */
+function weakestDimension(audit: InteractionAudit, showRelevance: boolean): { label: string; value: number } {
+  const dims = [
     { label: "Success", value: audit.success },
     { label: "Speed", value: audit.speed },
     ...(showRelevance ? [{ label: "Relevance", value: audit.contextRelevance }] : []),
   ];
-  return dims
-    .filter((d) => d.value < 1)
-    .map((d) => `${d.label}: ${fmt01(d.value)}`)
-    .join("  ");
+  return dims.reduce((min, d) => (d.value < min.value ? d : min));
 }
 
-/** Truncate a pre-formatted cell to fit, preserving its internal spacing. */
-function truncateCell(text: string, max: number): string {
+/** Collapse whitespace and truncate a judge rationale to fit the remaining line width. */
+function truncateRationale(rationale: string, max: number): string {
+  const text = rationale.replace(/\s+/g, " ").trim();
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
 }
 
-/** Collapse whitespace and truncate a judge rationale to fit one table cell. */
-function truncateRationale(rationale: string, max: number): string {
-  return truncateCell(rationale.replace(/\s+/g, " ").trim(), max);
-}
-
-/** The necessity row's flagged interactions, e.g. "Unnecessary: #4, #12" or "… +9 more". */
-function formatFlaggedIds(ids: number[]): string {
-  if (ids.length === 0) return "";
-  const shown = ids.slice(0, BREAKDOWN_MAX_FLAGGED_IDS).map((id) => `#${id}`);
-  const overflow = ids.length - shown.length;
-  if (overflow > 0) shown.push(`+${overflow} more`);
-  return `Unnecessary: ${shown.join(", ")}`;
-}
-
 /**
- * Render the per-interaction score breakdown for one category as a table.
+ * Render the worst interactions for one category as a short, borderless list.
  * Returns an empty array when the category has nothing to explain (no audits
- * with real rationales), matching the HTML report's behaviour.
+ * with real rationales, or all of them perfect and no unnecessary calls).
  */
 function renderBreakdownTable(label: string, cat: CategoryScore): string[] {
   const nonDefaultAudits = cat.audits.filter((a) => a.rationale !== "default");
   if (nonDefaultAudits.length === 0) return [];
 
   const showRelevance = categoryShowsRelevance(label);
-  const imperfect = nonDefaultAudits.filter((a) => isImperfectAudit(a, showRelevance));
+  const imperfect = nonDefaultAudits
+    .map((audit) => ({ audit, weakest: weakestDimension(audit, showRelevance) }))
+    .filter((r) => r.weakest.value < 1)
+    .sort((a, b) => a.weakest.value - b.weakest.value);
   const passingCount = nonDefaultAudits.length - imperfect.length;
 
-  const necessity = showRelevance && cat.necessity.rationale !== "default" ? cat.necessity : null;
+  const necessity =
+    showRelevance && cat.necessity.rationale !== "default" && cat.necessity.unnecessaryIds.length > 0
+      ? cat.necessity
+      : null;
   if (imperfect.length === 0 && !necessity) return [];
 
-  // Build the cells first so the columns can be sized to the content: a
-  // dimensions cell ranges from "Speed: 60" to "Success: 99  Speed: 99  Relevance: 99".
-  const rows: Array<[id: string, dims: string, rationale: string]> = [];
-  if (necessity) {
-    rows.push(["Necessity", formatFlaggedIds(necessity.unnecessaryIds), necessity.rationale]);
-  }
-  for (const audit of imperfect) {
-    rows.push([`#${audit.id}`, formatAuditDims(audit, showRelevance), audit.rationale]);
-  }
+  const rationaleWidth = BREAKDOWN_WIDTH - 4 - COL_BREAKDOWN_ID - COL_BREAKDOWN_METRIC;
+  const renderRow = (id: string, metric: string, rationale: string) =>
+    `    ${id.padEnd(COL_BREAKDOWN_ID)}${metric.padEnd(COL_BREAKDOWN_METRIC)}${truncateRationale(rationale, rationaleWidth)}`;
 
-  const header: [string, string, string] = ["Interaction", "Dimensions", "Rationale"];
-  const widthOf = (i: 0 | 1) => Math.max(header[i].length, ...rows.map((r) => r[i].length)) + BREAKDOWN_GUTTER;
-  const idWidth = widthOf(0);
-  const dimsWidth = Math.min(widthOf(1), COL_BREAKDOWN_DIMS_MAX + BREAKDOWN_GUTTER);
-  const rationaleWidth = Math.max(BREAKDOWN_RATIONALE_MIN, SEP_BREAKDOWN - idWidth - dimsWidth);
-
-  const renderRow = ([id, dims, rationale]: [string, string, string]) =>
-    `    ${id.padEnd(idWidth)}${truncateCell(dims, dimsWidth - BREAKDOWN_GUTTER).padEnd(dimsWidth)}` +
-    truncateRationale(rationale, rationaleWidth);
-
-  const sep = "─".repeat(idWidth + dimsWidth + rationaleWidth);
   const lines: string[] = [];
 
-  lines.push("");
-  lines.push("    Score breakdown");
-  lines.push(`    ${sep}`);
-  lines.push(renderRow(header));
-  lines.push(`    ${sep}`);
-  lines.push(...rows.map(renderRow));
-  lines.push(`    ${sep}`);
-
-  if (passingCount > 0) {
-    lines.push(`    ${passingCount} other passing interaction${passingCount !== 1 ? "s" : ""} not shown`);
+  for (const { audit, weakest } of imperfect.slice(0, BREAKDOWN_MAX_ROWS)) {
+    lines.push(renderRow(`#${audit.id}`, `${weakest.label} ${fmt01(weakest.value)}`, audit.rationale));
   }
+  if (necessity) {
+    lines.push(renderRow("Necessity", `${necessity.unnecessaryIds.length} unnecessary`, necessity.rationale));
+  }
+
+  const hiddenCount = imperfect.length - Math.min(imperfect.length, BREAKDOWN_MAX_ROWS);
+  const footer = [
+    ...(hiddenCount > 0 ? [`${hiddenCount} more flagged`] : []),
+    ...(passingCount > 0 ? [`${passingCount} passing`] : []),
+  ];
+  if (footer.length > 0) lines.push(`    ${footer.join(", ")} not shown`);
 
   return lines;
 }
 
-/**
- * Render one process-quality category: score header, interaction counts, and —
- * in verbose mode — the dimension roll-up plus the per-interaction breakdown table.
- */
-function renderCategorySection(label: string, cat: CategoryScore, verbose: boolean): string[] {
-  const lines: string[] = [];
+/** Width of the scorecard and section rules, including the 2-space indent. */
+const SCORECARD_WIDTH = 80;
+/** Cells in a score bar; each cell is 5 points. */
+const SCORE_BAR_CELLS = 20;
 
-  lines.push(`  ${label.padEnd(COL_CATEGORY_LABEL)}${cat.score} / 100`);
-  lines.push(`    ${cat.interactionCount} interactions  |  ${cat.auditedCount} audited`);
+/** A 0-100 score as a fixed-width bar, e.g. "████████████░░░░░░░░". */
+function scoreBar(score: number): string {
+  const filled = Math.round((Math.max(0, Math.min(100, score)) / 100) * SCORE_BAR_CELLS);
+  return "█".repeat(filled) + "░".repeat(SCORE_BAR_CELLS - filled);
+}
 
-  if (verbose) {
-    const d = cat.dimensions;
-    lines.push(
-      `    Success: ${d.success}  |  Speed: ${d.speed}  |  Weight: ${d.weight}  |  ` +
-        `Relevance: ${d.relevance}  |  Necessity: ${d.necessity}`,
-    );
-    lines.push(...renderBreakdownTable(label, cat));
-  }
+/** One scorecard row: label, "NN / 100", bar, and an optional trailing note. */
+function scorecardRow(label: string, score: number, note?: string): string {
+  const row = `  ${label.padEnd(COL_CATEGORY_LABEL)}${String(score).padStart(3)} / 100  ${scoreBar(score)}`;
+  return note ? `${row}  ${note}` : row;
+}
 
-  return lines;
+/** A section heading followed by a rule to the scorecard width, e.g. "  Agent ─────". */
+function sectionHeading(title: string): string {
+  return `  ${title} ${"─".repeat(Math.max(0, SCORECARD_WIDTH - title.length - 3))}`;
+}
+
+/** Verbose detail for one process-quality category: dimension roll-up plus the worst interactions. */
+function renderCategoryDetail(label: string, cat: CategoryScore): string[] {
+  const d = cat.dimensions;
+  return [
+    sectionHeading(label),
+    `    Success ${d.success}  ·  Speed ${d.speed}  ·  Weight ${d.weight}  ·  ` +
+      `Relevance ${d.relevance}  ·  Necessity ${d.necessity}`,
+    ...renderBreakdownTable(label, cat),
+  ];
 }
 
 export function renderFinalOutput(output: RunOutput, verbose: boolean, agentCount?: number): string {
@@ -410,43 +385,47 @@ function renderScoredResult(result: ScoredRunResult, verbose: boolean): string {
   const { score } = result;
   const sep = "─".repeat(SEP_DETAIL);
   const lines: string[] = [];
+  const categories: Array<[label: string, cat: CategoryScore]> = [
+    ["Environment", score.environment],
+    ["Service", score.service],
+    ["Agent", score.agent],
+  ];
 
   lines.push("");
   lines.push(`  AXIS Report: ${result.scenarioName}`);
   lines.push(`  ${sep}`);
   lines.push("");
-  lines.push(`  AXIS Result         ${score.axisScore} / 100`);
+
+  // Scorecard: every score up front, aligned, so they read at a glance.
+  lines.push(scorecardRow("AXIS Result", score.axisScore));
+  lines.push("");
+  lines.push(scorecardRow("Goal Achievement", score.goalAchievement.score));
+  for (const [label, cat] of categories) {
+    lines.push(scorecardRow(label, cat.score, `${cat.interactionCount} interactions · ${cat.auditedCount} audited`));
+  }
+  lines.push("");
+  lines.push(`  Agent: ${result.agentName}`);
   if (score.judging) {
     const judgeLabel = score.judging.model ? `${score.judging.agent}|${score.judging.model}` : score.judging.agent;
-    lines.push(`  Agent used for judging:           ${judgeLabel}`);
+    lines.push(`  Judged by: ${judgeLabel}`);
   }
-  lines.push("");
 
-  // Goal Achievement
-  lines.push(`  Goal Achievement    ${score.goalAchievement.score} / 100`);
-  for (const c of score.goalAchievement.criteria) {
-    const icon = c.score >= CRITERION_HIGH ? "\u2714" : c.score >= CRITERION_MEDIUM ? "\u25D0" : "\u2717";
-    const label = c.check.length > 38 ? c.check.slice(0, 35) + "..." : c.check;
-    lines.push(`    ${icon} ${label.padEnd(40)} (${c.score}/10)`);
-  }
-  lines.push("");
-
-  lines.push(...renderCategorySection("Environment", score.environment, verbose));
-  lines.push("");
-
-  lines.push(...renderCategorySection("Service", score.service, verbose));
-  lines.push("");
-
-  lines.push(...renderCategorySection("Agent", score.agent, verbose));
-  lines.push("");
-
-  lines.push(`  Agent: ${result.agentName}`);
-
-  // Verbose: show rationale per criterion
-  if (verbose) {
+  // Breakdowns underneath the scorecard.
+  if (score.goalAchievement.criteria.length > 0) {
     lines.push("");
+    lines.push(sectionHeading("Goal Achievement"));
     for (const c of score.goalAchievement.criteria) {
-      lines.push(`    [${c.check}] ${c.rationale}`);
+      const icon = c.score >= CRITERION_HIGH ? "\u2714" : c.score >= CRITERION_MEDIUM ? "\u25D0" : "\u2717";
+      const label = c.check.length > 38 ? c.check.slice(0, 35) + "..." : c.check;
+      lines.push(`    ${icon} ${label.padEnd(40)} (${c.score}/10)`);
+      if (verbose && c.rationale) lines.push(`      ${c.rationale}`);
+    }
+  }
+
+  if (verbose) {
+    for (const [label, cat] of categories) {
+      lines.push("");
+      lines.push(...renderCategoryDetail(label, cat));
     }
   }
 

@@ -419,7 +419,7 @@ function makeScoredResult(agentCat: Partial<CategoryScore>): RunResult {
 }
 
 describe("renderScenarioDetail score breakdown", () => {
-  it("renders a table row per imperfect audit with its sub-perfect dimensions", () => {
+  it("renders one row per imperfect audit with its weakest dimension", () => {
     const out = renderScenarioDetail(
       makeScoredResult({
         audits: [
@@ -429,16 +429,27 @@ describe("renderScenarioDetail score breakdown", () => {
       }),
     );
 
-    expect(out).toContain("Score breakdown");
-    expect(out).toContain("Interaction");
-    expect(out).toMatch(/#3\s+Success: 50\s+Speed: 80\s+Install failed once\./);
-    expect(out).toMatch(/#7\s+Speed: 60\s+Slow directory scan\./);
+    expect(out).toMatch(/#3\s+Success 50\s+Install failed once\./);
+    expect(out).toMatch(/#7\s+Speed 60\s+Slow directory scan\./);
+    expect(out).not.toMatch(/#3.*Speed 80/);
   });
 
-  it("omits dimensions that are already perfect", () => {
-    const out = renderScenarioDetail(makeScoredResult({ audits: [makeAudit({ id: 1, speed: 0.4 })] }));
-    expect(out).toMatch(/#1\s+Speed: 40/);
-    expect(out).not.toContain("Success: 100");
+  it("orders rows worst-first and caps them at three", () => {
+    const out = renderScenarioDetail(
+      makeScoredResult({
+        audits: [
+          makeAudit({ id: 1, speed: 0.9 }),
+          makeAudit({ id: 2, success: 0.2 }),
+          makeAudit({ id: 3, speed: 0.5 }),
+          makeAudit({ id: 4, contextRelevance: 0.3 }),
+          makeAudit({ id: 5 }),
+        ],
+      }),
+    );
+
+    const ids = [...out.matchAll(/^\s+#(\d+)\s/gm)].map((m) => Number(m[1]));
+    expect(ids).toEqual([2, 4, 3]);
+    expect(out).toContain("1 more flagged, 1 passing not shown");
   });
 
   it("counts passing audits instead of listing them", () => {
@@ -452,52 +463,40 @@ describe("renderScenarioDetail score breakdown", () => {
         ],
       }),
     );
-    expect(out).toContain("2 other passing interactions not shown");
+    expect(out).toContain("2 passing not shown");
     expect(out).not.toMatch(/^\s+#2\s/m);
   });
 
-  it("singularizes the passing-interaction count", () => {
-    const out = renderScenarioDetail(
-      makeScoredResult({ audits: [makeAudit({ id: 1, success: 0.5 }), makeAudit({ id: 2 })] }),
-    );
-    expect(out).toContain("1 other passing interaction not shown");
-  });
-
-  it("renders a necessity row with the flagged interaction ids", () => {
+  it("renders a necessity row with the unnecessary-call count", () => {
     const out = renderScenarioDetail(
       makeScoredResult({
         audits: [makeAudit({ id: 1, success: 0.5 })],
         necessity: { category: "agent", score: 0.7, unnecessaryIds: [4, 12], rationale: "Redundant greps." },
       }),
     );
-    expect(out).toMatch(/Necessity\s+Unnecessary: #4, #12\s+Redundant greps\./);
+    expect(out).toMatch(/Necessity\s+2 unnecessary\s+Redundant greps\./);
   });
 
-  it("spills a long flagged-id list into a +N more suffix", () => {
+  it("omits the necessity row when nothing was flagged", () => {
     const out = renderScenarioDetail(
       makeScoredResult({
         audits: [makeAudit({ id: 1, success: 0.5 })],
-        necessity: {
-          category: "agent",
-          score: 0.1,
-          unnecessaryIds: [1, 2, 3, 4, 5, 6, 7],
-          rationale: "Many redundant calls.",
-        },
+        necessity: { category: "agent", score: 1, unnecessaryIds: [], rationale: "All calls were needed." },
       }),
     );
-    expect(out).toContain("Unnecessary: #1, #2, #3, #4, +3 more");
+    expect(out).not.toMatch(/^\s+Necessity\s/m);
   });
 
   it("omits the table when every audit is a default placeholder", () => {
     const out = renderScenarioDetail(
       makeScoredResult({ audits: [makeAudit({ id: 1, success: 0.5, rationale: "default" })] }),
     );
-    expect(out).not.toContain("Score breakdown");
+    expect(out).not.toMatch(/^\s+#1\s/m);
   });
 
   it("omits the table when all audits pass and necessity is default", () => {
     const out = renderScenarioDetail(makeScoredResult({ audits: [makeAudit({ id: 1 })] }));
-    expect(out).not.toContain("Score breakdown");
+    expect(out).not.toMatch(/^\s+#1\s/m);
   });
 
   it("ignores context relevance outside the Agent category", () => {
@@ -506,21 +505,13 @@ describe("renderScenarioDetail score breakdown", () => {
     const out = renderScenarioDetail({ ...makeResult({ exitCode: 0 }), score: makeScoreResult({ env }) } as RunResult);
 
     // Relevance does not feed Env's score, so this audit counts as passing.
-    expect(out).not.toMatch(/#1\s+Relevance: 20/);
+    expect(out).not.toMatch(/#1\s+Relevance 20/);
   });
 
-  it("keeps every line within the 102-column table footprint", () => {
+  it("keeps every breakdown line within 80 columns", () => {
     const out = renderScenarioDetail(
       makeScoredResult({
-        audits: [
-          makeAudit({
-            id: 1,
-            success: 0.99,
-            speed: 0.99,
-            contextRelevance: 0.99,
-            rationale: "A ".repeat(200),
-          }),
-        ],
+        audits: [makeAudit({ id: 1, success: 0.5, rationale: "A ".repeat(200) })],
         necessity: {
           category: "agent",
           score: 0.1,
@@ -530,8 +521,32 @@ describe("renderScenarioDetail score breakdown", () => {
       }),
     );
 
-    for (const line of out.split("\n")) {
-      expect([...line].length).toBeLessThanOrEqual(102);
+    const rows = out.split("\n").filter((l) => /^\s+(#\d+|Necessity)\s/.test(l));
+    expect(rows).toHaveLength(2);
+    for (const line of rows) {
+      expect([...line].length).toBeLessThanOrEqual(80);
     }
+  });
+});
+
+describe("renderScenarioDetail scorecard", () => {
+  const out = renderScenarioDetail({
+    ...makeResult({ exitCode: 0 }),
+    score: makeScoreResult({ env: makeCategory(62), svc: makeCategory(95), agent: makeCategory(0) }),
+  } as RunResult);
+
+  it("lists every score with a bar before any breakdown", () => {
+    const scorecard = out.slice(0, out.indexOf("─────\n", out.indexOf("Environment")));
+    expect(scorecard).toMatch(/AXIS Result\s+80 \/ 100 {2}█{16}░{4}/);
+    expect(scorecard).toMatch(/Goal Achievement\s+80 \/ 100/);
+    expect(scorecard).toMatch(/Environment\s+62 \/ 100 {2}█{12}░{8}/);
+    expect(scorecard).toMatch(/Service\s+95 \/ 100 {2}█{19}░/);
+    expect(scorecard).toMatch(/Agent\s+0 \/ 100 {2}░{20}/);
+  });
+
+  it("puts the category breakdowns underneath the scorecard", () => {
+    const scorecardAt = out.indexOf("Agent                  0 / 100");
+    expect(out.indexOf("  Environment ──")).toBeGreaterThan(scorecardAt);
+    expect(out.indexOf("  Agent ──")).toBeGreaterThan(out.indexOf("  Service ──"));
   });
 });
