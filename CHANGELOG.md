@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.19.0](https://github.com/netlify/axis/compare/v1.18.0...v1.19.0) (2026-09-29)
+
+
+### Features
+
+* add profile definitions and improve the selection process ([798dfe8](https://github.com/netlify/axis/commit/798dfe8cf10393b7c4c9601ac35b2832f271cff9))
+
+
+### Bug Fixes
+
+* misconfigured scenarios should hard fail vs silently ([8def3c4](https://github.com/netlify/axis/commit/8def3c4747a5dabb0bbdf27c060d36a5a06a0b56))
+* misconfigured scenarios should hard fail vs silently ([7762d9e](https://github.com/netlify/axis/commit/7762d9eb7a1deca02c39997db589e0d817a9c1d8))
+
 ## [1.18.0](https://github.com/netlify/axis/compare/v1.17.6...v1.18.0) (2026-09-29)
 
 
