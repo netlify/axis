@@ -1,0 +1,5 @@
+{
+  "name": "Agent name fixture",
+  "prompt": "hello",
+  "judge": "The agent should echo back the prompt text."
+}

@@ -1,0 +1,1 @@
+{ "name": "Skipped fixture", "skip": true, "prompt": "skipped-one", "judge": "echoes" }

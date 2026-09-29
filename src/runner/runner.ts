@@ -1,7 +1,13 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { loadConfig, discoverScenarios, matchesScenarioFilter, matchesAgentFilter } from "../config/loader.js";
+import {
+  loadConfig,
+  discoverScenarios,
+  matchesScenarioFilter,
+  matchesAgentFilter,
+  applySuiteSelector,
+} from "../config/loader.js";
 import { mergeRemoteConfig } from "../config/remote-scenarios.js";
 import { getAdapter, registerAdapter } from "../adapters/registry.js";
 import { runLifecyclePhase } from "./lifecycle.js";
@@ -94,6 +100,11 @@ export type { RunOutput, RunResult };
 
 export interface RunOptions {
   configPath?: string;
+  /**
+   * Name of a `profiles` entry in the config to merge over the base before
+   * the run. Unknown names throw.
+   */
+  profile?: string;
   scenarioFilter?: string[];
   agentFilter?: string[];
   logger?: Logger;
@@ -165,7 +176,7 @@ const DEFAULT_PASS_ENV = ["ANTHROPIC_API_KEY", "CODEX_API_KEY", "GEMINI_API_KEY"
 export async function run(options: RunOptions = {}): Promise<RunOutput> {
   const logger = options.logger ?? defaultLogger;
   const runStart = Date.now();
-  const { config, configDir } = await loadConfig(options.configPath);
+  const { config, configDir, baseConfig } = await loadConfig(options.configPath, { profile: options.profile });
 
   // Remote scenarios: clone any remote URL entries once up front so the
   // per-agent discoverScenarios() calls below don't re-pull each time. Also
@@ -202,6 +213,8 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   // agent (discovery runs per agent to honour per-agent scenario filters).
   const loadFailures = new Map<string, ScenarioLoadFailure>();
 
+  await assertEveryScenarioIsReachable(baseConfig, configDir, logger, loadFailures);
+
   for (const { name: agentName, config: agentConfig } of agents) {
     if (options.agentFilter?.length && !matchesAgentFilter(agentName, options.agentFilter)) {
       continue;
@@ -211,6 +224,8 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
       logger,
       maxRemotesDepth: config.settings?.remotes?.maxDepth,
       onLoadFailure: (failure) => loadFailures.set(failure.path, failure),
+      include: config.include,
+      exclude: config.exclude,
     });
 
     // Partition into active and skipped
@@ -531,6 +546,58 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
 }
 
 /** `1 scenario` / `3 scenarios`. */
+
+/**
+ * Fail when a scenario is excluded from the default suite and no profile
+ * claims it, which means it can never run under any profile. Silent
+ * unreachability is the failure mode that suite-level `exclude` introduces,
+ * so it is a hard error rather than a warning.
+ *
+ * Only meaningful once `profiles` exist: without them, `exclude` is just
+ * "never run this" and unreachability is the point.
+ */
+async function assertEveryScenarioIsReachable(
+  baseConfig: AxisConfig,
+  configDir: string,
+  logger: Logger,
+  loadFailures: Map<string, ScenarioLoadFailure>,
+): Promise<void> {
+  const profiles = baseConfig.profiles;
+  if (!profiles) return;
+  // With no base selector every scenario is in the default suite already.
+  if (!baseConfig.include?.length && !baseConfig.exclude?.length) return;
+
+  const pool = await discoverScenarios(configDir, baseConfig.scenarios, undefined, {
+    logger,
+    maxRemotesDepth: baseConfig.settings?.remotes?.maxDepth,
+    onLoadFailure: (failure) => loadFailures.set(failure.path, failure),
+  });
+
+  const reachable = new Set<string>();
+  const claim = (include?: string[], exclude?: string[]) => {
+    for (const s of applySuiteSelector(pool, include, exclude)) reachable.add(s.key);
+  };
+
+  claim(baseConfig.include, baseConfig.exclude);
+  for (const overlay of Object.values(profiles)) {
+    // A profile with no selector of its own runs the default suite, already
+    // claimed above.
+    if (overlay.include === undefined && overlay.exclude === undefined) continue;
+    claim(overlay.include, overlay.exclude);
+  }
+
+  // Scenarios disabled at the source are meant to be unreachable.
+  const orphans = pool.filter((s) => !s.skip && !reachable.has(s.key)).map((s) => s.key);
+  if (orphans.length === 0) return;
+
+  const them = orphans.length === 1 ? "it" : "them";
+  throw new Error(
+    `${plural(orphans.length, "scenario")} excluded from the default suite with no profile to claim ${them}: ` +
+      `${formatKeyList(orphans)}. Add ${them} to a profile's "include", or set "skip: true" on the scenario ` +
+      `to disable ${them} outright.`,
+  );
+}
+
 function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
@@ -895,15 +962,43 @@ export function buildJobEnv(config: AxisConfig): Record<string, string> {
 function normalizeAgents(agents: (string | AgentConfig)[]): Array<{ name: string; config: AgentConfig }> {
   const result: Array<{ name: string; config: AgentConfig }> = [];
   const nameCounts = new Map<string, number>();
+  // Every assigned name, explicit or derived. An agent name is a report path
+  // segment and a baseline key, so two entries resolving to the same one would
+  // silently overwrite each other's results instead of producing two rows.
+  const used = new Set<string>();
 
   for (const entry of agents) {
     const config: AgentConfig = typeof entry === "string" ? { agent: entry } : entry;
+
+    // An explicit name is the entry's identity verbatim: no counter suffix, so
+    // it stays stable when entries are added or reordered around it. Renaming
+    // one behind the user's back would be worse than failing.
+    if (config.name) {
+      if (used.has(config.name)) {
+        throw new Error(
+          `Duplicate agent name "${config.name}". Each agents[].name must be unique and must not ` +
+            `collide with the "{agent}|{model}" name another entry derives.`,
+        );
+      }
+      used.add(config.name);
+      result.push({ name: config.name, config });
+      continue;
+    }
 
     const baseName = buildAgentBaseName(config.agent, config.model);
     const count = (nameCounts.get(baseName) ?? 0) + 1;
     nameCounts.set(baseName, count);
 
     const name = count === 1 ? baseName : `${baseName}-${count}`;
+    // The counter only tracks derived names, so a derived name can still land
+    // on one an earlier entry claimed explicitly.
+    if (used.has(name)) {
+      throw new Error(
+        `Agent entry "${config.agent}"${config.model ? ` (model "${config.model}")` : ""} derives the name ` +
+          `"${name}", which another entry already claims via its "name" field. Rename one of them.`,
+      );
+    }
+    used.add(name);
     result.push({ name, config });
   }
 

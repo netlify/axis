@@ -71,9 +71,11 @@ Full documentation lives at **[axis.run](https://axis.run)**:
 
 Use the programmatic API when you want to integrate AXIS into an existing test runner, build tool, or CI pipeline rather than calling the CLI directly.
 
+`run({ profile })` and `loadConfig(path, { profile })` select a named profile from the config, the same overlay `axis run --profile` applies. `loadConfig` returns the resolved `config` alongside the pre-merge `baseConfig`, for callers that need the suite layout as a whole rather than the active suite.
+
 ## Roadmap
 
-Delivered: scenario runner, four-dimension scoring pipeline, baselines with regression detection, MCP/skills wiring, custom adapter API, built-in adapters for Claude Code, Codex, and Gemini.
+Delivered: scenario runner, four-dimension scoring pipeline, baselines with regression detection, MCP/skills wiring, custom adapter API, config profiles for running one repo's scenarios under several agent matrices, built-in adapters for Claude Code, Codex, and Gemini.
 
 Planned:
 

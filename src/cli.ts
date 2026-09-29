@@ -244,6 +244,7 @@ program
 
 interface RunPipelineOptions {
   configPath?: string;
+  profile?: string;
   scenarios?: string[];
   agents?: string[];
   concurrency?: number;
@@ -282,7 +283,7 @@ async function executeRunPipeline(
   /** Called when scoring completes for a job (interactive mode only). */
   onScoringDone?: (scored: ScoredRunResult) => void,
 ): Promise<{ output: ScoredOutput | RunOutput; reportId: string; configDir: string }> {
-  const { config, configDir } = await loadConfig(opts.configPath);
+  const { config, configDir } = await loadConfig(opts.configPath, { profile: opts.profile });
   const scoringPromises: Promise<ScoredRunResult>[] = [];
 
   // Wire up graceful cancel: first Ctrl-C aborts via this controller so the
@@ -343,6 +344,7 @@ async function runPipelineBody(
   try {
     runOutput = await run({
       configPath: opts.configPath,
+      profile: opts.profile,
       scenarioFilter: opts.scenarios,
       agentFilter: opts.agents,
       jobFilter: opts.jobFilter,
@@ -422,7 +424,7 @@ async function runPipelineBody(
     // can find this run, even if scoring or run() blew up mid-flight.
     const safeOutput = output ?? runOutput ?? buildEmptyRunOutput();
     try {
-      finalizeReport(reportDir, safeOutput, config.name);
+      finalizeReport(reportDir, safeOutput, config.name, opts.profile);
     } catch (err) {
       logger.error(`Failed to finalize report: ${formatError(err)}`);
     }
@@ -498,6 +500,7 @@ program
     "run specific scenarios (comma-separated, supports globs e.g. 'cms/*' or 'hello-*,foo')",
   )
   .option("-a, --agent <names>", "run with specific agents (comma-separated, supports globs e.g. 'claude-code|*')")
+  .option("-p, --profile <name>", "apply a named profile from the config's `profiles` map")
   .option("--json", "output results as JSON to stdout", false)
   .option("-v, --verbose", "show detailed per-step logging", false)
   .option("-o, --output-dir <dir>", "also write axis-report-[timestamp].json to this directory")
@@ -531,7 +534,7 @@ program
         process.exit(1);
       }
       const requestedId = opts.failed === true ? "latest" : String(opts.failed);
-      const { configDir } = await loadConfig(opts.config);
+      const { configDir } = await loadConfig(opts.config, { profile: opts.profile });
       const manifest = readReport(configDir, requestedId);
       if (!manifest) {
         process.stderr.write(`\n  Error: report "${requestedId}" not found\n\n`);
@@ -549,6 +552,7 @@ program
 
     const pipelineOpts: RunPipelineOptions = {
       configPath: opts.config,
+      profile: opts.profile,
       scenarios,
       agents,
       concurrency: opts.concurrency,

@@ -1,0 +1,21 @@
+{
+  "adapters": {
+    "echo": "../adapters/custom/echo-adapter.ts"
+  },
+  "scenarios": "./edge-scenarios",
+  "agents": [
+    {
+      "agent": "echo"
+    }
+  ],
+  "profiles": {
+    "ask": {
+      "agents": [
+        {
+          "agent": "echo",
+          "model": "ask-model"
+        }
+      ]
+    }
+  }
+}

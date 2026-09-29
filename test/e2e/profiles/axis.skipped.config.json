@@ -1,0 +1,23 @@
+{
+  "adapters": {
+    "echo": "../adapters/custom/echo-adapter.ts"
+  },
+  "scenarios": "./edge-scenarios",
+  "exclude": ["skipped-*", "ask-*", "questions-*", "nested/*"],
+  "agents": [
+    {
+      "agent": "echo"
+    }
+  ],
+  "profiles": {
+    "ask": {
+      "include": ["ask-*"]
+    },
+    "questions": {
+      "include": ["questions-*"]
+    },
+    "nested": {
+      "include": ["nested/*"]
+    }
+  }
+}

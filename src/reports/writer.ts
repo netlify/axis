@@ -72,7 +72,12 @@ export function writeScenarioRawData(
  * Finalize a report: write scored scenario JSON, manifest, and HTML.
  * Call this after all scoring is complete.
  */
-export function finalizeReport(reportDir: string, output: ScoredOutput | RunOutput, name?: string): void {
+export function finalizeReport(
+  reportDir: string,
+  output: ScoredOutput | RunOutput,
+  name?: string,
+  profile?: string,
+): void {
   const reportId = path.basename(reportDir);
   const entries: ReportResultEntry[] = [];
 
@@ -107,6 +112,7 @@ export function finalizeReport(reportDir: string, output: ScoredOutput | RunOutp
     version: output.version,
     reportId,
     ...(name ? { name } : {}),
+    ...(profile ? { profile } : {}),
     timestamp: output.timestamp,
     durationMs: output.durationMs,
     summary: output.summary,

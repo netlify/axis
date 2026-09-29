@@ -1,0 +1,8 @@
+{
+  "adapters": { "echo": "../adapters/custom/echo-adapter.ts" },
+  "scenarios": "./scenarios",
+  "agents": [
+    { "agent": "echo", "model": "m2", "name": "echo|m1" },
+    { "agent": "echo", "model": "m1" }
+  ]
+}

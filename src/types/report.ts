@@ -11,6 +11,8 @@ export interface ReportManifest {
   reportId: string;
   /** Human-readable project name from config. */
   name?: string;
+  /** Profile applied to this run, when one was selected with `--profile`. */
+  profile?: string;
   timestamp: string;
   durationMs: number;
   summary: ScoredSummary | RunSummary;

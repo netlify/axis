@@ -15,6 +15,14 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     concurrency limit (default: 15).
   </p>
   <p>
+    Scenarios are selected in a fixed order, narrowing at each step. AXIS walks the
+    <code>scenarios</code> source, applies the active suite's
+    <a href="/configuration#profiles"><code>include</code> then <code>exclude</code></a>, narrows to
+    each agent's own <code>scenarios</code> list, then applies the <code>--scenario</code> filter.
+    Because each step only narrows, an agent filter or a <code>-s</code> flag cannot reach a
+    scenario the suite excluded.
+  </p>
+  <p>
     Each job follows the same lifecycle:
   </p>
   <ol>

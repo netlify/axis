@@ -26,6 +26,19 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
     if (typeof agentObj.agent !== "string") {
       throw new Error(`Invalid config at ${filePath}: agents[${i}] must have an "agent" string`);
     }
+    if (agentObj.name !== undefined) {
+      if (typeof agentObj.name !== "string" || agentObj.name.trim() === "") {
+        throw new Error(`Invalid config at ${filePath}: agents[${i}].name must be a non-empty string`);
+      }
+      // The name becomes a report path segment (`scenarios/{key}/{agent}.json`)
+      // and is split on "|" to recover the base agent, so reject anything that
+      // would escape the report directory.
+      if (/[/\\]/.test(agentObj.name)) {
+        throw new Error(
+          `Invalid config at ${filePath}: agents[${i}].name must not contain "/" or "\\" (it is used as a report file name)`,
+        );
+      }
+    }
     if (agentObj.scenarios !== undefined && !Array.isArray(agentObj.scenarios)) {
       throw new Error(`Invalid config at ${filePath}: agents[${i}].scenarios must be an array`);
     }
@@ -33,6 +46,10 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
       validateSkillsSources(agentObj.skills, filePath, `agents[${i}].skills`);
     }
   }
+
+  validateKeyGlobs(obj.include, filePath, '"include"');
+  validateKeyGlobs(obj.exclude, filePath, '"exclude"');
+  validateProfiles(obj.profiles, filePath);
 
   if (obj.env !== undefined) {
     if (!Array.isArray(obj.env) || !obj.env.every((v: unknown) => typeof v === "string")) {
@@ -394,6 +411,44 @@ export function validateMcpServers(data: unknown, filePath: string): void {
         }
       }
     }
+  }
+}
+
+/**
+ * Shared shape check for the `include` / `exclude` scenario key glob lists.
+ * `field` is the display path and is used verbatim, so top-level callers pass
+ * it quoted and nested ones pass a dotted path.
+ */
+function validateKeyGlobs(value: unknown, filePath: string, field: string): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value) || !value.every((v: unknown) => typeof v === "string")) {
+    throw new Error(`Invalid config at ${filePath}: ${field} must be an array of strings`);
+  }
+}
+
+/**
+ * Validate the `profiles` map. Each overlay is a partial config, so only its
+ * own shape is checked here; the merged result is validated again by the
+ * loader once a profile is actually selected.
+ */
+function validateProfiles(value: unknown, filePath: string): void {
+  if (value === undefined) return;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`Invalid config at ${filePath}: "profiles" must be an object`);
+  }
+  for (const [name, overlay] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof overlay !== "object" || overlay === null || Array.isArray(overlay)) {
+      throw new Error(`Invalid config at ${filePath}: profiles["${name}"] must be an object`);
+    }
+    const o = overlay as Record<string, unknown>;
+    if (o.profiles !== undefined) {
+      throw new Error(`Invalid config at ${filePath}: profiles["${name}"] must not define its own "profiles"`);
+    }
+    if (o.agents !== undefined && !Array.isArray(o.agents)) {
+      throw new Error(`Invalid config at ${filePath}: profiles["${name}"].agents must be an array`);
+    }
+    validateKeyGlobs(o.include, filePath, `profiles["${name}"].include`);
+    validateKeyGlobs(o.exclude, filePath, `profiles["${name}"].exclude`);
   }
 }
 

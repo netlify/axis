@@ -461,6 +461,26 @@ describe("finalizeReport", () => {
     expect(manifest.name).toBe("My Project");
   });
 
+  it("includes profile in manifest when provided", () => {
+    const output = makeRunOutput();
+    const { reportDir } = initReport(output.timestamp, tmpDir);
+
+    finalizeReport(reportDir, output, "My Project", "ask");
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(reportDir, "report.json"), "utf-8"));
+    expect(manifest.profile).toBe("ask");
+  });
+
+  it("omits profile from manifest when no profile was selected", () => {
+    const output = makeRunOutput();
+    const { reportDir } = initReport(output.timestamp, tmpDir);
+
+    finalizeReport(reportDir, output, "My Project");
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(reportDir, "report.json"), "utf-8"));
+    expect("profile" in manifest).toBe(false);
+  });
+
   it("propagates artifacts to manifest entry and strips them from scenario JSON", () => {
     const scored = makeScoredOutput();
     scored.results[0].artifacts = [

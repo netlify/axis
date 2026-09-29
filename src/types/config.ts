@@ -20,6 +20,29 @@ export interface AxisConfig {
    * When omitted, the loader defaults to `"./scenarios"` (relative to the config file).
    */
   scenarios?: string | (string | InlineScenario)[];
+  /**
+   * Scenario key globs limiting which discovered scenarios this suite runs.
+   * Omitted means every discovered scenario. Applied before {@link exclude}
+   * and before any per-agent `scenarios` filter.
+   */
+  include?: string[];
+  /**
+   * Scenario key globs removed from the suite, applied after {@link include}.
+   * This is the only subtractive selector. Use it to keep a group of
+   * scenarios out of the default suite so a named profile can claim them;
+   * to disable a scenario outright, set `skip: true` on the scenario itself.
+   */
+  exclude?: string[];
+  /**
+   * Named config overlays, selected with `axis run --profile <name>`. The
+   * chosen profile is merged over the base config before anything else runs:
+   * plain objects deep-merge, arrays and scalars replace.
+   *
+   * `include` and `exclude` merge as a pair. A profile that sets either one
+   * replaces both, so it starts from the full scenario pool rather than
+   * inheriting the base suite's subtractions.
+   */
+  profiles?: Record<string, AxisProfile>;
   agents: (string | AgentConfig)[];
   settings?: SettingsConfig;
   /** Custom adapter modules. Keys are adapter names, values are paths (relative to config) to JS/TS modules that export an AgentAdapter. */
@@ -92,6 +115,14 @@ export interface JudgingConfig {
 export interface AgentConfig {
   /** Name of the agent (registered adapter) to invoke. */
   agent: string;
+  /**
+   * Stable identifier for this entry in reports, baselines, and `-a` filters.
+   * Defaults to `{agent}|{model}`, with `-2`, `-3` appended when several
+   * entries derive the same name. Set it explicitly when two entries share an
+   * agent and model but differ only in flags, so neither one's identity
+   * depends on its position in the `agents` array.
+   */
+  name?: string;
   /** Executable command for custom adapters (e.g. "codex", "aider", "./my-agent.sh"). */
   command?: string;
   scenarios?: string[];
@@ -100,6 +131,13 @@ export interface AgentConfig {
   /** Adapter-specific CLI flags. Keys are flag names (without --), values are flag values (true for boolean flags). */
   flags?: Record<string, string | boolean>;
 }
+
+/**
+ * A named overlay in {@link AxisConfig.profiles}. Every field is optional;
+ * the ones a profile sets replace their counterparts in the base config.
+ * Profiles cannot nest.
+ */
+export type AxisProfile = Partial<Omit<AxisConfig, "profiles">>;
 
 export interface SettingsConfig {
   scoring_weights?: ScoringWeights;

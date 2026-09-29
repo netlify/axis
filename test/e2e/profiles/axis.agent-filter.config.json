@@ -1,0 +1,9 @@
+{
+  "adapters": { "echo": "../adapters/custom/echo-adapter.ts" },
+  "scenarios": "./edge-scenarios",
+  "exclude": ["ask-*"],
+  "agents": [
+    { "agent": "echo", "model": "reaches", "scenarios": ["create-one"] },
+    { "agent": "echo", "model": "blocked", "scenarios": ["ask-one"] }
+  ]
+}

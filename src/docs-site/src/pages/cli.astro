@@ -75,6 +75,14 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         </span>
       </div>
       <div class="cli-flag">
+        <span class="cli-flag-name"><code>-p, --profile &lt;name&gt;</code></span>
+        <span class="cli-flag-desc">
+          Apply a named profile from the config's <code>profiles</code> map before the run. An
+          unknown name is an error rather than a fallback to the default suite. See
+          <a href="/configuration#profiles">Profiles</a>.
+        </span>
+      </div>
+      <div class="cli-flag">
         <span class="cli-flag-name"><code>--json</code></span>
         <span class="cli-flag-desc">JSON output to stdout (no live terminal display).</span>
       </div>
@@ -100,7 +108,10 @@ import DocsLayout from "../layouts/DocsLayout.astro";
           Re-run only the scenario/agent pairs marked failed in a previous report
           (default: <code>latest</code>). Pairs no longer in the config are silently
           dropped. Mutually exclusive with <code>--scenario</code> and
-          <code>--agent</code>.
+          <code>--agent</code>, but combinable with <code>--profile</code>: retry the
+          report under the same profile that produced it, since pairs outside the
+          selected suite (or named by another suite's agent matrix) match nothing and
+          the run exits non-zero with no jobs discovered.
         </span>
       </div>
       <div class="cli-flag">

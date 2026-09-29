@@ -1,6 +1,6 @@
 ---
 name: using-axis
-description: Run AXIS, read its reports, navigate its project layout, and interpret scores. Use when the user asks to run AXIS, invoke the CLI, compare runs, explain a score, find a regression, manage baselines, or understand where AXIS writes its files.
+description: Run AXIS, read its reports, navigate its project layout, and interpret scores. Use when the user asks to run AXIS, invoke the CLI, run a specific profile or suite, compare runs, explain a score, find a regression, manage baselines, or understand where AXIS writes its files.
 ---
 
 # Using AXIS
@@ -11,7 +11,7 @@ For authoring scenarios and `axis.config.json`, see the `configure-axis` skill.
 
 ## When to use this skill
 
-Trigger phrases include "run AXIS", "compare runs", "explain this score", "which scenario regressed", "set a baseline", "where does AXIS put its reports", "what does this dimension mean".
+Trigger phrases include "run AXIS", "run the ask suite", "what does --profile do", "compare runs", "explain this score", "which scenario regressed", "set a baseline", "where does AXIS put its reports", "what does this dimension mean".
 
 Refer to the framework's output as the **AXIS Result**. The acronym is **Agent Experience Index Score**.
 
@@ -40,6 +40,7 @@ Execute every scenario against every configured agent in isolated workspaces, sc
 | `-c, --config <path>`       | Config path (default discovers `axis.config.{json,js,ts,mjs}`)         |
 | `-s, --scenario <keys>`     | Comma-separated keys with glob support (`cms/*`, `hello-*`)            |
 | `-a, --agent <names>`       | Comma-separated agent names with glob support (`claude-code\|*`)       |
+| `-p, --profile <name>`      | Apply a named overlay from the config's `profiles` map                 |
 | `--concurrency <n>`         | Max parallel jobs (default 15)                                         |
 | `--failed [reportId]`       | Re-run only failed pairs from a prior report (default `latest`)        |
 | `--no-score`                | Skip the LLM judges, write raw results only                            |
@@ -50,6 +51,10 @@ Execute every scenario against every configured agent in isolated workspaces, sc
 | `-v, --verbose`             | Per-step logging                                                       |
 | `--debug`                   | Capture raw agent stdout into `{agent}.debug.ndjson`                   |
 | `-o, --output-dir <dir>`    | Also write the report manifest to this directory                       |
+
+`--failed` can be combined with `--profile` (though not with `-s`/`-a`), but retry a report under the profile that produced it: profiles can rename agents and narrow the suite, so pairs from a different suite match nothing and the run exits non-zero having discovered no jobs.
+
+If the config defines `profiles`, `axis run` runs the default suite and `axis run --profile <name>` swaps in that overlay: usually a different agent matrix and a different slice of scenarios. An unknown profile name is an error, not a fallback to the default suite, so a typo in CI cannot quietly run the wrong suite. `-s` and `-a` narrow within the active suite; neither can reach a scenario the suite excluded. The active profile is recorded in the report manifest as `profile`.
 
 ### `axis reports`
 

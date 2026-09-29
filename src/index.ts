@@ -1,7 +1,13 @@
 export { run } from "./runner/runner.js";
 export type { RunOutput, RunResult, RunOptions } from "./runner/runner.js";
-export { loadConfig, discoverScenarios } from "./config/loader.js";
-export type { DiscoverScenariosOptions } from "./config/loader.js";
+export { loadConfig, discoverScenarios, applySuiteSelector } from "./config/loader.js";
+export type {
+  DiscoverScenariosOptions,
+  LoadConfigOptions,
+  LoadedConfig,
+  AxisConfigContext,
+  AxisConfigFactory,
+} from "./config/loader.js";
 export { getAdapter, registerAdapter } from "./adapters/registry.js";
 export { createAgentAdapter } from "./adapters/base/agent-adapter.js";
 export type {

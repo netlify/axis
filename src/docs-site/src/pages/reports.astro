@@ -32,7 +32,10 @@ const ciExample = `# GitHub Actions example
   <p>
     <code>report.json</code> contains the run metadata and a summary of every scenario/agent result:
     the composite AXIS Result, per-dimension scores, token usage, duration, and any error messages.
-    This is the file you read when scripting against AXIS output.
+    This is the file you read when scripting against AXIS output. A run started with
+    <a href="/configuration#profiles"><code>--profile</code></a> also records the profile name in a
+    top-level <code>profile</code> field, so a report is attributable to the suite that produced it;
+    the field is absent when no profile was selected.
   </p>
 
   <h3>Scenario files</h3>
@@ -160,6 +163,12 @@ npx @netlify/axis baseline delete v1.0`}</code></pre>
     <li>
       <strong><code>--concurrency</code></strong> -Control resource usage in constrained CI
       environments.
+    </li>
+    <li>
+      <strong><code>--profile</code></strong> -Pick which suite a job runs. A dispatch input maps
+      straight onto a profile name, so one workflow can offer several matrices without maintaining
+      a config file per mode. An unknown name fails the job instead of falling back to the default
+      suite. See <a href="/configuration#profiles">Profiles</a>.
     </li>
     <li>
       <strong>API keys via environment</strong> -Pass <code>ANTHROPIC_API_KEY</code>,

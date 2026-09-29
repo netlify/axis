@@ -1,6 +1,6 @@
 ---
 name: configure-axis
-description: Author AXIS (Agent Experience Index Score) scenarios and axis.config.json for a project. Use when the user asks to set up AXIS, add a scenario, write or edit axis.config.json, or evaluate an AI agent with AXIS.
+description: Author AXIS (Agent Experience Index Score) scenarios and axis.config.json for a project. Use when the user asks to set up AXIS, add a scenario, write or edit axis.config.json, define profiles or split scenarios into suites, stage an external repo into a scenario workspace, or evaluate an AI agent with AXIS.
 ---
 
 # Configure AXIS
@@ -162,6 +162,25 @@ Full annotated shape:
   // Defaults to "./scenarios" when omitted.
   "scenarios": ["./scenarios", "https://github.com/netlify/agent-runner-orchestrator"],
 
+  // Suite selection. Scenario key globs, applied to whatever "scenarios"
+  // discovered. "include" keeps only matches, then "exclude" drops matches.
+  // Omitting "include" keeps everything; "include": [] selects nothing.
+  // A bare "*" in either list means every scenario (plain glob "*" does not
+  // cross "/", so it would otherwise skip keys like "cms/create-post").
+  // Use "exclude" to hold a group of scenarios out of the default suite so a
+  // profile can claim them; to disable a scenario outright, set "skip": true
+  // on the scenario itself.
+  "exclude": ["ask-*"],
+
+  // Named config overlays, selected with `axis run --profile ask`.
+  // See "Profiles" below.
+  "profiles": {
+    "ask": {
+      "include": ["ask-*"],
+      "agents": [{ "agent": "claude-code", "flags": { "disallowed-tools": "Edit,Write" } }],
+    },
+  },
+
   // Agents to evaluate. Strings are shorthand for { "agent": "<name>" }.
   "agents": [
     "claude-code",
@@ -173,6 +192,7 @@ Full annotated shape:
       "scenarios": ["hello-world"], // restrict this agent to a subset (scenario keys)
       "skills": ["./skills/my-conventions"], // per-agent skills
       "flags": { "debug": true, "max-turns": "5" },
+      "name": "echo|control", // stable report/baseline/-a identity, see below
     },
     // Provider-prefixed models (e.g. OpenRouter) are supported. The raw string
     // is passed verbatim to the CLI via --model; the derived agent name slugifies
@@ -252,6 +272,59 @@ Full annotated shape:
 
 Any other name in `agents[].agent` must be declared in the `adapters` map and point to a module that exports an `AgentAdapter`.
 
+### Profiles
+
+A profile is a named overlay on the config, selected with `axis run --profile <name>`. Reach for one when a single repo has to run scenarios under materially different conditions, such as a read-only "ask" pass and a full write pass, where the same agent and model need two different flag sets.
+
+Without profiles, listing the same `agent` plus `model` twice produces two entries named `agent|model` and `agent|model-2`, so identity depends on array order. Profiles keep each variant in its own overlay and every suite reports under stable names.
+
+```json
+{
+  "scenarios": "./scenarios",
+  "exclude": ["ask-*"],
+  "agents": [{ "agent": "claude-code", "model": "opus" }],
+  "profiles": {
+    "ask": {
+      "include": ["ask-*"],
+      "agents": [{ "agent": "claude-code", "model": "opus", "flags": { "disallowed-tools": "Edit,Write" } }]
+    }
+  }
+}
+```
+
+`axis run` runs everything except `ask-*`. `axis run --profile ask` runs only `ask-*`, with the read-only flags.
+
+Merge rules:
+
+- Plain objects deep-merge, so a profile setting only `settings.limits` keeps the base `settings.concurrency`.
+- Arrays and scalars replace wholesale, so a profile's `agents` is its own matrix, not an addition to the base one.
+- `include` and `exclude` merge as a pair: a profile that sets either one replaces both and starts from the full scenario pool. Without this rule a base `exclude: ["ask-*"]` would cancel a profile's `include: ["ask-*"]`.
+- Profiles cannot nest.
+- An unknown `--profile` name is an error, never a fallback to the default suite.
+
+Selection order per agent: walk `scenarios`, apply the active suite's `include` then `exclude`, narrow to that agent's own `scenarios` list, then apply the CLI `--scenario` filter. An agent filter or `-s` narrows within the active suite; neither can reach a scenario the suite excluded.
+
+Once a config defines `profiles`, a scenario excluded from the default suite that no profile includes can never run, and AXIS fails the run rather than silently covering less than the suite defines.
+
+A function-style config receives the selected profile in its context argument, for anything the declarative merge cannot express. If it returns no `profiles` map, AXIS assumes the factory handled the profile and merges nothing.
+
+```ts
+export default ({ profile }) => ({
+  scenarios: "./scenarios",
+  agents: profile === "ask" ? askAgents : createAgents,
+});
+```
+
+### Stable agent names
+
+An agent entry is identified by `{agent}|{model}`, with `-2`, `-3` appended when several entries derive the same name. That suffix is positional, so inserting an entry above renames the ones below it and orphans their report history. Set `name` explicitly when two entries share an agent and model but differ only in flags:
+
+```json
+{ "agent": "claude-code", "model": "sonnet", "name": "claude-code|sonnet-control", "flags": { "effort": "low" } }
+```
+
+The name is used verbatim in report paths, baselines, and `-a` filters. It must be unique and must not contain `/` or `\`.
+
 ### Judging precedence
 
 For each run, AXIS finds a judge by scanning `judging.agents` in order and picking the first entry whose adapter name differs from the agent being scored. If every entry matches, the first entry is used. When `judging` is omitted, the run's own agent judges itself.
@@ -306,6 +379,40 @@ For each run, AXIS finds a judge by scanning `judging.agents` in order and picki
 }
 ```
 
+### One repo, several suites (profiles)
+
+The same scenarios directory split into a default suite and two named ones. Scenario files stay profile-agnostic; membership is declared here, by key glob.
+
+```json
+{
+  "scenarios": "./scenarios",
+  "exclude": ["ask-*", "questions-*"],
+  "agents": [{ "agent": "claude-code", "model": "claude-opus-5", "flags": { "permission-mode": "bypassPermissions" } }],
+  "profiles": {
+    "create": {},
+    "ask": {
+      "include": ["ask-*"],
+      "agents": [
+        {
+          "agent": "claude-code",
+          "model": "claude-opus-5",
+          "flags": { "disallowed-tools": "Edit,Write,NotebookEdit" }
+        },
+        { "agent": "codex", "model": "gpt-5.6-sol", "flags": { "sandbox": "read-only" } }
+      ]
+    },
+    "questions": {
+      "include": ["questions-*"],
+      "agents": [{ "agent": "claude-code", "model": "claude-opus-5" }]
+    }
+  }
+}
+```
+
+`axis run` runs the create suite. `axis run --profile ask` runs only `ask-*`, read-only. The empty `create` profile is an alias, so CI can pass all three names uniformly: `axis run --profile "$MODE"`.
+
+Two entries sharing an agent and model but differing in flags belong in separate profiles. If they must coexist in one `agents` array, give at least one an explicit `name`, or the second silently becomes `agent|model-2` and its identity depends on array order.
+
 ### Custom adapter wiring
 
 Module `adapters/echo.ts`:
@@ -356,7 +463,8 @@ For interpreting reports, comparing runs, finding regressions, or explaining sco
 10. In an isolated AXIS scenario workspace, do NOT try to verify your authored file by executing it, importing it, or cross-checking it against an installed copy of `@netlify/axis`. The workspace is intentionally minimal: no `node_modules`, no git history. That means: no `tsc`, no `node -e "require(...)"`, no `git diff` or `git status`, no `npm install`, and no reading or grepping the globally-installed `@netlify/axis` package outside the workspace (paths like `/usr/local/lib/node_modules/@netlify/axis`, `/opt/homebrew/.../node_modules/@netlify/axis`, or any `node_modules/@netlify/axis` you did not put there yourself). Every such command fails or wastes interactions and tanks the environment and agent dimensions. Write the file once, correctly, against the schema you already know from this skill. The AXIS judge inspects your output directly; you do not need to prove it works first.
 11. When asked to make a targeted edit (add a field, fix a single bug), edit ONLY what the prompt specifies. Do not reorganize, reformat, or add unrelated fields. Preserve every field the prompt did not name. The judge often checks "original X and Y fields are preserved unchanged".
 12. Minimize unnecessary tool calls. Every tool call is evaluated as an agent decision; redundant `ls`, repeated `cat` of the same file, exploratory `find` that you do not act on, all tank the agent dimension via the `necessity` sub-dimension. Read each file you need once. Write each edit once. Stop when the task is done.
-13. Field-name discipline. AXIS uses snake_case in all JSON config fields: `mcp_servers` not `mcpServers`, `time_minutes` not `timeMinutes`, `run_script` not `runScript` or `shell`. The deprecated alias `rubric` exists for backwards compat; prefer `judge`. Other commonly-invented names that are WRONG: `criteria`, `success_criteria`, `expected`, `tasks`, `evaluators`, `models`, `timeout`, `maxTokens`, `tokenLimit`, `timeoutMinutes`.
+13. Profiles are config-side only. A scenario never declares which profile it belongs to: there is no `profiles` field on a scenario, and inventing one is the most common mistake here. Suite membership is declared in the config with `include` / `exclude` key globs, which keeps scenario files portable across repos that clone them. Use `skip: true` to disable a scenario everywhere; use `exclude` to hold it out of the default suite so a profile can claim it. Excluding a scenario that no profile includes fails the run.
+14. Field-name discipline. AXIS uses snake_case in all JSON config fields: `mcp_servers` not `mcpServers`, `time_minutes` not `timeMinutes`, `run_script` not `runScript` or `shell`. The deprecated alias `rubric` exists for backwards compat; prefer `judge`. Other commonly-invented names that are WRONG: `criteria`, `success_criteria`, `expected`, `tasks`, `evaluators`, `models`, `timeout`, `maxTokens`, `tokenLimit`, `timeoutMinutes`.
 
 ## Validation
 

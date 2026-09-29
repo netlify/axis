@@ -304,6 +304,13 @@ export default {
       preamble, counted separately in the summary, and does not affect the exit code. A file that
       failed to load is an accident, and is reported as one.
     </p>
+    <p>
+      <code>skip</code> is also not the same as
+      <a href="/configuration#profiles"><code>exclude</code></a>. Use <code>skip</code> to disable a
+      scenario everywhere; use <code>exclude</code> to hold it out of the default suite so a profile
+      can claim it. Excluding a scenario that no profile includes fails the run, since it could
+      never execute.
+    </p>
   </div>
 
   <h2>Writing Effective Prompts</h2>

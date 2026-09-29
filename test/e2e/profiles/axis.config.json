@@ -1,0 +1,11 @@
+{
+  "adapters": { "echo": "../adapters/custom/echo-adapter.ts" },
+  "scenarios": "./scenarios",
+  "exclude": ["ask-*", "questions-*"],
+  "agents": [{ "agent": "echo" }],
+  "profiles": {
+    "create": {},
+    "ask": { "include": ["ask-*"], "agents": [{ "agent": "echo", "model": "ask-model" }] },
+    "questions": { "include": ["questions-*"] }
+  }
+}

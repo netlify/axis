@@ -1,0 +1,5 @@
+{
+  "name": "Profile suite fixture: questions-one",
+  "prompt": "questions-one",
+  "judge": "The agent should echo back the prompt text."
+}

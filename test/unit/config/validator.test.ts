@@ -1,6 +1,80 @@
 import { describe, it, expect } from "vitest";
 import { validateConfig, validateScenario, resolveJudgeWeights } from "../../../src/config/validator.js";
 
+describe("validateConfig profiles, include and exclude", () => {
+  const base = { scenarios: "./scenarios", agents: ["claude-code"] };
+
+  it("accepts include, exclude and a profiles map", () => {
+    const config = {
+      ...base,
+      include: ["a-*"],
+      exclude: ["b-*"],
+      profiles: { ask: { include: ["ask-*"], agents: [{ agent: "codex" }] }, create: {} },
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("rejects a non-array include", () => {
+    expect(() => validateConfig({ ...base, include: "a-*" }, "test.json")).toThrow(
+      '"include" must be an array of strings',
+    );
+  });
+
+  it("rejects a non-string entry in exclude", () => {
+    expect(() => validateConfig({ ...base, exclude: [1] }, "test.json")).toThrow(
+      '"exclude" must be an array of strings',
+    );
+  });
+
+  it("rejects a non-object profiles map", () => {
+    expect(() => validateConfig({ ...base, profiles: ["ask"] }, "test.json")).toThrow('"profiles" must be an object');
+  });
+
+  it("rejects a non-object profile overlay", () => {
+    expect(() => validateConfig({ ...base, profiles: { ask: "yes" } }, "test.json")).toThrow(
+      'profiles["ask"] must be an object',
+    );
+  });
+
+  it("rejects nested profiles", () => {
+    expect(() => validateConfig({ ...base, profiles: { ask: { profiles: {} } } }, "test.json")).toThrow(
+      'must not define its own "profiles"',
+    );
+  });
+
+  it("rejects a bad selector inside a profile", () => {
+    expect(() => validateConfig({ ...base, profiles: { ask: { include: "ask-*" } } }, "test.json")).toThrow(
+      'profiles["ask"].include must be an array of strings',
+    );
+  });
+
+  it("accepts an explicit agent name", () => {
+    const config = { ...base, agents: [{ agent: "codex", name: "codex|control" }] };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("rejects an empty agent name", () => {
+    expect(() => validateConfig({ ...base, agents: [{ agent: "codex", name: "  " }] }, "test.json")).toThrow(
+      "agents[0].name must be a non-empty string",
+    );
+  });
+
+  it("rejects an agent name containing a path separator", () => {
+    expect(() => validateConfig({ ...base, agents: [{ agent: "codex", name: "a/b" }] }, "test.json")).toThrow(
+      'agents[0].name must not contain "/"',
+    );
+    expect(() => validateConfig({ ...base, agents: [{ agent: "codex", name: "a\\b" }] }, "test.json")).toThrow(
+      'agents[0].name must not contain "/"',
+    );
+  });
+
+  it("rejects a non-string agent name", () => {
+    expect(() => validateConfig({ ...base, agents: [{ agent: "codex", name: 7 }] }, "test.json")).toThrow(
+      "agents[0].name must be a non-empty string",
+    );
+  });
+});
+
 describe("validateConfig", () => {
   it("accepts a valid config with string agents", () => {
     const config = {

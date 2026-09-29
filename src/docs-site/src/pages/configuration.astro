@@ -203,6 +203,37 @@ export default async () => {
         </td>
       </tr>
       <tr>
+        <td><code>include</code></td>
+        <td><code>string[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Scenario key globs limiting which discovered scenarios this suite runs. Omitting the
+          field means every discovered scenario; an empty array selects nothing. A bare
+          <code>"*"</code> means every scenario, since glob <code>*</code> alone does not cross
+          <code>/</code> and would otherwise skip namespaced keys like <code>cms/create-post</code>.
+          See <a href="#profiles">Profiles</a>.
+        </td>
+      </tr>
+      <tr>
+        <td><code>exclude</code></td>
+        <td><code>string[]</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Scenario key globs removed from the suite, applied after <code>include</code>. Use it to
+          keep a group of scenarios out of the default suite so a profile can claim them; to
+          disable a scenario outright, set <code>skip: true</code> on the scenario itself.
+        </td>
+      </tr>
+      <tr>
+        <td><code>profiles</code></td>
+        <td><code>Record&lt;string, AxisProfile&gt;</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Named config overlays selected with <code>axis run --profile &lt;name&gt;</code>. See
+          <a href="#profiles">Profiles</a>.
+        </td>
+      </tr>
+      <tr>
         <td><code>agents</code></td>
         <td><code>(string | AgentConfig)[]</code></td>
         <td><span class="req-yes">Yes</span></td>
@@ -415,6 +446,21 @@ curl -X POST "$SLACK_WEBHOOK" \\
         <td>Model override passed to the agent CLI.</td>
       </tr>
       <tr>
+        <td><code>name</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Stable identifier for this entry in reports, baselines, and <code>-a</code> filters.
+          Defaults to <code>&#123;agent&#125;|&#123;model&#125;</code>, with <code>-2</code>,
+          <code>-3</code> appended when several entries derive the same name. Set it explicitly
+          when two entries share an agent and model but differ only in flags, so neither one's
+          identity depends on its position in the array. An explicit name is used verbatim with no
+          counter, must be unique, and must not contain <code>/</code> or <code>\</code>. Because
+          the base agent is recovered by splitting on <code>|</code>, a name without one is not
+          reachable via <code>-a &lt;adapter&gt;</code>.
+        </td>
+      </tr>
+      <tr>
         <td><code>scenarios</code></td>
         <td><code>string[]</code></td>
         <td><span class="req-no">No</span></td>
@@ -440,6 +486,86 @@ curl -X POST "$SLACK_WEBHOOK" \\
       </tr>
     </tbody>
   </table>
+
+  <h2 id="profiles">Profiles</h2>
+  <p>
+    A profile is a named overlay on the config, selected with
+    <code>axis run --profile &lt;name&gt;</code>. Use profiles when one repo needs to run the same
+    scenarios under materially different conditions: a read-only "ask" pass and a full write pass,
+    say, where the same agent and model need two different flag sets.
+  </p>
+  <p>
+    Without profiles, the same <code>agent</code> plus <code>model</code> pair listed twice
+    resolves to two entries named <code>agent|model</code> and <code>agent|model-2</code>. Profiles
+    keep each variant in its own overlay, so every suite reports under stable names.
+  </p>
+
+  <pre><code>{`{
+  "scenarios": "./scenarios",
+  "exclude": ["ask-*"],
+  "agents": [
+    { "agent": "claude-code", "model": "opus", "flags": { "permission-mode": "bypassPermissions" } }
+  ],
+  "profiles": {
+    "ask": {
+      "include": ["ask-*"],
+      "agents": [
+        { "agent": "claude-code", "model": "opus", "flags": { "disallowed-tools": "Edit,Write" } }
+      ]
+    }
+  }
+}`}</code></pre>
+
+  <p>
+    <code>axis run</code> runs the default suite: every scenario except <code>ask-*</code>, with
+    write tools enabled. <code>axis run --profile ask</code> runs only <code>ask-*</code>, with the
+    read-only flag set. An unknown profile name is an error rather than a silent fallback to the
+    default suite.
+  </p>
+
+  <h3 id="profiles-merge">Merge rules</h3>
+  <ul>
+    <li>Plain objects deep-merge, so a profile that sets only <code>settings.limits</code> keeps the base <code>settings.concurrency</code>.</li>
+    <li>Arrays and scalars replace wholesale, so a profile's <code>agents</code> is its own matrix rather than an addition to the base one.</li>
+    <li>
+      <code>include</code> and <code>exclude</code> merge as a pair. A profile that sets either one
+      replaces both and starts from the full scenario pool. Without this, a base
+      <code>exclude: ["ask-*"]</code> would cancel out a profile's <code>include: ["ask-*"]</code>
+      and leave the suite empty.
+    </li>
+    <li>Profiles cannot nest: a profile may not define its own <code>profiles</code>.</li>
+  </ul>
+
+  <h3 id="profiles-selection-order">Scenario selection order</h3>
+  <p>
+    Suite selection and per-agent selection do different jobs and compose. For each agent, AXIS
+    walks the <code>scenarios</code> source, applies the active suite's <code>include</code> then
+    <code>exclude</code>, then narrows to that agent's own <code>scenarios</code> list, then
+    applies the CLI <code>--scenario</code> filter. An agent filter or a <code>--scenario</code>
+    flag narrows within the active suite; neither can reach a scenario the suite excluded.
+  </p>
+
+  <h3 id="profiles-unreachable">Unreachable scenarios</h3>
+  <p>
+    Once a config defines <code>profiles</code>, a scenario that the default suite excludes and no
+    profile includes can never run under any profile. AXIS treats that as a config error and fails
+    the run rather than quietly covering fewer scenarios than the suite defines. Add it to a
+    profile's <code>include</code>, or set <code>skip: true</code> on the scenario to disable it
+    outright.
+  </p>
+
+  <h3 id="profiles-factory">Profiles in function configs</h3>
+  <p>
+    A <a href="#config-formats">function-style config</a> receives the selected profile in its
+    context argument, so it can branch however it likes for anything the declarative merge cannot
+    express. When such a config returns no <code>profiles</code> map, AXIS assumes the factory
+    resolved the profile itself and merges nothing.
+  </p>
+
+  <pre><code>{`export default ({ profile }) => ({
+  scenarios: "./scenarios",
+  agents: profile === "ask" ? askAgents : createAgents,
+});`}</code></pre>
 
   <h2>Scoring Weights</h2>
   <p>

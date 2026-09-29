@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
-import type { AxisConfig, InlineScenario } from "../types/config.js";
+import type { AxisConfig, AxisProfile, InlineScenario } from "../types/config.js";
 import type { Scenario, ScenarioVariant } from "../types/scenario.js";
 import { validateConfig, validateScenario } from "./validator.js";
 import { formatError } from "../types/output.js";
@@ -17,7 +17,29 @@ const DEFAULT_CONFIG_BASENAME = "axis.config";
 const JS_EXTENSIONS = new Set([".js", ".mjs", ".cjs"]);
 const TS_EXTENSIONS = new Set([".ts", ".mts", ".cts"]);
 
-export async function loadConfig(configPath?: string): Promise<{ config: AxisConfig; configDir: string }> {
+export interface LoadConfigOptions {
+  /**
+   * Name of a `profiles` entry to merge over the base config. Unknown names
+   * throw rather than falling back, so a typo in CI can't quietly run the
+   * default suite instead of the one that was asked for.
+   */
+  profile?: string;
+}
+
+export interface LoadedConfig {
+  /** The config to run: the base config with the selected profile merged in. */
+  config: AxisConfig;
+  configDir: string;
+  /**
+   * The config exactly as authored, before any profile was merged. Callers
+   * that need to reason about the suite layout as a whole (rather than the
+   * active suite) read `include`/`exclude`/`profiles` from here, since the
+   * merge overwrites the base selector with the active profile's.
+   */
+  baseConfig: AxisConfig;
+}
+
+export async function loadConfig(configPath?: string, options?: LoadConfigOptions): Promise<LoadedConfig> {
   const resolvedPath = await resolveConfigPath(configPath);
   const ext = path.extname(resolvedPath).toLowerCase();
 
@@ -30,24 +52,104 @@ export async function loadConfig(configPath?: string): Promise<{ config: AxisCon
     throw new Error(`Unsupported config file extension "${ext}" at ${resolvedPath}`);
   }
 
-  // Support a default export that is either the config object or a (sync/async) function returning it.
-  if (typeof parsed === "function") {
-    parsed = await (parsed as () => unknown | Promise<unknown>)();
+  // Support a default export that is either the config object or a (sync/async)
+  // function returning it. The factory receives the run context so a config can
+  // branch on the selected profile for anything the declarative merge can't
+  // express. Existing zero-argument factories ignore it.
+  const fromFactory = typeof parsed === "function";
+  if (fromFactory) {
+    parsed = await (parsed as AxisConfigFactory)({ profile: options?.profile });
   }
 
   validateConfig(parsed, resolvedPath);
-  normalizeConfigAgents(parsed);
-  normalizeJudging(parsed);
+
+  let config: AxisConfig = parsed;
+  if (options?.profile !== undefined) {
+    const profiles = config.profiles;
+    if (profiles) {
+      config = applyProfile(config, profiles, options.profile, resolvedPath);
+      // Re-validate: the overlay can introduce its own agents and settings.
+      validateConfig(config, resolvedPath);
+    } else if (!fromFactory) {
+      // Nothing to merge and nothing that could have consumed the flag, so the
+      // name is a typo. Running the default suite instead would hide it.
+      throw new Error(`Unknown profile "${options.profile}" in ${resolvedPath}. The config defines no "profiles".`);
+    }
+    // A factory that returned no `profiles` map already received the profile
+    // in its context and resolved it itself; there is nothing left to merge.
+  }
+
+  normalizeConfigAgents(config);
+  normalizeJudging(config);
 
   // Default the scenarios source when omitted; downstream code can assume it is set.
-  if (parsed.scenarios === undefined) {
-    parsed.scenarios = "./scenarios";
+  if (config.scenarios === undefined) {
+    config.scenarios = "./scenarios";
   }
 
   return {
-    config: parsed,
+    config,
     configDir: path.dirname(resolvedPath),
+    baseConfig: parsed,
   };
+}
+
+/** Context handed to a function-style config default export. */
+export interface AxisConfigContext {
+  /** The profile selected for this run, or undefined when none was requested. */
+  profile?: string;
+}
+
+/** A config module may default-export the config object or a factory returning it. */
+export type AxisConfigFactory = (ctx: AxisConfigContext) => unknown | Promise<unknown>;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Deep-merge `overlay` over `base`. Plain objects merge key by key; arrays and
+ * scalars replace wholesale, so a profile's `agents` is its own matrix rather
+ * than an append to the base one.
+ */
+function deepMerge<T>(base: T, overlay: Partial<T>): T {
+  const out = { ...(base as Record<string, unknown>) };
+  for (const [key, value] of Object.entries(overlay as Record<string, unknown>)) {
+    if (value === undefined) continue;
+    const existing = out[key];
+    out[key] = isPlainObject(existing) && isPlainObject(value) ? deepMerge(existing, value) : value;
+  }
+  return out as T;
+}
+
+/**
+ * Resolve `--profile <name>` into a single flat config. `profiles` itself is
+ * left on the result so the runner can check every profile's scenario
+ * selector, not just the active one.
+ */
+function applyProfile(
+  config: AxisConfig,
+  profiles: Record<string, AxisProfile>,
+  profileName: string,
+  filePath: string,
+): AxisConfig {
+  if (!Object.prototype.hasOwnProperty.call(profiles, profileName)) {
+    throw new Error(`Unknown profile "${profileName}" in ${filePath}. Available: ${Object.keys(profiles).join(", ")}.`);
+  }
+
+  const overlay: AxisProfile = profiles[profileName];
+  const base = { ...config };
+
+  // `include` and `exclude` are two halves of one suite selector. A profile
+  // that sets either one is defining its own suite, so the base's other half
+  // is dropped rather than silently intersected with it — otherwise a base
+  // `exclude: ["ask-*"]` would cancel out a profile's `include: ["ask-*"]`.
+  if (overlay.include !== undefined || overlay.exclude !== undefined) {
+    delete base.include;
+    delete base.exclude;
+  }
+
+  return deepMerge(base, overlay as Partial<AxisConfig>);
 }
 
 async function resolveConfigPath(configPath: string | undefined): Promise<string> {
@@ -163,6 +265,14 @@ export interface DiscoverScenariosOptions {
    * exit code so the missing scenarios don't pass unnoticed.
    */
   onLoadFailure?: (failure: ScenarioLoadFailure) => void;
+  /**
+   * Suite-level scenario key globs from `AxisConfig.include`. Applied before
+   * the per-agent `filter`, so an agent's own `scenarios` list narrows within
+   * the suite rather than escaping it.
+   */
+  include?: string[];
+  /** Suite-level scenario key globs from `AxisConfig.exclude`, applied after `include`. */
+  exclude?: string[];
 }
 
 /** Reporting channels threaded through the scenarios walk. */
@@ -212,12 +322,46 @@ export async function discoverScenarios(
   // Sort by key for deterministic ordering
   scenarios.sort((a, b) => a.key.localeCompare(b.key));
 
+  // Narrow to the active suite first, then to the agent's own subset.
+  const inSuite = applySuiteSelector(scenarios, options?.include, options?.exclude);
+
   // Filter scenarios if agent specifies a subset
   if (filter && !filter.includes("*")) {
-    return scenarios.filter((s) => matchesScenarioFilter(s.key, filter));
+    return inSuite.filter((s) => matchesScenarioFilter(s.key, filter));
   }
 
-  return scenarios;
+  return inSuite;
+}
+
+/**
+ * Apply a suite selector to a scenario list: keep only keys matching
+ * `include` (when set), then drop keys matching `exclude`. Exported so the
+ * runner can evaluate every profile's selector when checking that no
+ * scenario has been excluded from the default suite without a profile
+ * claiming it.
+ */
+export function applySuiteSelector<T extends { key: string }>(
+  scenarios: T[],
+  include?: string[],
+  exclude?: string[],
+): T[] {
+  let out = scenarios;
+  // Only an omitted `include` means "everything". An empty one selects
+  // nothing, matching the per-agent `scenarios` filter. An empty `exclude`
+  // drops nothing, since no key can match an empty pattern list.
+  if (include !== undefined) out = out.filter((s) => matchesSuitePattern(s.key, include));
+  if (exclude !== undefined) out = out.filter((s) => !matchesSuitePattern(s.key, exclude));
+  return out;
+}
+
+/**
+ * Match a scenario key against a suite pattern list, treating a bare `"*"` as
+ * every scenario. The glob `*` does not cross `/`, so without this a plain
+ * `["*"]` would quietly drop namespaced keys like `cms/create-post`. The
+ * per-agent `scenarios` filter gives `"*"` the same meaning.
+ */
+function matchesSuitePattern(key: string, patterns: string[]): boolean {
+  return patterns.includes("*") || matchesScenarioFilter(key, patterns);
 }
 
 /** File extensions recognized by the scenarios walker. */
