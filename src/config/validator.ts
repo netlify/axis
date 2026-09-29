@@ -1,3 +1,4 @@
+import { parseGitCopySource } from "../runner/repo-cache.js";
 import type { AxisConfig } from "../types/config.js";
 import type { JudgeCriterion, Scenario } from "../types/scenario.js";
 
@@ -462,6 +463,29 @@ function validateLifecycleActions(data: unknown, filePath: string, field: string
       }
       if (typeof entry.destination !== "string" || entry.destination.length === 0) {
         throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}] missing non-empty "destination" string`);
+      }
+      // `ref` and `include_git` only mean something for a git URL. Silently
+      // ignoring them on a local glob hides a typo'd `match`, so reject.
+      const isGitSource = parseGitCopySource(entry.match) !== null;
+      if (entry.ref !== undefined) {
+        if (typeof entry.ref !== "string" || entry.ref.length === 0) {
+          throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}].ref must be a non-empty string`);
+        }
+        if (!isGitSource) {
+          throw new Error(
+            `Invalid scenario at ${filePath}: ${field}[${i}].ref is only valid when "match" is a git URL`,
+          );
+        }
+      }
+      if (entry.include_git !== undefined) {
+        if (typeof entry.include_git !== "boolean") {
+          throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}].include_git must be a boolean`);
+        }
+        if (!isGitSource) {
+          throw new Error(
+            `Invalid scenario at ${filePath}: ${field}[${i}].include_git is only valid when "match" is a git URL`,
+          );
+        }
       }
     } else {
       throw new Error(`Invalid scenario at ${filePath}: ${field}[${i}].action must be "run_script" or "copy"`);

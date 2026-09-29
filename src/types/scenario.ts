@@ -71,15 +71,33 @@ export interface RunScriptAction {
 }
 
 /**
- * Copy files matching `match` (a glob, resolved relative to the config
- * directory) into `destination` (relative to the agent workspace). Each
- * matched file's path relative to the longest non-glob prefix of `match`
- * is preserved under `destination`.
+ * Copy files into `destination` (relative to the agent workspace).
+ *
+ * `match` is either a glob resolved relative to the config directory, or a git
+ * URL (`https://github.com/org/repo`, `git@github.com:org/repo.git`, with an
+ * optional `#branch|tag|commit` fragment). Git sources are cloned once into
+ * `.axis/repos/` and reused by every scenario, variant, and agent in the run.
+ *
+ * For globs, each matched file's path relative to the longest non-glob prefix
+ * of `match` is preserved under `destination`. For git sources, the repository
+ * working tree (or the subdirectory named by a pasted `/tree/<ref>/<path>` web
+ * URL) is copied to `destination`.
  */
 export interface CopyAction {
   action: "copy";
   match: string;
   destination: string;
+  /**
+   * Git sources only: branch, tag, or commit to check out. Overrides a `#ref`
+   * fragment in `match`. Pin it to keep results comparable across runs.
+   */
+  ref?: string;
+  /**
+   * Git sources only: whether to copy the `.git` directory into the workspace.
+   * Defaults to true, so agents can run `git status`/`git diff` the way they
+   * would in a real checkout. Set false for a plain file tree.
+   */
+  include_git?: boolean;
 }
 
 export interface JudgeCriterion {

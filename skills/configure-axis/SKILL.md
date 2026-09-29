@@ -51,6 +51,7 @@ Full annotated shape:
   "setup": [
     { "action": "run_script", "command": "git init -q && git add -A && git commit -q -m init" },
     { "action": "copy", "match": "fixtures/sample-repo/**", "destination": "." },
+    // …or stage a real codebase: { "action": "copy", "match": "https://github.com/org/project#v1.2.3", "destination": "." }
   ],
 
   // The task. Be specific and verifiable.
@@ -104,6 +105,16 @@ Two action types are allowed in `setup` and `teardown`:
 
 - `{ "action": "run_script", "command": "<shell command>" }`: runs with the agent's workspace as cwd. Available env vars include `AXIS_PHASE` (`setup`/`teardown`), `AXIS_WORKSPACE`, and `AXIS_OUTPUT` (a file path where the script can append markdown that will surface in the report).
 - `{ "action": "copy", "match": "<glob>", "destination": "<workspace-relative path>" }`: copies files matching `match` (resolved relative to the config file) into `destination` (relative to the workspace). The path of each matched file relative to the longest non-glob prefix of `match` is preserved under `destination`.
+
+`match` also accepts a **git URL**, which stages a real codebase instead of a local fixture:
+
+- `{ "action": "copy", "match": "https://github.com/org/project", "destination": "." }` clones the repo and copies its working tree (including `.git`) into the workspace.
+- Pin a ref with a fragment (`"https://github.com/org/project#v1.2.3"`) or a `"ref"` field. Pin whenever you care about comparing results over time; an unpinned repo is fetched once and then reused as-is.
+- Paste a directory URL (`"https://github.com/org/project/tree/main/examples/blog"`) to copy just that subtree. The subpath may itself be a glob.
+- `"include_git": false` drops the `.git` directory, leaving a plain file tree.
+- `git@github.com:org/project.git`, `git://`, and `ssh://` URLs work too.
+
+Each repo + ref is cloned once into `.axis/repos/` and reused by every scenario, variant, and agent in the run (and by later runs). `axis run --refresh-repos` re-clones. Dependencies are not installed for you: follow the copy with `{ "action": "run_script", "command": "npm install" }` when the scenario needs them.
 
 ### Variants
 

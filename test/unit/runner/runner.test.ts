@@ -16,6 +16,7 @@ vi.mock("../../../src/runner/lifecycle.js", () => ({
 import { run } from "../../../src/runner/runner.js";
 import { getAdapter } from "../../../src/adapters/registry.js";
 import { runLifecyclePhase } from "../../../src/runner/lifecycle.js";
+import { resetRepoCache, setGitCloneImplForTests } from "../../../src/runner/repo-cache.js";
 
 const mockExecuteLifecycle = vi.mocked(runLifecyclePhase);
 
@@ -1175,5 +1176,85 @@ describe("artifact capture", () => {
 
     const paths = (output.results[0].artifacts ?? []).map((a) => a.path).sort();
     expect(paths).toEqual(["config.txt", "scenario.txt"]);
+  });
+});
+
+describe("repository pre-fetch", () => {
+  let tmp: string;
+  let restoreClone: () => void;
+  let clones: string[];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "axis-repo-cfg-"));
+    clones = [];
+    resetRepoCache();
+    restoreClone = setGitCloneImplForTests(async (source, targetDir) => {
+      clones.push(`${source.url}${source.ref ? `#${source.ref}` : ""}`);
+      fs.mkdirSync(path.join(targetDir, ".git"), { recursive: true });
+      fs.writeFileSync(path.join(targetDir, ".git", "HEAD"), "ref: refs/heads/main\n");
+      fs.writeFileSync(path.join(targetDir, "README.md"), "# repo\n");
+    });
+
+    const gitCopy = (destination: string) => ({
+      action: "copy",
+      match: "https://github.com/org/project",
+      destination,
+    });
+    fs.writeFileSync(
+      path.join(tmp, "axis.config.json"),
+      JSON.stringify({
+        scenarios: [
+          { key: "one", name: "One", prompt: "p", judge: "j", setup: [gitCopy(".")] },
+          { key: "two", name: "Two", prompt: "p", judge: "j", setup: [gitCopy("app")] },
+          {
+            key: "three",
+            name: "Three",
+            prompt: "p",
+            judge: "j",
+            setup: [{ action: "copy", match: "https://github.com/org/project", destination: ".", ref: "v2" }],
+          },
+        ],
+        agents: ["mock-agent", "other-agent"],
+      }),
+    );
+  });
+
+  afterEach(() => {
+    restoreClone();
+    resetRepoCache();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("fetches each repo and ref once for the whole run, not once per job", async () => {
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+
+    const output = await run({
+      configPath: path.join(tmp, "axis.config.json"),
+      logger: silentLogger,
+    });
+
+    // 3 scenarios x 2 agents = 6 jobs, but only two distinct (repo, ref) pairs.
+    expect(output.results).toHaveLength(6);
+    expect(clones.sort()).toEqual(["https://github.com/org/project", "https://github.com/org/project#v2"]);
+    expect(fs.existsSync(path.join(tmp, ".axis", "repos", "com.github", "org", "project", "HEAD"))).toBe(true);
+    expect(fs.existsSync(path.join(tmp, ".axis", "repos", "com.github", "org", "project", "v2"))).toBe(true);
+  });
+
+  it("does not abort the run when a repository cannot be cloned", async () => {
+    restoreClone();
+    restoreClone = setGitCloneImplForTests(async () => {
+      throw new Error("repository not found");
+    });
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+    const errors: string[] = [];
+
+    const output = await run({
+      configPath: path.join(tmp, "axis.config.json"),
+      logger: { ...silentLogger, error: (m: string) => errors.push(m) },
+    });
+
+    expect(output.results).toHaveLength(6);
+    expect(errors.join("\n")).toContain("repository not found");
   });
 });

@@ -35,20 +35,21 @@ Scaffold `axis.config.json` and a sample scenario, then install AXIS skills via 
 
 Execute every scenario against every configured agent in isolated workspaces, score the results, and write a report.
 
-| Flag                        | Purpose                                                            |
-| --------------------------- | ------------------------------------------------------------------ |
-| `-c, --config <path>`       | Config path (default discovers `axis.config.{json,js,ts,mjs}`)     |
-| `-s, --scenario <keys>`     | Comma-separated keys with glob support (`cms/*`, `hello-*`)        |
-| `-a, --agent <names>`       | Comma-separated agent names with glob support (`claude-code\|*`)   |
-| `--concurrency <n>`         | Max parallel jobs (default 15)                                     |
-| `--failed [reportId]`       | Re-run only failed pairs from a prior report (default `latest`)    |
-| `--no-score`                | Skip the LLM judges, write raw results only                        |
-| `--compare-baseline [name]` | Diff results against a saved baseline (default `main`)             |
-| `--refresh-skills`          | Force re-clone of remote skills cached under `.axis/skills-cache/` |
-| `--json`                    | Emit JSON to stdout instead of the live TTY display                |
-| `-v, --verbose`             | Per-step logging                                                   |
-| `--debug`                   | Capture raw agent stdout into `{agent}.debug.ndjson`               |
-| `-o, --output-dir <dir>`    | Also write the report manifest to this directory                   |
+| Flag                        | Purpose                                                                |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `-c, --config <path>`       | Config path (default discovers `axis.config.{json,js,ts,mjs}`)         |
+| `-s, --scenario <keys>`     | Comma-separated keys with glob support (`cms/*`, `hello-*`)            |
+| `-a, --agent <names>`       | Comma-separated agent names with glob support (`claude-code\|*`)       |
+| `--concurrency <n>`         | Max parallel jobs (default 15)                                         |
+| `--failed [reportId]`       | Re-run only failed pairs from a prior report (default `latest`)        |
+| `--no-score`                | Skip the LLM judges, write raw results only                            |
+| `--compare-baseline [name]` | Diff results against a saved baseline (default `main`)                 |
+| `--refresh-skills`          | Force re-clone of remote skills cached under `.axis/skills-cache/`     |
+| `--refresh-repos`           | Force re-clone of repos cached under `.axis/repos/` for `copy` actions |
+| `--json`                    | Emit JSON to stdout instead of the live TTY display                    |
+| `-v, --verbose`             | Per-step logging                                                       |
+| `--debug`                   | Capture raw agent stdout into `{agent}.debug.ndjson`                   |
+| `-o, --output-dir <dir>`    | Also write the report manifest to this directory                       |
 
 ### `axis reports`
 
@@ -99,6 +100,7 @@ project/
     ├── baselines/
     │   └── <name>.json             ← saved baselines (default name: main)
     ├── remotes/                    ← cloned scenarios from remote git URLs
+    ├── repos/                      ← repos cloned by `copy` actions (per repo + ref)
     └── skills-cache/               ← cloned remote skills
 ```
 

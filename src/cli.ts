@@ -253,6 +253,7 @@ interface RunPipelineOptions {
   outputDir?: string;
   json: boolean;
   refreshSkills: boolean;
+  refreshRepos: boolean;
   jobFilter?: Array<{ scenarioKey: string; agentName: string }>;
 }
 
@@ -351,6 +352,7 @@ async function runPipelineBody(
       registerCleanup,
       debug: opts.debug,
       refreshSkills: opts.refreshSkills,
+      refreshRepos: opts.refreshRepos,
       reportDir,
       onResult: opts.score
         ? (result: RunResult): Promise<void> => {
@@ -504,6 +506,7 @@ program
   .option("--failed [reportId]", "re-run only the failed scenario/agent pairs from a previous report (default: latest)")
   .option("--no-score", "skip scoring (raw results only)")
   .option("--refresh-skills", "force re-clone of cached remote skills", false)
+  .option("--refresh-repos", "force re-clone of repositories cached for `copy` actions", false)
   .option(
     "--compare-baseline [name]",
     `compare results against a baseline after scoring (default: "${DEFAULT_BASELINE_NAME}")`,
@@ -555,6 +558,7 @@ program
       outputDir: opts.outputDir,
       json: opts.json,
       refreshSkills: opts.refreshSkills,
+      refreshRepos: opts.refreshRepos,
       jobFilter,
     };
 

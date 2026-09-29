@@ -5,6 +5,8 @@ import { loadConfig, discoverScenarios, matchesScenarioFilter, matchesAgentFilte
 import { mergeRemoteConfig } from "../config/remote-scenarios.js";
 import { getAdapter, registerAdapter } from "../adapters/registry.js";
 import { runLifecyclePhase } from "./lifecycle.js";
+import { collectGitCopySources, defaultRepoCacheRoot, ensureRepo } from "./repo-cache.js";
+import type { GitCopySource } from "./repo-cache.js";
 import { captureArtifacts, resolveArtifactPatterns } from "./artifacts.js";
 import type { ResolvedRunConfig, RunOutput, RunResult, Logger, JobState, JobStatus } from "../types/output.js";
 import { silentLogger as defaultLogger, formatError, isFailedRun } from "../types/output.js";
@@ -111,6 +113,8 @@ export interface RunOptions {
   debug?: boolean;
   /** Force re-clone of remote skills from cache. */
   refreshSkills?: boolean;
+  /** Force re-clone of repositories staged by `copy` actions pointed at a git URL. */
+  refreshRepos?: boolean;
   /**
    * Report directory root. When provided and the scenario configures `artifacts`
    * patterns, captured files are copied to
@@ -362,6 +366,26 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
     }
   }
 
+  // --- Fetch repositories staged by `copy` actions (once, before any jobs) ---
+  // Jobs run in parallel and many scenarios point at the same repo, so warming
+  // the cache here means one clone per (repo, ref) instead of a race between
+  // job setups. A failure is not fatal to the whole run: the jobs that need
+  // that repo fail in setup (reusing this same cached error, so there's still
+  // only one clone attempt) while unrelated jobs carry on.
+  const repoCacheRoot = defaultRepoCacheRoot(configDir);
+  const repoSources = new Map<string, GitCopySource>();
+  for (const job of jobs) {
+    collectGitCopySources(job.scenario.setup, repoCacheRoot, repoSources);
+    collectGitCopySources(job.scenario.teardown, repoCacheRoot, repoSources);
+  }
+  for (const source of repoSources.values()) {
+    try {
+      await ensureRepo(source, { cacheRoot: repoCacheRoot, logger, refresh: options.refreshRepos });
+    } catch (err) {
+      logger.error(formatError(err));
+    }
+  }
+
   // Emit initial state after pre-flight so ink's first render is clean
   logger.onJobUpdate?.(jobStates, jobMeta);
 
@@ -558,6 +582,7 @@ async function executeJob(
       logger.verbose?.(`[${label}] Running teardown...`);
       const outcome = await runLifecyclePhase(scenario.teardown, workspace, jobEnv, "teardown", lifecycleContext, {
         sourceRoot: configDir,
+        repoCacheRoot: defaultRepoCacheRoot(configDir),
         debug,
         logger,
       });
@@ -595,6 +620,7 @@ async function executeJob(
     logger.verbose?.(`[${label}] Running setup...`);
     const outcome = await runLifecyclePhase(scenario.setup, workspace, jobEnv, "setup", lifecycleContext, {
       sourceRoot: configDir,
+      repoCacheRoot: defaultRepoCacheRoot(configDir),
       debug,
       logger,
     });

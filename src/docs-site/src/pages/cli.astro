@@ -112,6 +112,13 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <span class="cli-flag-desc">Force re-clone remote skills.</span>
       </div>
       <div class="cli-flag">
+        <span class="cli-flag-name"><code>--refresh-repos</code></span>
+        <span class="cli-flag-desc">
+          Force re-clone of repositories cached under <code>.axis/repos/</code> for
+          <code>copy</code> actions pointed at a git URL.
+        </span>
+      </div>
+      <div class="cli-flag">
         <span class="cli-flag-name"><code>--compare-baseline [name]</code></span>
         <span class="cli-flag-desc">
           Compare against a baseline after scoring (default name: <code>default</code>). Exits with

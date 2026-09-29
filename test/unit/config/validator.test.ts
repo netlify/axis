@@ -665,6 +665,62 @@ describe("validateScenario", () => {
     expect(() => validateScenario(scenario, "test.json")).toThrow('"match"');
   });
 
+  it("accepts a copy action with a git url", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", match: "https://github.com/org/project", destination: "." }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("accepts ref and include_git on a git copy action", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [
+        {
+          action: "copy",
+          match: "git@github.com:org/project.git",
+          destination: ".",
+          ref: "v1.2.3",
+          include_git: false,
+        },
+      ],
+    };
+    expect(() => validateScenario(scenario, "test.json")).not.toThrow();
+  });
+
+  it("rejects ref on a local copy action", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", match: "./fixtures/*", destination: ".", ref: "main" }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).toThrow('only valid when "match" is a git URL');
+  });
+
+  it("rejects include_git on a local copy action", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", match: "./fixtures/*", destination: ".", include_git: true }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).toThrow('only valid when "match" is a git URL');
+  });
+
+  it("rejects a non-boolean include_git", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", match: "https://github.com/org/project", destination: ".", include_git: "yes" }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).toThrow("include_git must be a boolean");
+  });
+
+  it("rejects an empty ref", () => {
+    const scenario = {
+      ...validScenario,
+      setup: [{ action: "copy", match: "https://github.com/org/project", destination: ".", ref: "" }],
+    };
+    expect(() => validateScenario(scenario, "test.json")).toThrow("ref must be a non-empty string");
+  });
+
   it("accepts a scenario with skills", () => {
     const scenario = { ...validScenario, skills: ["./local-skill", "owner/repo"] };
     expect(() => validateScenario(scenario, "test.json")).not.toThrow();

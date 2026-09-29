@@ -1,8 +1,11 @@
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
+import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { globToRegExp, walk } from "./artifacts.js";
+import { defaultRepoCacheRoot, ensureRepo, parseGitCopySource } from "./repo-cache.js";
+import type { GitCopySource } from "./repo-cache.js";
 import type { Logger } from "../types/output.js";
 import type { CopyAction, LifecycleAction, RunScriptAction } from "../types/scenario.js";
 
@@ -27,6 +30,13 @@ export interface LifecycleExecOptions {
   debug?: boolean;
   /** Logger used to emit debug output. Debug messages are dropped when omitted. */
   logger?: Logger;
+  /**
+   * Root directory for repositories cloned by `copy` actions pointed at a git
+   * URL. Defaults to `<sourceRoot>/.axis/repos`.
+   */
+  repoCacheRoot?: string;
+  /** Re-clone cached repositories instead of reusing them. */
+  refreshRepos?: boolean;
 }
 
 export async function executeLifecycleActions(
@@ -38,7 +48,7 @@ export async function executeLifecycleActions(
   const results: LifecycleResult[] = [];
 
   for (const action of actions) {
-    const result = action.action === "copy" ? runCopy(action, cwd, options) : await runScript(action, cwd, env);
+    const result = action.action === "copy" ? await runCopy(action, cwd, options) : await runScript(action, cwd, env);
     results.push(result);
 
     if (result.exitCode !== 0) {
@@ -194,16 +204,19 @@ function runScript(action: RunScriptAction, cwd: string, env?: Record<string, st
 }
 
 /**
- * Copy files matching `action.match` (glob, resolved relative to
- * `options.sourceRoot` — defaults to `cwd`) into `action.destination`
- * (resolved relative to `cwd`, the agent workspace). Each match keeps its
- * path relative to the longest non-glob prefix of `match`, so directory
- * structure under that prefix is preserved.
+ * Copy files matching `action.match` into `action.destination` (resolved
+ * relative to `cwd`, the agent workspace).
+ *
+ * `match` is either a glob resolved relative to `options.sourceRoot`
+ * (defaults to `cwd`) or a git URL, which is cloned into the repo cache and
+ * staged from there — see {@link runGitCopy}. Each glob match keeps its path
+ * relative to the longest non-glob prefix of `match`, so directory structure
+ * under that prefix is preserved.
  *
  * In debug mode, the resolved source/destination absolute paths and each
  * per-file copy are logged so authors can verify their patterns.
  */
-function runCopy(action: CopyAction, cwd: string, options?: LifecycleExecOptions): LifecycleResult {
+async function runCopy(action: CopyAction, cwd: string, options?: LifecycleExecOptions): Promise<LifecycleResult> {
   const start = Date.now();
   const sourceRoot = options?.sourceRoot ?? cwd;
   const debugLog = options?.debug ? (msg: string) => options.logger?.info(`[copy] ${msg}`) : undefined;
@@ -215,46 +228,138 @@ function runCopy(action: CopyAction, cwd: string, options?: LifecycleExecOptions
     durationMs: Date.now() - start,
   });
 
+  const gitSource = parseGitCopySource(action.match);
+  if (gitSource) return runGitCopy(action, gitSource, cwd, options, debugLog, result);
+
   try {
-    const normalizedPattern = action.match.replace(/\\/g, "/").replace(/^\.\//, "");
-    const base = findGlobBase(normalizedPattern);
-    const baseAbs = path.resolve(sourceRoot, base);
     const destAbs = path.resolve(cwd, action.destination);
-
     debugLog?.(`pattern=${action.match}`);
-    debugLog?.(`resolved source base=${baseAbs}`);
-    debugLog?.(`resolved destination=${destAbs}`);
+    const error = copyByGlob(sourceRoot, action.match, destAbs, debugLog);
+    return error ? result(1, error) : result(0);
+  } catch (err) {
+    return result(1, err instanceof Error ? err.message : String(err));
+  }
+}
 
-    if (!fs.existsSync(baseAbs)) {
-      // A literal path that doesn't exist is a hard error — the author named
-      // a specific file. A glob whose base is missing is just "zero matches".
-      const isLiteral = base === normalizedPattern;
-      if (isLiteral) return result(1, `source base does not exist: ${baseAbs}`);
-      debugLog?.("no files matched");
-      return result(0);
+/**
+ * Stage a git repository into the workspace. The repo is cloned into the
+ * cache on first use (`.axis/repos/<host>/<owner>/<repo>/<ref>` by default)
+ * and every later scenario, variant, and agent copies out of that one
+ * checkout — the fetch happens once per run, not once per job.
+ *
+ * With no subpath the whole working tree is copied verbatim, including
+ * `.git` unless `include_git` is false, so the agent sees a real checkout.
+ * A subpath (from a pasted `/tree/<ref>/<path>` URL) is staged through the
+ * same glob machinery local fixtures use, so it may itself be a glob.
+ */
+async function runGitCopy(
+  action: CopyAction,
+  parsed: GitCopySource,
+  cwd: string,
+  options: LifecycleExecOptions | undefined,
+  debugLog: ((msg: string) => void) | undefined,
+  result: (exitCode: number, stderr?: string) => LifecycleResult,
+): Promise<LifecycleResult> {
+  // An explicit `ref` on the action wins over one embedded in the URL.
+  const source = action.ref ? { ...parsed, ref: action.ref } : parsed;
+  const cacheRoot = options?.repoCacheRoot ?? defaultRepoCacheRoot(options?.sourceRoot ?? cwd);
+  const destAbs = path.resolve(cwd, action.destination);
+
+  debugLog?.(`repo=${source.url}${source.ref ? ` ref=${source.ref}` : ""}`);
+  if (source.subpath) debugLog?.(`subpath=${source.subpath}`);
+  debugLog?.(`resolved destination=${destAbs}`);
+
+  let repoDir: string;
+  try {
+    repoDir = await ensureRepo(source, {
+      cacheRoot,
+      ...(options?.logger ? { logger: options.logger } : {}),
+      ...(options?.refreshRepos ? { refresh: true } : {}),
+    });
+  } catch (err) {
+    return result(1, err instanceof Error ? err.message : String(err));
+  }
+  debugLog?.(`cached clone=${repoDir}`);
+
+  try {
+    if (source.subpath) {
+      const error = copyByGlob(repoDir, source.subpath, destAbs, debugLog);
+      return error ? result(1, error) : result(0);
     }
-
-    const matches = collectMatches(baseAbs, normalizedPattern, base);
-
-    if (matches.length === 0) {
-      debugLog?.("no files matched");
-      return result(0);
-    }
-
-    fs.mkdirSync(destAbs, { recursive: true });
-    matches.sort((a, b) => a.relFromBase.localeCompare(b.relFromBase));
-    for (const m of matches) {
-      const dst = path.join(destAbs, m.relFromBase);
-      fs.mkdirSync(path.dirname(dst), { recursive: true });
-      fs.copyFileSync(m.src, dst);
-      debugLog?.(`${m.src} -> ${dst}`);
-    }
-    debugLog?.(`copied ${matches.length} file(s)`);
-
+    await copyRepoTree(repoDir, destAbs, action.include_git ?? true, debugLog);
     return result(0);
   } catch (err) {
     return result(1, err instanceof Error ? err.message : String(err));
   }
+}
+
+/**
+ * Copy every file matching `pattern` (relative to `sourceRoot`) into
+ * `destAbs`, preserving each match's path relative to the longest non-glob
+ * prefix. Returns an error message, or undefined on success.
+ */
+function copyByGlob(
+  sourceRoot: string,
+  pattern: string,
+  destAbs: string,
+  debugLog?: (msg: string) => void,
+): string | undefined {
+  const normalizedPattern = pattern.replace(/\\/g, "/").replace(/^\.\//, "");
+  const base = findGlobBase(normalizedPattern);
+  const baseAbs = path.resolve(sourceRoot, base);
+
+  debugLog?.(`resolved source base=${baseAbs}`);
+  debugLog?.(`resolved destination=${destAbs}`);
+
+  if (!fs.existsSync(baseAbs)) {
+    // A literal path that doesn't exist is a hard error — the author named
+    // a specific file. A glob whose base is missing is just "zero matches".
+    const isLiteral = base === normalizedPattern;
+    if (isLiteral) return `source base does not exist: ${baseAbs}`;
+    debugLog?.("no files matched");
+    return undefined;
+  }
+
+  const matches = collectMatches(baseAbs, normalizedPattern, base);
+
+  if (matches.length === 0) {
+    debugLog?.("no files matched");
+    return undefined;
+  }
+
+  fs.mkdirSync(destAbs, { recursive: true });
+  matches.sort((a, b) => a.relFromBase.localeCompare(b.relFromBase));
+  for (const m of matches) {
+    const dst = path.join(destAbs, m.relFromBase);
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.copyFileSync(m.src, dst);
+    debugLog?.(`${m.src} -> ${dst}`);
+  }
+  debugLog?.(`copied ${matches.length} file(s)`);
+  return undefined;
+}
+
+/**
+ * Copy a cached checkout into the workspace verbatim — symlinks, empty
+ * directories, and (unless `includeGit` is false) the `.git` directory.
+ *
+ * Async on purpose: a representative codebase can be large, and jobs copy
+ * into their own workspace in parallel. A synchronous copy would stall every
+ * other job (and the live display) for the duration.
+ */
+async function copyRepoTree(
+  repoDir: string,
+  destAbs: string,
+  includeGit: boolean,
+  debugLog?: (msg: string) => void,
+): Promise<void> {
+  const gitDir = path.join(repoDir, ".git");
+  await fsp.mkdir(destAbs, { recursive: true });
+  await fsp.cp(repoDir, destAbs, {
+    recursive: true,
+    ...(includeGit ? {} : { filter: (src: string) => src !== gitDir && !src.startsWith(gitDir + path.sep) }),
+  });
+  debugLog?.(`copied repository tree${includeGit ? " (including .git)" : " (excluding .git)"} -> ${destAbs}`);
 }
 
 interface CopyMatch {

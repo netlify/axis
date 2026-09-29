@@ -401,9 +401,11 @@ export default {
 
   <h4 id="action-copy"><code>copy</code></h4>
   <p>
-    Copies files from your config directory into the agent's workspace without spawning a shell.
-    This is the recommended way to stage fixtures &mdash; faster and clearer than the equivalent
-    <code>cp -R</code> command, and portable across operating systems.
+    Copies files from your config directory &mdash; or from a git repository &mdash; into the
+    agent's workspace without spawning a shell. This is the recommended way to stage fixtures
+    &mdash; faster and clearer than the equivalent <code>cp -R</code> command, and portable across
+    operating systems. See <a href="#copy-from-a-repository">copying from a repository</a> for
+    pointing a scenario at a real codebase.
   </p>
   <table class="table-fields">
     <thead>
@@ -423,7 +425,8 @@ export default {
         <td>
           Glob pattern resolved relative to <code>AXIS_CONFIG_DIR</code> (the directory containing
           <code>axis.config.&#123;json,ts,js&#125;</code>). Supports <code>*</code>, <code>**</code>,
-          <code>?</code>, and character classes.
+          <code>?</code>, and character classes. Also accepts a
+          <a href="#copy-from-a-repository">git URL</a>.
         </td>
       </tr>
       <tr>
@@ -432,6 +435,24 @@ export default {
         <td><span class="req-yes">Yes</span></td>
         <td>
           Directory path resolved relative to the agent workspace. Created if missing.
+        </td>
+      </tr>
+      <tr>
+        <td><code>ref</code></td>
+        <td><code>string</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Git sources only. Branch, tag, or commit to check out. Overrides a <code>#ref</code>
+          fragment in <code>match</code>.
+        </td>
+      </tr>
+      <tr>
+        <td><code>include_git</code></td>
+        <td><code>boolean</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          Git sources only. Whether to copy the <code>.git</code> directory into the workspace.
+          Defaults to <code>true</code>.
         </td>
       </tr>
     </tbody>
@@ -457,6 +478,51 @@ export default {
     destination, and every <code>src&nbsp;-&gt;&nbsp;dst</code> pair, so you can verify a pattern
     without dry-running the whole scenario.
   </p>
+
+  <h4 id="copy-from-a-repository">Copying from a repository</h4>
+  <p>
+    When <code>match</code> is a git URL, AXIS clones the repository and copies it into the
+    workspace &mdash; the way to run scenarios against a real codebase instead of a fixture you
+    maintain inside the project. HTTPS, <code>git@host:owner/repo</code>,
+    <code>git://</code>, and <code>ssh://</code> URLs are all accepted.
+  </p>
+  <pre><code>{`// Whole repository at its default branch, into the workspace root
+{ "action": "copy", "match": "https://github.com/org/project", "destination": "." }
+
+// Pinned to a tag, branch, or commit
+{ "action": "copy", "match": "https://github.com/org/project#v1.2.3", "destination": "." }
+{ "action": "copy", "match": "https://github.com/org/project", "destination": ".", "ref": "v1.2.3" }
+
+// One subdirectory, from a URL pasted straight out of the repo browser
+{ "action": "copy", "match": "https://github.com/org/project/tree/main/examples/blog", "destination": "." }
+
+// Plain file tree, no .git
+{ "action": "copy", "match": "git@github.com:org/project.git", "destination": ".", "include_git": false }`}</code></pre>
+  <p>
+    The whole working tree is copied, <code>.git</code> included, so the agent sees a real checkout
+    and commands like <code>git status</code> and <code>git diff</code> behave normally. Set
+    <code>include_git</code> to <code>false</code> for a plain file tree. A URL with a
+    <code>/tree/&lt;ref&gt;/&lt;path&gt;</code> (or <code>/blob/&lt;ref&gt;/&lt;file&gt;</code>)
+    suffix copies only that subtree, and that subpath may itself be a glob.
+  </p>
+  <div class="callout callout-info">
+    <div class="callout-title">Fetched once, reused everywhere</div>
+    <p>
+      Each repository and ref is cloned once into <code>.axis/repos/</code> and reused by every
+      scenario, variant, and agent in the run &mdash; including across later runs. Cached clones
+      are never auto-updated, so results stay comparable; run
+      <code>axis run --refresh-repos</code> to pull in upstream changes. Pin a <code>ref</code>
+      whenever a scenario's score should be comparable over time.
+    </p>
+  </div>
+  <p>
+    Dependencies are not installed for you. Follow the copy with a
+    <a href="#action-run-script"><code>run_script</code></a> action when the codebase needs them:
+  </p>
+  <pre><code>{`"setup": [
+  { "action": "copy", "match": "https://github.com/org/project#v1.2.3", "destination": "." },
+  { "action": "run_script", "command": "npm install --silent" }
+]`}</code></pre>
 
   <h3 id="lifecycle-environment-variables">Lifecycle environment variables</h3>
   <p>
