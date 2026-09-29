@@ -1258,3 +1258,121 @@ describe("repository pre-fetch", () => {
     expect(errors.join("\n")).toContain("repository not found");
   });
 });
+
+describe("scenario discovery reporting", () => {
+  let tmp: string;
+  let scenariosDir: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "axis-discovery-"));
+    scenariosDir = path.join(tmp, "scenarios");
+    fs.mkdirSync(scenariosDir, { recursive: true });
+    fs.writeFileSync(path.join(scenariosDir, "real.json"), JSON.stringify({ name: "Real", prompt: "p", judge: "r" }));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function writeConfig(agents: unknown = ["mock-agent"]): string {
+    const p = path.join(tmp, "axis.config.json");
+    fs.writeFileSync(p, JSON.stringify({ scenarios: "./scenarios", agents }));
+    return p;
+  }
+
+  function collectingLogger() {
+    const info: string[] = [];
+    const errors: string[] = [];
+    return { logger: { info: (m: string) => info.push(m), error: (m: string) => errors.push(m) }, info, errors };
+  }
+
+  it("reports files that failed to load in the run output", async () => {
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+    fs.writeFileSync(path.join(scenariosDir, "broken.mjs"), `import "./does-not-exist.js";`);
+
+    const output = await run({ configPath: writeConfig(), logger: silentLogger });
+
+    expect(output.results).toHaveLength(1);
+    expect(output.summary.loadFailed).toBe(1);
+    expect(output.loadFailures).toHaveLength(1);
+    expect(output.loadFailures?.[0].path).toBe(path.join(scenariosDir, "broken.mjs"));
+  });
+
+  it("omits loadFailures entirely when every file loads", async () => {
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+
+    const output = await run({ configPath: writeConfig(), logger: silentLogger });
+
+    expect(output.loadFailures).toBeUndefined();
+    expect(output.summary.loadFailed).toBeUndefined();
+  });
+
+  it("reports a failed file once even though discovery runs per agent", async () => {
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+    fs.writeFileSync(path.join(scenariosDir, "broken.json"), "not json at all");
+
+    const output = await run({
+      configPath: writeConfig([
+        { agent: "mock-agent", model: "opus" },
+        { agent: "mock-agent", model: "sonnet" },
+      ]),
+      logger: silentLogger,
+    });
+
+    expect(output.results).toHaveLength(2);
+    expect(output.loadFailures).toHaveLength(1);
+  });
+
+  it("logs the discovered scenario, agent, and job counts", async () => {
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+    const { logger, info } = collectingLogger();
+
+    await run({
+      configPath: writeConfig([
+        { agent: "mock-agent", model: "opus" },
+        { agent: "mock-agent", model: "sonnet" },
+      ]),
+      logger,
+    });
+
+    expect(info).toContain("Discovered 1 scenario across 2 agents: 2 jobs");
+  });
+
+  it("logs which scenarios were skipped on purpose", async () => {
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+    fs.writeFileSync(
+      path.join(scenariosDir, "paused.json"),
+      JSON.stringify({ name: "Paused", prompt: "p", judge: "r", skip: true }),
+    );
+    const { logger, info } = collectingLogger();
+
+    const output = await run({ configPath: writeConfig(), logger });
+
+    expect(output.summary.skipped).toBe(1);
+    expect(info).toContain("Skipping 1 scenario marked skip: paused");
+  });
+
+  it("rolls up load failures as an error so a short run is visible", async () => {
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+    fs.writeFileSync(path.join(scenariosDir, "broken.json"), "not json at all");
+    const { logger, errors } = collectingLogger();
+
+    await run({ configPath: writeConfig(), logger });
+
+    expect(errors.join("\n")).toContain("1 file in the scenarios tree failed to load");
+    expect(errors.join("\n")).toContain("broken.json");
+  });
+
+  it("fails discovery when a scenario file is missing its prompt and judge", async () => {
+    mockGetAdapter.mockReturnValue(createMockAdapter());
+    fs.writeFileSync(
+      path.join(scenariosDir, "half-written.json"),
+      JSON.stringify({ name: "Half written", setup: [{ run: "echo hi" }] }),
+    );
+
+    await expect(run({ configPath: writeConfig(), logger: silentLogger })).rejects.toThrow(
+      /is missing the required "prompt" and "judge" fields/,
+    );
+  });
+});

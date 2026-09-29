@@ -199,12 +199,37 @@ export function renderReport(report: ReportData): string {
   return `
     <div class="container">
       ${renderHeader(orderedReport)}
+      ${renderLoadFailures(orderedReport)}
       ${renderResultsSection(orderedReport)}
       <footer class="report-footer">
         AXIS is OSS maintained by <a href="https://www.netlify.com" target="_blank" rel="noopener">Netlify</a> and the open source contributors.
       </footer>
     </div>
     ${renderModals(orderedResults)}`;
+}
+
+// --- Load failures ---
+
+/**
+ * Banner for scenario files that failed to load. Surfaced above the results so
+ * a report can't read as complete while quietly covering fewer scenarios than
+ * the suite defines.
+ */
+function renderLoadFailures(report: ReportData): string {
+  const failures = report.loadFailures ?? [];
+  if (failures.length === 0) return "";
+
+  const items = failures
+    .map((f) => `<li><code>${escapeHtml(f.path)}</code><span>${escapeHtml(f.reason)}</span></li>`)
+    .join("");
+
+  return `
+    <div class="error-banner load-failures">
+      <div class="load-failures-title">
+        ${failures.length} scenario file${failures.length === 1 ? "" : "s"} failed to load, so this report does not cover the whole suite.
+      </div>
+      <ul class="load-failures-list">${items}</ul>
+    </div>`;
 }
 
 // --- Header ---

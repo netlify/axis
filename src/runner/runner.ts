@@ -8,7 +8,15 @@ import { runLifecyclePhase } from "./lifecycle.js";
 import { collectGitCopySources, defaultRepoCacheRoot, ensureRepo } from "./repo-cache.js";
 import type { GitCopySource } from "./repo-cache.js";
 import { captureArtifacts, resolveArtifactPatterns } from "./artifacts.js";
-import type { ResolvedRunConfig, RunOutput, RunResult, Logger, JobState, JobStatus } from "../types/output.js";
+import type {
+  ResolvedRunConfig,
+  RunOutput,
+  RunResult,
+  Logger,
+  JobState,
+  JobStatus,
+  ScenarioLoadFailure,
+} from "../types/output.js";
 import { silentLogger as defaultLogger, formatError, isFailedRun } from "../types/output.js";
 import type { Scenario } from "../types/scenario.js";
 import type { AgentConfig, AxisConfig, ResolvedSkill, ScenarioLimitsConfig } from "../types/config.js";
@@ -190,13 +198,20 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   const jobs: Job[] = [];
   const agents = normalizeAgents(config.agents);
   const skippedKeys = new Set<string>();
+  // Keyed by path so a file that fails to load is reported once, not once per
+  // agent (discovery runs per agent to honour per-agent scenario filters).
+  const loadFailures = new Map<string, ScenarioLoadFailure>();
 
   for (const { name: agentName, config: agentConfig } of agents) {
     if (options.agentFilter?.length && !matchesAgentFilter(agentName, options.agentFilter)) {
       continue;
     }
 
-    const allScenarios = await discoverScenarios(configDir, config.scenarios, agentConfig.scenarios);
+    const allScenarios = await discoverScenarios(configDir, config.scenarios, agentConfig.scenarios, {
+      logger,
+      maxRemotesDepth: config.settings?.remotes?.maxDepth,
+      onLoadFailure: (failure) => loadFailures.set(failure.path, failure),
+    });
 
     // Partition into active and skipped
     const scenarios: Scenario[] = [];
@@ -240,10 +255,12 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   }
 
   const skippedCount = skippedKeys.size;
+  const failedToLoad = [...loadFailures.values()];
+
+  logDiscoverySummary(logger, jobs, skippedKeys, failedToLoad);
 
   if (jobs.length === 0) {
-    logger.info("No jobs discovered.");
-    return buildOutput(runStart, [], skippedCount);
+    return buildOutput(runStart, [], skippedCount, failedToLoad);
   }
 
   // --- Initialize job state tracker ---
@@ -510,7 +527,55 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   // Clean up overall time limit timer
   if (runTimeLimitTimer) clearTimeout(runTimeLimitTimer);
 
-  return buildOutput(runStart, results, skippedCount);
+  return buildOutput(runStart, results, skippedCount, failedToLoad);
+}
+
+/** `1 scenario` / `3 scenarios`. */
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** Comma-joined list, capped so a big suite doesn't flood the preamble. */
+function formatKeyList(keys: string[], limit = 5): string {
+  const sorted = [...keys].sort();
+  if (sorted.length <= limit) return sorted.join(", ");
+  return `${sorted.slice(0, limit).join(", ")}, and ${sorted.length - limit} more`;
+}
+
+/**
+ * Report the denominator before anything runs: how many scenarios were found,
+ * how many are opted out, and whether any file failed to load. Without this a
+ * run that covers fewer scenarios than intended still prints a clean summary,
+ * so a scenario that quietly stopped loading looks like a passing report.
+ */
+function logDiscoverySummary(
+  logger: Logger,
+  jobs: Job[],
+  skippedKeys: Set<string>,
+  loadFailures: ScenarioLoadFailure[],
+): void {
+  if (jobs.length === 0) {
+    logger.info("No jobs discovered.");
+  } else {
+    const scenarioCount = new Set(jobs.map((j) => j.scenario.key)).size;
+    const agentCount = new Set(jobs.map((j) => j.agentName)).size;
+    logger.info(
+      `Discovered ${plural(scenarioCount, "scenario")} across ${plural(agentCount, "agent")}: ${plural(jobs.length, "job")}`,
+    );
+  }
+
+  if (skippedKeys.size > 0) {
+    logger.info(`Skipping ${plural(skippedKeys.size, "scenario")} marked skip: ${formatKeyList([...skippedKeys])}`);
+  }
+
+  // Each failure was already logged with its reason as the walk hit it; this is
+  // the roll-up so the count is visible next to the discovery numbers.
+  if (loadFailures.length > 0) {
+    logger.error(
+      `${plural(loadFailures.length, "file")} in the scenarios tree failed to load; ` +
+        `${loadFailures.length === 1 ? "its" : "their"} scenarios did not run.`,
+    );
+  }
 }
 
 interface JobOutput {
@@ -879,7 +944,12 @@ function buildFailedResult(job: Job, error: string): RunResult {
   };
 }
 
-function buildOutput(runStart: number, results: RunResult[], skippedCount = 0): RunOutput {
+function buildOutput(
+  runStart: number,
+  results: RunResult[],
+  skippedCount = 0,
+  loadFailures: ScenarioLoadFailure[] = [],
+): RunOutput {
   const completed = results.filter((r) => !isFailedRun(r.output)).length;
 
   return {
@@ -892,6 +962,8 @@ function buildOutput(runStart: number, results: RunResult[], skippedCount = 0): 
       completed,
       failed: results.length - completed,
       ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
+      ...(loadFailures.length > 0 ? { loadFailed: loadFailures.length } : {}),
     },
+    ...(loadFailures.length > 0 ? { loadFailures } : {}),
   };
 }

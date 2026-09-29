@@ -904,7 +904,10 @@ curl -X POST "$SLACK_WEBHOOK" \\
     helpers and external packages. If the cloned repo has a <code>package.json</code> and no
     <code>node_modules/</code>, AXIS runs <code>npm install</code> (or <code>pnpm install</code> /
     <code>yarn install</code> based on the lockfile) automatically before walking. Install failures
-    are logged but do not abort the run; modules whose imports fail are reported and skipped.
+    are logged but do not abort the run. Modules whose imports still fail after that are
+    recorded as <a href="/scenarios#load-failures">load failures</a>: they are named with their
+    reason, stored in the report, and make the run exit non-zero, so a remote library whose
+    scenarios stopped loading can't pass unnoticed.
   </p>
 
   <h3 id="remote-scenarios-nesting">Nested remote references</h3>

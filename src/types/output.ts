@@ -31,6 +31,22 @@ export interface RunOutput {
   durationMs: number;
   results: RunResult[];
   summary: RunSummary;
+  /** Files in the scenarios tree that could not be loaded. Omitted when every file loaded. */
+  loadFailures?: ScenarioLoadFailure[];
+}
+
+/**
+ * A file in the scenarios tree that could not be loaded as a scenario.
+ *
+ * Distinct from a `skip: true` scenario: that is a deliberate opt-out, while
+ * this is a file that was meant to be a scenario (or is too broken to tell)
+ * and would otherwise silently shrink the run without anyone noticing.
+ */
+export interface ScenarioLoadFailure {
+  /** Absolute path to the file that failed to load. */
+  path: string;
+  /** Why it could not be loaded. */
+  reason: string;
 }
 
 /** Shared fields for all run results (scored and unscored). */
@@ -60,7 +76,10 @@ export interface RunSummary {
   total: number;
   completed: number;
   failed: number;
+  /** Scenarios deliberately opted out via `skip: true`. */
   skipped?: number;
+  /** Files in the scenarios tree that could not be loaded. */
+  loadFailed?: number;
 }
 
 export type JobStatus = "pending" | "setup" | "starting" | "running" | "teardown" | "done" | "failed" | "scoring";
@@ -114,6 +133,36 @@ export const silentLogger: Logger = {
   info() {},
   error() {},
 };
+
+/**
+ * Exit status for a completed run.
+ *
+ * Non-zero when jobs failed, when a scenario file failed to load, or when the
+ * run discovered nothing at all. The last two matter because neither shows up
+ * in the pass/fail counts: a suite that quietly stopped loading a scenario
+ * still produces a clean-looking average over the scenarios that remain.
+ */
+export function runExitStatus(output: { summary: RunSummary; loadFailures?: ScenarioLoadFailure[] }): {
+  code: number;
+  reason?: string;
+} {
+  const reasons: string[] = [];
+  const loadFailed = output.loadFailures?.length ?? 0;
+
+  if (loadFailed > 0) {
+    const plural = loadFailed === 1 ? "" : "s";
+    reasons.push(
+      `${loadFailed} scenario file${plural} failed to load, so this run did not cover the whole suite. ` +
+        `Fix the file${plural}, or move ${loadFailed === 1 ? "it" : "them"} into a "fixtures" directory if not scenarios.`,
+    );
+  }
+  if (output.summary.total === 0) {
+    reasons.push("No scenarios ran. Check the scenarios path and any --scenario / --agent filters.");
+  }
+
+  const failing = loadFailed > 0 || output.summary.total === 0 || output.summary.failed > 0;
+  return { code: failing ? 1 : 0, ...(reasons.length > 0 ? { reason: reasons.join(" ") } : {}) };
+}
 
 /** Type guard: checks if a run result has been scored. */
 export function isScoredResult(result: BaseRunResult): result is ScoredRunResult {

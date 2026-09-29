@@ -183,9 +183,11 @@ export default async () => ({
       <div class="callout callout-info">
         <div class="callout-title">Helpers and shared logic</div>
         <p>
-          Module files in the scenarios directory whose default export is missing or is not a
-          scenario object are silently skipped, so helpers, fixtures, and shared utilities can
-          live alongside scenarios without any special configuration.
+          Module files in the scenarios directory with no default export, or whose default export
+          carries no scenario fields, are skipped, so helpers and shared utilities can live
+          alongside scenarios without any special configuration. A file that <em>does</em> carry
+          scenario fields but is missing <code>prompt</code> or <code>judge</code> is an error,
+          not a skip. See <a href="#discovery">Discovery</a>.
         </p>
       </div>
     </div>
@@ -226,6 +228,83 @@ export default {
       </p>
     </div>
   </details>
+
+  <h2 id="discovery">Discovery</h2>
+  <p>
+    AXIS walks the scenarios directory and loads every <code>.json</code>, <code>.js</code>,
+    <code>.mjs</code>, <code>.cjs</code>, <code>.ts</code>, <code>.mts</code>, and
+    <code>.cts</code> file it finds. Because real suites keep fixture codebases and helper
+    modules in the same tree, the walker has to decide what is an intended scenario and what is
+    not. It does that in three buckets.
+  </p>
+  <table>
+    <thead>
+      <tr><th>File</th><th>What happens</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Has <code>prompt</code> or <code>judge</code></td>
+        <td>
+          Loaded and validated as a scenario. Anything malformed is a hard error naming the file
+          and the field.
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Has scenario fields (<code>variants</code>, <code>setup</code>, <code>teardown</code>,
+          <code>limits</code>, <code>skip</code>, <code>agents</code>, <code>skills</code>,
+          <code>mcp_servers</code>, <code>artifacts</code>) but no <code>prompt</code> or
+          <code>judge</code>
+        </td>
+        <td>
+          <strong>Hard error.</strong> This is an unfinished scenario, and dropping it would
+          shrink the run without changing how the report looks.
+        </td>
+      </tr>
+      <tr>
+        <td>Has none of the above</td>
+        <td>
+          Skipped quietly (visible with <code>--verbose</code>). Helper modules, sample data, and
+          framework configs fall here.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 id="fixtures-directories">Excluding files from discovery</h3>
+  <p>
+    Directories named <code>fixtures</code> or <code>scenario-fixtures</code> are never walked,
+    and neither are dotfile directories or <code>node_modules</code>. Put anything a scenario
+    needs but that is not itself a scenario in one of those, and the walker will not look at it:
+  </p>
+  <pre><code>{`scenarios/
+  create-post.json          # loaded
+  shared/variants.ts        # skipped: no default export
+  fixtures/
+    starter-site/           # never walked
+    seed-data.json          # never walked`}</code></pre>
+  <p>
+    A directory named <code>fixtures</code> is still walked when it is the configured scenarios
+    root itself. The exclusion applies to directories found <em>during</em> the walk.
+  </p>
+
+  <h3 id="load-failures">Files that fail to load</h3>
+  <p>
+    Some files can't be classified at all: JSON that doesn't parse, or a module that throws on
+    import (commonly a syntax error, or a remote scenario repo whose dependencies aren't
+    installed). These don't halt discovery, since one bad file shouldn't strand a whole suite,
+    but each one is reported with its reason, recorded in the report manifest under
+    <code>loadFailures</code>, shown in the HTML report, and makes <code>axis run</code> exit
+    non-zero.
+  </p>
+  <div class="callout callout-info">
+    <div class="callout-title">Skipped is not the same as missing</div>
+    <p>
+      A scenario with <code>skip: true</code> is a deliberate opt-out: it is listed in the run
+      preamble, counted separately in the summary, and does not affect the exit code. A file that
+      failed to load is an accident, and is reported as one.
+    </p>
+  </div>
 
   <h2>Writing Effective Prompts</h2>
   <p>

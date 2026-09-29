@@ -6,7 +6,7 @@ import type { AxisConfig, InlineScenario } from "../types/config.js";
 import type { Scenario, ScenarioVariant } from "../types/scenario.js";
 import { validateConfig, validateScenario } from "./validator.js";
 import { formatError } from "../types/output.js";
-import type { Logger } from "../types/output.js";
+import type { Logger, ScenarioLoadFailure } from "../types/output.js";
 import { globToRegExp } from "../runner/artifacts.js";
 import { expandRemoteScenarios } from "./remote-scenarios.js";
 
@@ -156,6 +156,19 @@ export interface DiscoverScenariosOptions {
   logger?: Logger;
   /** How many levels of remote-to-remote references to follow. Defaults to 1. */
   maxRemotesDepth?: number;
+  /**
+   * Called once per file that was meant to load as a scenario but could not
+   * (unparseable JSON, a module that throws on import). The walk continues so
+   * one bad file can't strand a whole run; callers surface these and fail the
+   * exit code so the missing scenarios don't pass unnoticed.
+   */
+  onLoadFailure?: (failure: ScenarioLoadFailure) => void;
+}
+
+/** Reporting channels threaded through the scenarios walk. */
+interface WalkContext {
+  logger?: Logger;
+  onLoadFailure?: (failure: ScenarioLoadFailure) => void;
 }
 
 export async function discoverScenarios(
@@ -175,10 +188,11 @@ export async function discoverScenarios(
   });
   const entries = Array.isArray(expanded) ? expanded : [expanded ?? "./scenarios"];
   const scenarios: Scenario[] = [];
+  const ctx: WalkContext = { logger: options?.logger, onLoadFailure: options?.onLoadFailure };
 
   for (const entry of entries) {
     if (typeof entry === "string") {
-      await collectFromPath(path.resolve(configDir, entry), scenarios, options?.logger);
+      await collectFromPath(path.resolve(configDir, entry), scenarios, ctx);
     } else {
       // Inline scenarios are validated by validateConfig; here we just normalize and expand.
       scenarios.push(...expandInline(entry));
@@ -210,7 +224,7 @@ export async function discoverScenarios(
 const SCENARIO_EXTENSIONS = new Set([".json", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"]);
 const SCENARIO_EXT_RE = /\.(json|js|mjs|cjs|ts|mts|cts)$/;
 
-async function collectFromPath(absolutePath: string, scenarios: Scenario[], logger?: Logger): Promise<void> {
+async function collectFromPath(absolutePath: string, scenarios: Scenario[], ctx: WalkContext): Promise<void> {
   let stat;
   try {
     stat = await fs.stat(absolutePath);
@@ -219,7 +233,7 @@ async function collectFromPath(absolutePath: string, scenarios: Scenario[], logg
   }
 
   if (stat.isDirectory()) {
-    await walkDir(absolutePath, absolutePath, scenarios, logger);
+    await walkDir(absolutePath, absolutePath, scenarios, ctx);
     return;
   }
   if (!stat.isFile()) {
@@ -232,18 +246,26 @@ async function collectFromPath(absolutePath: string, scenarios: Scenario[], logg
   }
   // Single-file entry is explicit, so missing default exports are an error (not silent skip).
   const baseKey = path.basename(absolutePath, ext);
-  const loaded = await loadScenarioFromPath(absolutePath, baseKey, false);
+  const loaded = await loadScenarioFromPath(absolutePath, baseKey, false, ctx);
   if (loaded) scenarios.push(...loaded);
 }
 
 /**
- * Directory names skipped when walking the scenarios tree. These commonly
- * appear inside fixture codebases (e.g. `scenarios/fixtures/site/.netlify/`)
- * and never contain authored scenarios.
+ * Directory names skipped when walking the scenarios tree.
+ *
+ * `fixtures` / `scenario-fixtures` are the supported opt-out: anything a
+ * scenario needs but that is not itself a scenario (starter codebases, sample
+ * data, framework configs) goes in one of these and the walker never looks
+ * inside. That opt-out is what lets discovery treat every other file in the
+ * tree as an intended scenario and complain when one is malformed, instead of
+ * quietly dropping it.
  */
-const WALK_SKIP_DIRS = new Set(["node_modules"]);
+const WALK_SKIP_DIRS = new Set(["node_modules", "fixtures", "scenario-fixtures"]);
 
-async function walkDir(dir: string, rootDir: string, scenarios: Scenario[], logger?: Logger): Promise<void> {
+/** An AXIS config nested in the scenarios tree is never itself a scenario. */
+const CONFIG_BASENAME_RE = /^axis\.config\./;
+
+async function walkDir(dir: string, rootDir: string, scenarios: Scenario[], ctx: WalkContext): Promise<void> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
 
   for (const entry of entries) {
@@ -254,20 +276,22 @@ async function walkDir(dir: string, rootDir: string, scenarios: Scenario[], logg
       // non-source dirs so we don't crawl into tool state or vendored code
       // when a scenario directory contains fixture codebases.
       if (entry.name.startsWith(".") || WALK_SKIP_DIRS.has(entry.name)) continue;
-      await walkDir(fullPath, rootDir, scenarios, logger);
+      await walkDir(fullPath, rootDir, scenarios, ctx);
       continue;
     }
     if (!entry.isFile()) continue;
 
     const ext = path.extname(entry.name).toLowerCase();
     if (!SCENARIO_EXTENSIONS.has(ext)) continue;
+    if (CONFIG_BASENAME_RE.test(entry.name)) continue;
 
     // Derive key from path relative to the walk root: scenarios/cms/create-post.ts → "cms/create-post"
     const baseKey = path.relative(rootDir, fullPath).replace(SCENARIO_EXT_RE, "").split(path.sep).join("/");
-    // Walking a directory: silently skip files that don't look like a scenario
-    // (e.g. fixture JSON, helper TS modules) so authors can keep them alongside
-    // real scenarios without special handling.
-    const loaded = await loadScenarioFromPath(fullPath, baseKey, true, logger);
+    // Walking a directory: files that clearly aren't scenarios (helper modules,
+    // stray data) are skipped quietly so authors can keep them alongside real
+    // scenarios. Files that look like unfinished scenarios throw, and files too
+    // broken to classify are reported through `onLoadFailure`.
+    const loaded = await loadScenarioFromPath(fullPath, baseKey, true, ctx);
     if (loaded) scenarios.push(...loaded);
   }
 }
@@ -285,16 +309,16 @@ async function loadScenarioFromPath(
   filePath: string,
   baseKey: string,
   silentSkip: boolean,
-  logger?: Logger,
+  ctx: WalkContext,
 ): Promise<Scenario[] | null> {
   const ext = path.extname(filePath).toLowerCase();
 
   if (ext === ".json") {
-    return loadJsonScenario(filePath, baseKey, silentSkip);
+    return loadJsonScenario(filePath, baseKey, silentSkip, ctx);
   }
 
   if (JS_EXTENSIONS.has(ext) || TS_EXTENSIONS.has(ext)) {
-    return loadModuleScenario(filePath, baseKey, silentSkip, logger);
+    return loadModuleScenario(filePath, baseKey, silentSkip, ctx);
   }
 
   if (silentSkip) return null;
@@ -312,18 +336,53 @@ async function loadScenarioFromPath(
  */
 const SCENARIO_MARKER_FIELDS = ["prompt", "judge", "rubric"] as const;
 
-async function loadJsonScenario(filePath: string, baseKey: string, silentSkip: boolean): Promise<Scenario[] | null> {
+/**
+ * Fields only an AXIS scenario carries. A walked file with one of these but no
+ * marker field is a scenario someone left unfinished, not a fixture: the
+ * marker heuristic would drop it without a word, and the run would quietly
+ * cover fewer scenarios while still reporting a clean result. So it throws
+ * instead. Files that genuinely aren't scenarios have none of these, and
+ * anything ambiguous belongs in a `fixtures/` directory.
+ */
+const SCENARIO_INTENT_FIELDS = [
+  "variants",
+  "setup",
+  "teardown",
+  "limits",
+  "skip",
+  "agents",
+  "skills",
+  "mcp_servers",
+  "artifacts",
+] as const;
+
+async function loadJsonScenario(
+  filePath: string,
+  baseKey: string,
+  silentSkip: boolean,
+  ctx: WalkContext,
+): Promise<Scenario[] | null> {
   const raw = await fs.readFile(filePath, "utf-8");
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    if (silentSkip) return null;
+    if (silentSkip) {
+      // Can't read the file at all, so we can't tell a broken scenario from
+      // unrelated data. Report it rather than guess: a JSON file in the
+      // scenarios tree that won't parse is worth a look either way.
+      reportLoadFailure(ctx, filePath, "file is not valid JSON");
+      return null;
+    }
     throw new Error(`Failed to parse JSON in scenario file ${filePath}`);
   }
 
-  if (silentSkip && !looksLikeScenario(parsed)) return null;
+  if (silentSkip && !looksLikeScenario(parsed)) {
+    assertNotUnfinishedScenario(parsed, filePath);
+    skipQuietly(ctx, filePath, `no ${SCENARIO_MARKER_FIELDS.map((f) => `"${f}"`).join(" / ")} field`);
+    return null;
+  }
 
   return finalizeScenarioObject(parsed, filePath, baseKey);
 }
@@ -334,11 +393,40 @@ function looksLikeScenario(parsed: unknown): boolean {
   return SCENARIO_MARKER_FIELDS.some((field) => field in obj);
 }
 
+/**
+ * Throws when a walked file carries scenario-only fields but no marker field,
+ * i.e. it was meant to be a scenario and is missing the required `prompt` and
+ * `judge`. Returns normally when the file is plausibly something else.
+ */
+function assertNotUnfinishedScenario(parsed: unknown, filePath: string): void {
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return;
+  const obj = parsed as Record<string, unknown>;
+  const present = SCENARIO_INTENT_FIELDS.filter((field) => field in obj);
+  if (present.length === 0) return;
+
+  throw new Error(
+    `Invalid scenario at ${filePath}: has scenario ${present.length > 1 ? "fields" : "field"} ` +
+      `${present.map((f) => `"${f}"`).join(", ")} but is missing the required "prompt" and "judge" fields. ` +
+      `Add them, or move this file into a "fixtures" directory if it is not a scenario.`,
+  );
+}
+
+/** Note a file the walk passed over on purpose. Visible under `--verbose` only. */
+function skipQuietly(ctx: WalkContext, filePath: string, reason: string): void {
+  ctx.logger?.verbose?.(`Not a scenario, skipped ${filePath}: ${reason}`);
+}
+
+/** Record a file that should have loaded but couldn't, and warn about it now. */
+function reportLoadFailure(ctx: WalkContext, filePath: string, reason: string): void {
+  ctx.logger?.error(`Failed to load scenario ${filePath}: ${reason}`);
+  ctx.onLoadFailure?.({ path: filePath, reason });
+}
+
 async function loadModuleScenario(
   filePath: string,
   baseKey: string,
   silentSkip: boolean,
-  logger?: Logger,
+  ctx: WalkContext,
 ): Promise<Scenario[] | null> {
   let mod: { default?: unknown };
   try {
@@ -346,10 +434,10 @@ async function loadModuleScenario(
   } catch (err) {
     if (silentSkip) {
       // Failed imports during a walk are usually missing dependencies (e.g.
-      // remote repos whose deps haven't been installed) or fixture modules
-      // that can't load standalone. Surface them as warnings so users can
-      // tell why a scenario went missing without halting the walk.
-      logger?.error(`Skipping ${filePath}: ${formatError(err)}`);
+      // remote repos whose deps haven't been installed) or a syntax error in
+      // an otherwise-real scenario. Either way the module might have been a
+      // scenario, so record it as a load failure instead of halting the walk.
+      reportLoadFailure(ctx, filePath, formatError(err));
       return null;
     }
     throw new Error(`Failed to load scenario module at ${filePath}: ${formatError(err)}`);
@@ -361,15 +449,24 @@ async function loadModuleScenario(
   }
 
   if (def === undefined || def === null || typeof def !== "object" || Array.isArray(def)) {
-    if (silentSkip) return null;
+    if (silentSkip) {
+      // Helper modules that export named utilities (shared variants, builders)
+      // live in the scenarios tree by design and have no default export.
+      skipQuietly(ctx, filePath, "no default object export");
+      return null;
+    }
     throw new Error(`Scenario module at ${filePath} must default-export an object (or function returning one)`);
   }
 
-  // Fixture codebases inside the scenarios tree may include framework configs
-  // (next.config.mjs, vite.config.ts, …) that default-export an object. Skip
-  // anything without scenario-marker fields when walking; surface a real error
-  // only for files explicitly named on the command line / config.
-  if (silentSkip && !looksLikeScenario(def)) return null;
+  // Modules that default-export something other than a scenario (framework
+  // configs, data builders) are skipped when walking; an unfinished scenario
+  // throws. Files explicitly named on the command line / config always
+  // surface a real validation error.
+  if (silentSkip && !looksLikeScenario(def)) {
+    assertNotUnfinishedScenario(def, filePath);
+    skipQuietly(ctx, filePath, `no ${SCENARIO_MARKER_FIELDS.map((f) => `"${f}"`).join(" / ")} field`);
+    return null;
+  }
 
   return finalizeScenarioObject(def, filePath, baseKey);
 }

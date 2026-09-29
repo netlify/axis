@@ -193,8 +193,10 @@ export function buildScoredOutput(runOutput: RunOutput, scoredResults: ScoredRun
       completed,
       failed,
       ...(runOutput.summary.skipped ? { skipped: runOutput.summary.skipped } : {}),
+      ...(runOutput.summary.loadFailed ? { loadFailed: runOutput.summary.loadFailed } : {}),
       averageAxisScore: Math.round(averageAxisScore),
     },
+    ...(runOutput.loadFailures?.length ? { loadFailures: runOutput.loadFailures } : {}),
   };
 }
 

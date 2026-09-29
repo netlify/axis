@@ -111,6 +111,7 @@ export function finalizeReport(reportDir: string, output: ScoredOutput | RunOutp
     durationMs: output.durationMs,
     summary: output.summary,
     results: entries,
+    ...(output.loadFailures?.length ? { loadFailures: output.loadFailures } : {}),
   };
 
   fs.writeFileSync(path.join(reportDir, "report.json"), JSON.stringify(manifest, null, 2));

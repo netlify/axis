@@ -23,7 +23,7 @@ import {
   renderBaselineShow,
   renderBaselineComparison,
 } from "./ui/format.js";
-import { formatError, isFailedRun } from "./types/output.js";
+import { formatError, isFailedRun, runExitStatus } from "./types/output.js";
 import type { Logger, JobState, RunResult, RunOutput } from "./types/output.js";
 import type { ScoredRunResult, ScoredOutput } from "./types/scoring.js";
 import type { AgentConfig, AxisConfig } from "./types/config.js";
@@ -578,7 +578,9 @@ program
           if (exitCode !== 0) process.exit(exitCode);
         }
 
-        if (output.summary.failed > 0) process.exit(1);
+        const status = runExitStatus(output);
+        if (status.reason) process.stderr.write(`\n  ${status.reason}\n\n`);
+        if (status.code !== 0) process.exit(status.code);
       } catch (err) {
         process.stderr.write(`\n  Error: ${formatError(err)}\n\n`);
         process.exit(1);
@@ -674,7 +676,9 @@ program
         if (exitCode !== 0) process.exit(exitCode);
       }
 
-      if (output.summary.failed > 0) process.exit(1);
+      const status = runExitStatus(output);
+      if (status.reason) process.stderr.write(`  ${status.reason}\n\n`);
+      if (status.code !== 0) process.exit(status.code);
     } catch (err) {
       unmountInk?.();
       process.stderr.write(`\n  Error: ${formatError(err)}\n\n`);

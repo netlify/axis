@@ -128,6 +128,41 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     </div>
   </div>
 
+  <h3 id="run-exit-codes">Exit codes</h3>
+  <p>
+    <code>axis run</code> exits non-zero in three cases. The last two are about coverage rather
+    than scores: a suite that quietly stops loading a scenario would otherwise keep reporting a
+    clean average over whatever is left.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Condition</th><th>Exit</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Every job ran and passed</td><td><code>0</code></td></tr>
+      <tr><td>One or more jobs failed</td><td><code>1</code></td></tr>
+      <tr>
+        <td>
+          A file in the scenarios tree failed to load. The files and reasons are printed, stored
+          in the report manifest under <code>loadFailures</code>, and shown in the HTML report.
+        </td>
+        <td><code>1</code></td>
+      </tr>
+      <tr>
+        <td>
+          No jobs were discovered at all, e.g. a <code>--scenario</code> or <code>--agent</code>
+          filter that matches nothing.
+        </td>
+        <td><code>1</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Scenarios opted out with <code>skip: true</code> do not affect the exit code. They are
+    counted separately from files that failed to load, in both the terminal summary and the
+    report.
+  </p>
+
   <h2><code>axis reports</code></h2>
   <div class="cli-block">
     <div class="cli-command">axis reports [reportId] [scenarioKey] [options]</div>

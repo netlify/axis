@@ -1,5 +1,5 @@
 import type { AgentConfig, ScoringWeights } from "./config.js";
-import type { BaseRunResult, Logger, RunSummary } from "./output.js";
+import type { BaseRunResult, Logger, RunSummary, ScenarioLoadFailure } from "./output.js";
 
 // --- Per-criterion judge output ---
 
@@ -196,6 +196,8 @@ export interface ScoredOutput {
   durationMs: number;
   results: ScoredRunResult[];
   summary: ScoredSummary;
+  /** Files in the scenarios tree that could not be loaded. Omitted when every file loaded. */
+  loadFailures?: ScenarioLoadFailure[];
 }
 
 export interface ScoredSummary extends RunSummary {

@@ -1,7 +1,7 @@
 import type { TokenUsage } from "./agent.js";
 import type { AgentConfig } from "./config.js";
 import type { ScoreResult } from "./scoring.js";
-import type { ArtifactEntry, ResolvedRunConfig, RunSummary } from "./output.js";
+import type { ArtifactEntry, ResolvedRunConfig, RunSummary, ScenarioLoadFailure } from "./output.js";
 import type { ScoredSummary } from "./scoring.js";
 import type { JudgeCriterion } from "./scenario.js";
 
@@ -15,6 +15,12 @@ export interface ReportManifest {
   durationMs: number;
   summary: ScoredSummary | RunSummary;
   results: ReportResultEntry[];
+  /**
+   * Files in the scenarios tree that could not be loaded for this run. Kept in
+   * the manifest so a report can't look complete while silently covering fewer
+   * scenarios than the suite defines.
+   */
+  loadFailures?: ScenarioLoadFailure[];
 }
 
 /** Summary of a single scenario×agent result (no transcript). */

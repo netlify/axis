@@ -1,4 +1,4 @@
-import type { RunOutput, RunResult, RunSummary } from "../types/output.js";
+import type { RunOutput, RunResult, RunSummary, ScenarioLoadFailure } from "../types/output.js";
 import { isFailedRun, isScoredResult } from "../types/output.js";
 import type { CategoryScore, InteractionAudit, ScoreResult, ScoredOutput, ScoredRunResult } from "../types/scoring.js";
 import type { ReportManifest } from "../types/report.js";
@@ -75,6 +75,31 @@ export function formatSummaryFooter(summary: RunSummary): string {
   if (summary.failed > 0) parts.push(`${summary.failed} failed`);
   if (summary.skipped) parts.push(`${summary.skipped} skipped`);
   return `${parts.join(", ")} (${summary.total} total)`;
+}
+
+const LOAD_FAILURE_REASON_MAX = 140;
+
+/**
+ * Summary lines for files that failed to load, listed under the totals rather
+ * than folded into them: these scenarios never ran, so counting them as
+ * failures would misstate the results, and leaving them out entirely is what
+ * made a short run look like a clean one.
+ */
+export function formatLoadFailureLines(failures: ScenarioLoadFailure[] | undefined): string[] {
+  if (!failures || failures.length === 0) return [];
+
+  const lines = [
+    failures.length === 1
+      ? `  1 file failed to load, so its scenarios did not run:`
+      : `  ${failures.length} files failed to load, so their scenarios did not run:`,
+  ];
+  for (const failure of failures) {
+    const reason = failure.reason.replace(/\s+/g, " ").trim();
+    const clipped =
+      reason.length > LOAD_FAILURE_REASON_MAX ? `${reason.slice(0, LOAD_FAILURE_REASON_MAX - 1)}\u2026` : reason;
+    lines.push(`    \u21B3 ${failure.path}: ${clipped}`);
+  }
+  return lines;
 }
 
 /** Common error patterns mapped to friendly one-line messages. */
@@ -222,6 +247,7 @@ export function renderSummaryTable(output: RunOutput): string {
     `  ${formatSummaryFooter(output.summary)}`.padEnd(56) +
       `${formatDuration(output.durationMs).padEnd(COL_DURATION)} ${totalCost > 0 ? "$" + totalCost.toFixed(4) : ""}`,
   );
+  lines.push(...formatLoadFailureLines(output.loadFailures));
   lines.push("");
 
   return lines.join("\n") + "\n";
@@ -417,6 +443,7 @@ export function renderScoredSummaryTable(output: ScoredOutput): string {
   if (output.summary.skipped) {
     lines.push(`  ${output.summary.skipped} marked to be skipped`);
   }
+  lines.push(...formatLoadFailureLines(output.loadFailures));
   lines.push("");
 
   return lines.join("\n") + "\n";
@@ -476,6 +503,7 @@ export function renderReportDetail(report: ReportManifest): string {
     lines.push(`  AXIS Result: ${(report.summary as { averageAxisScore: number }).averageAxisScore} / 100 (average)`);
   }
 
+  lines.push(...formatLoadFailureLines(report.loadFailures));
   lines.push("");
 
   if (hasScores) {

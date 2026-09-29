@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import * as fsSync from "node:fs";
@@ -9,6 +9,7 @@ import {
   matchesScenarioFilter,
   matchesAgentFilter,
 } from "../../../src/config/loader.js";
+import type { ScenarioLoadFailure } from "../../../src/types/output.js";
 
 const FIXTURES_DIR = path.resolve(import.meta.dirname, "../../e2e/fixtures/basic");
 
@@ -340,7 +341,7 @@ describe("discoverScenarios", () => {
       await fs.rm(tmpDir, { recursive: true });
     });
 
-    it("silently skips module files that fail to import when walking", async () => {
+    it("keeps walking past module files that fail to import, and reports them", async () => {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-walk-"));
       const scenariosDir = path.join(tmpDir, "scenarios");
       await fs.mkdir(scenariosDir, { recursive: true });
@@ -351,10 +352,201 @@ describe("discoverScenarios", () => {
       );
       await fs.writeFile(path.join(scenariosDir, "broken.mjs"), `import "./does-not-exist.js";`);
 
-      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      const failures: ScenarioLoadFailure[] = [];
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios", undefined, {
+        onLoadFailure: (f) => failures.push(f),
+      });
+
       expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+      expect(failures).toHaveLength(1);
+      expect(failures[0].path).toBe(path.join(scenariosDir, "broken.mjs"));
+      expect(failures[0].reason).toBeTruthy();
 
       await fs.rm(tmpDir, { recursive: true });
+    });
+  });
+
+  describe("unfinished scenarios", () => {
+    let tmpDir: string;
+    let scenariosDir: string;
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-unfinished-"));
+      scenariosDir = path.join(tmpDir, "scenarios");
+      await fs.mkdir(scenariosDir, { recursive: true });
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("throws when a walked JSON file has scenario fields but no prompt or judge", async () => {
+      await fs.writeFile(
+        path.join(scenariosDir, "half-written.json"),
+        JSON.stringify({ name: "Half written", setup: [{ run: "npm install" }] }),
+      );
+
+      await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(
+        /half-written\.json: has scenario field "setup" but is missing the required "prompt" and "judge" fields/,
+      );
+    });
+
+    it("names every scenario field it found", async () => {
+      await fs.writeFile(
+        path.join(scenariosDir, "half-written.json"),
+        JSON.stringify({ name: "Half written", setup: [], variants: [{ name: "a" }] }),
+      );
+
+      await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(/has scenario fields "variants", "setup"/);
+    });
+
+    it("throws when a walked module has scenario fields but no prompt or judge", async () => {
+      await fs.writeFile(
+        path.join(scenariosDir, "half-written.mjs"),
+        `export default { name: "Half written", limits: { time_minutes: 5 } };`,
+      );
+
+      await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(
+        /is missing the required "prompt" and "judge" fields/,
+      );
+    });
+
+    it("points at the fixtures escape hatch", async () => {
+      await fs.writeFile(path.join(scenariosDir, "data.json"), JSON.stringify({ name: "Data", artifacts: ["*.txt"] }));
+
+      await expect(discoverScenarios(tmpDir, "./scenarios")).rejects.toThrow(/move this file into a "fixtures"/);
+    });
+
+    it("still skips files with no scenario fields at all", async () => {
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
+      );
+      await fs.writeFile(
+        path.join(scenariosDir, "package.json"),
+        JSON.stringify({ name: "fixture-site", version: "1.0.0", scripts: { build: "vite build" } }),
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+    });
+  });
+
+  describe("fixture directories", () => {
+    let tmpDir: string;
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-fixtures-"));
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it.each(["fixtures", "scenario-fixtures"])("never walks into %s/", async (dirName) => {
+      const scenariosDir = path.join(tmpDir, "scenarios");
+      const fixtureDir = path.join(scenariosDir, dirName);
+      await fs.mkdir(fixtureDir, { recursive: true });
+
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
+      );
+      // Both a valid-looking scenario and an unfinished one: inside a fixtures
+      // directory neither should load, and neither should throw.
+      await fs.writeFile(
+        path.join(fixtureDir, "sample.json"),
+        JSON.stringify({ name: "Sample", prompt: "p", judge: "r" }),
+      );
+      await fs.writeFile(path.join(fixtureDir, "half.json"), JSON.stringify({ name: "Half", setup: [] }));
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+    });
+
+    it("still walks a directory named fixtures when it is the scenarios root", async () => {
+      const root = path.join(tmpDir, "fixtures");
+      await fs.mkdir(root, { recursive: true });
+      await fs.writeFile(path.join(root, "real.json"), JSON.stringify({ name: "Real", prompt: "p", judge: "r" }));
+
+      const scenarios = await discoverScenarios(tmpDir, "./fixtures");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+    });
+
+    it("ignores an AXIS config nested in the scenarios tree", async () => {
+      const scenariosDir = path.join(tmpDir, "scenarios");
+      await fs.mkdir(scenariosDir, { recursive: true });
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
+      );
+      // Has `agents`, which would otherwise read as an unfinished scenario.
+      await fs.writeFile(
+        path.join(scenariosDir, "axis.config.json"),
+        JSON.stringify({ agents: ["claude-code"], scenarios: "./nested" }),
+      );
+
+      const scenarios = await discoverScenarios(tmpDir, "./scenarios");
+      expect(scenarios.map((s) => s.key)).toEqual(["real"]);
+    });
+  });
+
+  describe("load failure reporting", () => {
+    let tmpDir: string;
+    let scenariosDir: string;
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "axis-loadfail-"));
+      scenariosDir = path.join(tmpDir, "scenarios");
+      await fs.mkdir(scenariosDir, { recursive: true });
+      await fs.writeFile(
+        path.join(scenariosDir, "real.json"),
+        JSON.stringify({ name: "Real", prompt: "p", judge: "r" }),
+      );
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    async function collectFailures(): Promise<ScenarioLoadFailure[]> {
+      const failures: ScenarioLoadFailure[] = [];
+      await discoverScenarios(tmpDir, "./scenarios", undefined, { onLoadFailure: (f) => failures.push(f) });
+      return failures;
+    }
+
+    it("reports unparseable JSON", async () => {
+      await fs.writeFile(path.join(scenariosDir, "garbage.json"), "this is not json");
+
+      const failures = await collectFailures();
+      expect(failures).toHaveLength(1);
+      expect(failures[0].path).toBe(path.join(scenariosDir, "garbage.json"));
+      expect(failures[0].reason).toBe("file is not valid JSON");
+    });
+
+    it("does not report helper modules with no default export", async () => {
+      await fs.writeFile(path.join(scenariosDir, "helpers.mjs"), `export const shared = { prompt: "p" };`);
+
+      expect(await collectFailures()).toEqual([]);
+    });
+
+    it("does not report files that simply aren't scenarios", async () => {
+      await fs.writeFile(path.join(scenariosDir, "state.json"), JSON.stringify({ siteId: "abc" }));
+
+      expect(await collectFailures()).toEqual([]);
+    });
+
+    it("logs each failure as it happens", async () => {
+      await fs.writeFile(path.join(scenariosDir, "garbage.json"), "nope");
+      const errors: string[] = [];
+
+      await discoverScenarios(tmpDir, "./scenarios", undefined, {
+        logger: { info() {}, error: (m) => errors.push(m) },
+      });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("Failed to load scenario");
+      expect(errors[0]).toContain("garbage.json");
     });
   });
 

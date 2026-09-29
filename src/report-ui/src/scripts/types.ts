@@ -10,12 +10,24 @@ export interface ReportData {
   durationMs: number;
   summary: ScoredSummary | RunSummary;
   results: ResultEntry[];
+  /** Files in the scenarios tree that could not be loaded for this run. */
+  loadFailures?: ScenarioLoadFailure[];
+}
+
+/** A file that was meant to load as a scenario but could not. */
+export interface ScenarioLoadFailure {
+  path: string;
+  reason: string;
 }
 
 export interface RunSummary {
   total: number;
   completed: number;
   failed: number;
+  /** Scenarios deliberately opted out via `skip: true`. */
+  skipped?: number;
+  /** Files in the scenarios tree that could not be loaded. */
+  loadFailed?: number;
 }
 
 export interface ScoredSummary extends RunSummary {

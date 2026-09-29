@@ -184,6 +184,25 @@ describe("writeReportToStore", () => {
     expect(manifest.results[0].totalCostUsd).toBeUndefined();
   });
 
+  it("persists scenario load failures in the manifest", () => {
+    const output = makeRunOutput();
+    output.summary.loadFailed = 1;
+    output.loadFailures = [{ path: "/suite/scenarios/broken.ts", reason: "Unexpected end of input" }];
+
+    const reportId = writeReportToStore(output, tmpDir);
+    const manifest = JSON.parse(fs.readFileSync(path.join(tmpDir, ".axis/reports", reportId, "report.json"), "utf-8"));
+
+    expect(manifest.summary.loadFailed).toBe(1);
+    expect(manifest.loadFailures).toEqual([{ path: "/suite/scenarios/broken.ts", reason: "Unexpected end of input" }]);
+  });
+
+  it("omits loadFailures from the manifest when every file loaded", () => {
+    const reportId = writeReportToStore(makeRunOutput(), tmpDir);
+    const manifest = JSON.parse(fs.readFileSync(path.join(tmpDir, ".axis/reports", reportId, "report.json"), "utf-8"));
+
+    expect(manifest.loadFailures).toBeUndefined();
+  });
+
   it("writes .raw.ndjson file when rawOutput is present", () => {
     const output = makeRunOutput();
     output.results[0].output.rawOutput = [

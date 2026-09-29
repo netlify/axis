@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isFailedRun, hasEmptyOutput } from "../../../src/types/output.js";
+import { isFailedRun, hasEmptyOutput, runExitStatus } from "../../../src/types/output.js";
 import type { AgentOutput, TranscriptEntry } from "../../../src/types/agent.js";
 
 function makeOutput(overrides: Partial<AgentOutput> = {}): AgentOutput {
@@ -73,5 +73,52 @@ describe("isFailedRun", () => {
       metadata: { ...makeOutput().metadata, exitCode: 1 },
     });
     expect(isFailedRun(output)).toBe(true);
+  });
+});
+
+describe("runExitStatus", () => {
+  const clean = { summary: { total: 2, completed: 2, failed: 0 } };
+
+  it("is zero for a run where everything passed", () => {
+    expect(runExitStatus(clean)).toEqual({ code: 0 });
+  });
+
+  it("is non-zero when a job failed", () => {
+    expect(runExitStatus({ summary: { total: 2, completed: 1, failed: 1 } }).code).toBe(1);
+  });
+
+  it("is non-zero when a scenario file failed to load, even with every job passing", () => {
+    const status = runExitStatus({
+      ...clean,
+      loadFailures: [{ path: "/s/broken.ts", reason: "Unexpected token" }],
+    });
+
+    expect(status.code).toBe(1);
+    expect(status.reason).toContain("1 scenario file failed to load");
+    expect(status.reason).toContain("did not cover the whole suite");
+  });
+
+  it("pluralizes the load failure reason", () => {
+    const status = runExitStatus({
+      ...clean,
+      loadFailures: [
+        { path: "/s/a.ts", reason: "boom" },
+        { path: "/s/b.json", reason: "file is not valid JSON" },
+      ],
+    });
+
+    expect(status.reason).toContain("2 scenario files failed to load");
+    expect(status.reason).toContain("move them");
+  });
+
+  it("is non-zero when nothing ran at all", () => {
+    const status = runExitStatus({ summary: { total: 0, completed: 0, failed: 0 } });
+
+    expect(status.code).toBe(1);
+    expect(status.reason).toContain("No scenarios ran");
+  });
+
+  it("gives no reason for ordinary job failures, since the table already shows them", () => {
+    expect(runExitStatus({ summary: { total: 1, completed: 0, failed: 1 } }).reason).toBeUndefined();
   });
 });

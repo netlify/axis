@@ -415,5 +415,23 @@ describe("scoreResults", () => {
       expect(out.summary.completed).toBe(0);
       expect(out.summary.failed).toBe(1);
     });
+
+    it("carries scenario load failures through to the scored output", () => {
+      const runOutput = makeRunOutput();
+      runOutput.summary = { total: 1, completed: 1, failed: 0, loadFailed: 1 };
+      runOutput.loadFailures = [{ path: "/suite/scenarios/broken.ts", reason: "Unexpected end of input" }];
+
+      const out = buildScoredOutput(runOutput, []);
+
+      expect(out.summary.loadFailed).toBe(1);
+      expect(out.loadFailures).toEqual([{ path: "/suite/scenarios/broken.ts", reason: "Unexpected end of input" }]);
+    });
+
+    it("omits load failure fields when every file loaded", () => {
+      const out = buildScoredOutput(makeRunOutput(), []);
+
+      expect(out.summary.loadFailed).toBeUndefined();
+      expect(out.loadFailures).toBeUndefined();
+    });
   });
 });

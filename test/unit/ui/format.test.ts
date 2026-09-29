@@ -3,6 +3,7 @@ import {
   buildScoreInsight,
   friendlyError,
   renderSummaryTable,
+  formatLoadFailureLines,
   renderResultDetail,
   renderScenarioDetail,
   renderBaselineList,
@@ -178,6 +179,43 @@ describe("renderSummaryTable", () => {
     const table = renderSummaryTable(output);
     expect(table).toContain("✓ pass");
     expect(table).not.toContain("↳");
+  });
+
+  it("lists files that failed to load under the totals", () => {
+    const output: RunOutput = {
+      version: "1.0",
+      timestamp: "2026-01-01T00:00:00Z",
+      durationMs: 60000,
+      results: [makeResult({ exitCode: 0 })],
+      summary: { total: 1, completed: 1, failed: 0, loadFailed: 1 },
+      loadFailures: [{ path: "/suite/scenarios/broken.ts", reason: "Unexpected end of input" }],
+    };
+    const table = renderSummaryTable(output);
+    expect(table).toContain("1 file failed to load");
+    expect(table).toContain("/suite/scenarios/broken.ts: Unexpected end of input");
+  });
+});
+
+describe("formatLoadFailureLines", () => {
+  it("returns nothing when there are no failures", () => {
+    expect(formatLoadFailureLines(undefined)).toEqual([]);
+    expect(formatLoadFailureLines([])).toEqual([]);
+  });
+
+  it("pluralizes the header", () => {
+    const lines = formatLoadFailureLines([
+      { path: "/a.ts", reason: "boom" },
+      { path: "/b.ts", reason: "bang" },
+    ]);
+    expect(lines[0]).toContain("2 files failed to load, so their scenarios did not run");
+    expect(lines).toHaveLength(3);
+  });
+
+  it("collapses whitespace and clips long reasons", () => {
+    const lines = formatLoadFailureLines([{ path: "/a.ts", reason: `boom\n  at some${"!".repeat(400)}` }]);
+    expect(lines[1]).toContain("boom at some");
+    expect(lines[1]).not.toContain("\n");
+    expect(lines[1].length).toBeLessThan(200);
   });
 });
 
