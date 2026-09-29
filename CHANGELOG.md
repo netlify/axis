@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/netlify/axis/compare/v1.17.6...v1.18.0) (2026-09-29)
+
+
+### Features
+
+* support copy from repo ([f261fca](https://github.com/netlify/axis/commit/f261fca0c9656656ee7bdeb6c11bbd0392f3a9b8))
+
 ## [1.17.6](https://github.com/netlify/axis/compare/v1.17.5...v1.17.6) (2026-09-08)
 
 
