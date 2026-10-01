@@ -46,7 +46,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     full list with required environment variables.
   </p>
 
-  <h2>Custom Agents</h2>
+  <h2 id="custom-agents">Custom Agents</h2>
   <p>
     You can test any agent by creating a custom agent module. Use the <code>createAgentAdapter()</code>
     factory for agents that produce NDJSON or plain text streams, or
@@ -132,6 +132,182 @@ buildArgs: () => [],`}</code></pre>
     <code>~/.claude.json</code>). ACP-based adapters pass MCP servers through the ACP
     <code>session/new</code> call instead. See
     <a href="/configuration#mcp-servers">MCP Servers</a> in the configuration reference.
+  </p>
+
+  <h2 id="multiple-runs">Multiple Runs</h2>
+  <p>
+    Agents are stochastic. Run the same scenario twice and the score moves, even when nothing
+    about your system changed. Set <code>runs</code> above 1 to sample a scenario/agent pair
+    several times, and AXIS reports a single representative result plus the spread around it.
+  </p>
+  <p>
+    The repeat count resolves from the most specific source that sets it:
+    <code>--runs</code> on the CLI, then a scenario's own <code>runs</code>, then
+    <code>settings.runs</code>, then 1. It must be <strong>odd</strong>; see
+    <a href="#odd-runs">why below</a>.
+  </p>
+  <pre><code>&#123;
+  "settings": &#123; "runs": 3 &#125;,
+  "agents": ["claude-code"]
+&#125;</code></pre>
+  <pre><code># or per invocation
+axis run --runs 3</code></pre>
+  <p>
+    Repeats are off by default because they are not free. Each extra run is a full agent
+    execution plus its four judge calls, so <code>runs: 3</code> costs roughly three times the
+    tokens and three times the wall clock of a single pass. Turn it on where score stability
+    matters (baselines and CI gates) rather than everywhere.
+  </p>
+
+  <h3 id="odd-runs">Run counts must be odd</h3>
+  <p>
+    AXIS rejects an even <code>runs</code> value. The reason is that both statistics a repeated
+    pair reports stop behaving without a middle run.
+  </p>
+  <p>
+    The median of the composites falls <em>between</em> two runs, so the number you would report
+    belongs to no run at all. That is precisely what representative selection exists to prevent.
+    And at <code>runs: 2</code> the selection degenerates completely: with two samples the
+    per-dimension median is their midpoint, both runs sit at identical distance from it, every
+    comparison ties, and the tie-break hands back run 1 no matter which run scored better. Swap
+    the order of the two runs and the "representative" follows position rather than merit.
+  </p>
+  <p>
+    So <code>runs: 2</code> as a cheap smoke check is not the bargain it looks like: it buys you
+    spread and reliability, but nothing at all for the central estimate, while presenting a
+    positional pick as a considered one. Use 3.
+  </p>
+  <p>
+    Even values are rejected outright rather than rounded. Turning a 4 into a 3 or a 5 silently
+    would change both the sample size and the bill, so the error names the nearest legal counts
+    and lets you choose.
+  </p>
+
+  <h3 id="representative-run">Picking the representative run</h3>
+  <p>
+    AXIS does not average the composites. An average is a number no run actually earned, with no
+    transcript behind it to explain it. Instead it selects a <strong>representative run</strong>:
+    the real run whose composite sits nearest the median of the pair's composites.
+  </p>
+  <p>
+    Because run counts are <a href="#odd-runs">odd</a>, the median is itself one of the
+    composites, so the representative's score <em>is</em> the median rather than merely being
+    close to it. Two properties follow, and both are the point:
+  </p>
+  <ul>
+    <li>
+      The headline equals the median of the runs listed directly beneath it in the report. A
+      reader who eyeballs <code>#1 81, #2 92, #3 87</code> and expects 87 gets 87.
+    </li>
+    <li>
+      The live CLI can compute the same pick from the composite alone, so the number in your
+      terminal and the number in the report are the same run's score by construction, not two
+      statistics that happen to agree.
+    </li>
+  </ul>
+  <p>
+    Ties go to the lowest run index, so selection is deterministic and re-aggregating the same
+    data never moves the headline. Only successful runs are candidates, so a crash can neither
+    become the headline nor drag the median.
+  </p>
+  <p>
+    Medians rather than means throughout, which matches the log-normal calibration AXIS already
+    uses for its category scores: these distributions are skewed, so one outlier run should not
+    drag the number everyone reads.
+  </p>
+  <p>
+    Everything in the report that describes a single run (the transcript, the interaction audits,
+    the waterfall, the sparse index) belongs to the representative. The other runs are recorded
+    alongside it with their own composite, their own four dimension scores, and their own spend.
+    Keeping dimensions <em>per run</em> rather than summarising them is deliberate: a pair whose
+    composite barely moves can still hide a goal-achievement score swinging 30 points against an
+    agent score that compensates, and only the per-run columns show that.
+  </p>
+
+  <h3 id="reliability">Failures and reliability</h3>
+  <p>
+    A failed run is excluded from the score aggregate and counted against the pair's
+    <strong>reliability</strong> instead, reported as a
+    <code>succeeded / total</code> fraction. Folding a crash into the score as a zero would make
+    flakiness look like low quality, and the two call for different fixes.
+  </p>
+  <p>
+    A run whose score was <em>withheld</em> is treated differently again. If a judge dies or
+    returns something unparseable, that is a measurement failure, not an agent failure, so the run
+    leaves the reliability denominator entirely rather than counting against the agent. A pair with
+    three runs where one judge call failed reports <code>2/2 scored (1 withheld)</code>.
+  </p>
+  <p>
+    Pair-level status follows from this: a pair is <strong>completed</strong> when at least one of
+    its runs produced a score, and <strong>failed</strong> only when none did. So a single flaky run
+    no longer fails your suite on its own, while a pair that never once succeeded still does. The
+    run-level counts appear separately in the summary as <code>runsTotal</code> and
+    <code>runsFailed</code>.
+  </p>
+
+  <h3 id="run-scheduling">Scheduling and interference</h3>
+  <p>
+    Repeats are queued <strong>run-major</strong>: every pair's run 1 is scheduled before any
+    pair's run 2. Left in discovery order, a pair's three runs would sit adjacent in the queue and
+    start together, which maximizes contention on the same provider rate limit and turns correlated
+    429s into what looks like variance in the agent.
+  </p>
+  <p>
+    Each run still gets its own isolated workspace and HOME, so repeats cannot interfere through the
+    filesystem. They <em>can</em> interfere through shared external state: a scenario whose setup
+    provisions a real site or service will have several runs collide on the same resource. Setup and
+    teardown scripts receive <code>AXIS_RUN_INDEX</code> and <code>AXIS_RUN_COUNT</code> for exactly
+    this reason, so you can namespace per run:
+  </p>
+  <pre><code>&#123;
+  "setup": [
+    &#123; "action": "run_script", "command": "netlify sites:create --name axis-$AXIS_SCENARIO-$AXIS_RUN_INDEX" &#125;
+  ]
+&#125;</code></pre>
+  <p>
+    Both variables are always set, reading <code>1</code> and <code>1</code> for an unrepeated pair,
+    so a script never has to branch on whether repeats are configured.
+  </p>
+  <p>
+    One thing to adjust when turning repeats on:
+    <a href="/configuration#limits"><code>settings.limits.run</code></a> is a budget for the whole
+    run, not per pair, so <code>runs: 3</code> exhausts it about three times sooner. AXIS prints a
+    note at startup when a run-level limit is set alongside repeats. Per-scenario limits are per
+    run and need no change.
+  </p>
+
+  <h3 id="run-reports">Reading a repeated run</h3>
+  <p>
+    The live CLI keeps one row per pair, with a chip per run and a running median, so a suite does
+    not triple in height when repeats are on:
+  </p>
+  <pre><code>cms/create-post
+  &#9680; claude-code|opus      2/3 &middot; med 86   [87&#10003; 84&#10003; &#9679;]  1:42  ~12.4k</code></pre>
+  <p>
+    In the report, a repeated pair is still a single row, tagged with a
+    <code>3 runs &middot; &#963; 5.1</code> pill and expanding to a per-run table that marks the
+    representative. The terminal equivalent appears under
+    <code>axis reports &lt;id&gt;</code>:
+  </p>
+  <pre><code>cms/create-post        claude-code|opus          87      88      92      84      80
+  &#8627; 3 runs &middot; representative #2 &middot; median 87 &middot; range 81-92 &middot; &#963; 5.5
+    runs: #1 81, #2 87*, #3 92   (* representative)</code></pre>
+  <p>
+    See <a href="/reports#multi-run-layout">Reports</a> for where each run's files land on disk.
+  </p>
+
+  <h3 id="run-baselines">Baselines and regression detection</h3>
+  <p>
+    This is the main payoff. A baseline built from repeats records the standard deviation it
+    measured, and <code>--compare-baseline</code> then sizes its noise tolerance from that data
+    instead of a fixed constant: a drop counts as a regression only when it exceeds two sigma of
+    the baseline's own observed spread, with a floor of 1 point. A single-run baseline has no
+    measured sigma and falls back to the flat floor, which is why a flaky scenario reports a
+    regression every other run.
+  </p>
+  <p>
+    Reliability is compared too. A pair that scores as well as ever on the runs it completes, but
+    now completes fewer of them, is reported as a regression on its own.
   </p>
 
   <h2>Multi-variant Scenarios</h2>

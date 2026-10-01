@@ -65,6 +65,10 @@ export function validateConfig(data: unknown, filePath: string): asserts data is
     }
   }
 
+  if (settings?.runs !== undefined) {
+    validateRunCount(settings.runs, filePath, "settings.runs");
+  }
+
   if (settings?.limits !== undefined) {
     const limits = settings.limits as Record<string, unknown>;
     if (typeof limits !== "object" || limits === null || Array.isArray(limits)) {
@@ -247,6 +251,10 @@ export function validateScenario(
     validateLimits(obj.limits, filePath, "limits");
   }
 
+  if (obj.runs !== undefined) {
+    validateRunCount(obj.runs, filePath, "runs");
+  }
+
   if (obj.setup !== undefined) {
     validateLifecycleActions(obj.setup, filePath, "setup");
   }
@@ -351,6 +359,10 @@ function validateVariants(data: unknown, filePath: string): void {
 
     if (variant.limits !== undefined) {
       validateLimits(variant.limits, filePath, `variants[${i}].limits`);
+    }
+
+    if (variant.runs !== undefined) {
+      validateRunCount(variant.runs, filePath, `variants[${i}].runs`);
     }
 
     if (variant.artifacts !== undefined) {
@@ -476,6 +488,74 @@ export function resolveJudgeWeights(judge: JudgeCriterion[]): JudgeCriterion[] {
   const share = unspecified.length > 0 ? remaining / unspecified.length : 0;
 
   return judge.map((r) => (r.weight !== undefined ? r : { ...r, weight: share }));
+}
+
+/**
+ * Upper bound on `runs`. A repeat count multiplies both agent executions and
+ * judge calls, so a mistyped `runs: 300` would spend a suite's entire budget
+ * before anyone noticed. The cap is deliberately generous but finite, and odd
+ * so it is itself a legal value.
+ */
+export const MAX_RUNS = 19;
+
+/**
+ * `runs` must be odd.
+ *
+ * An even sample has no middle element, so both statistics a repeated pair
+ * reports stop behaving:
+ *
+ * - The median of the composites falls between two runs, producing a headline
+ *   number no run actually earned. That is exactly what selecting a real
+ *   representative run was meant to avoid.
+ * - At `runs: 2` the representative selection degenerates outright. With two
+ *   samples the per-dimension median is their midpoint, so both runs sit at
+ *   identical distance from it, every comparison ties, and the tie-break
+ *   returns run 1 regardless of merit. A user would read a positional accident
+ *   as a considered choice.
+ *
+ * Odd counts keep the median on a real run and keep the selection meaningful.
+ */
+function validateRunCount(data: unknown, filePath: string, field: string): void {
+  if (typeof data !== "number" || !Number.isInteger(data) || data < 1) {
+    throw new Error(`Invalid config at ${filePath}: "${field}" must be a positive integer`);
+  }
+  if (data > MAX_RUNS) {
+    throw new Error(
+      `Invalid config at ${filePath}: "${field}" is ${data}, above the maximum of ${MAX_RUNS}. ` +
+        `Each run costs a full agent execution plus its judge calls.`,
+    );
+  }
+  if (data % 2 === 0) {
+    throw new Error(
+      `Invalid config at ${filePath}: "${field}" is ${data}, but run counts must be odd ` +
+        `(1, 3, 5, …). An even sample has no middle run, so the median falls between two runs ` +
+        `and no single run can represent the pair. Use ${data - 1} or ${data + 1}.`,
+    );
+  }
+}
+
+/**
+ * Validate a `runs` value that did not come from a config file, such as
+ * `--runs` on the CLI or `run({ runs })`. Throws with the same rules as the
+ * config validator but phrased for its source.
+ */
+export function assertValidRunCount(value: number, source: string): void {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${source} must be a positive integer, got ${value}.`);
+  }
+  if (value > MAX_RUNS) {
+    throw new Error(
+      `${source} is ${value}, above the maximum of ${MAX_RUNS}. ` +
+        `Each run costs a full agent execution plus its judge calls.`,
+    );
+  }
+  if (value % 2 === 0) {
+    throw new Error(
+      `${source} is ${value}, but run counts must be odd (1, 3, 5, …). An even sample has no ` +
+        `middle run, so the median falls between two runs and no single run can represent the ` +
+        `pair. Use ${value - 1} or ${value + 1}.`,
+    );
+  }
 }
 
 function validateLimits(data: unknown, filePath: string, field: string): void {

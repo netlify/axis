@@ -1,7 +1,15 @@
 import type { RunOutput, RunResult, RunSummary, ScenarioLoadFailure } from "../types/output.js";
 import { isFailedRun, isScoredResult } from "../types/output.js";
-import type { CategoryScore, InteractionAudit, ScoreResult, ScoredOutput, ScoredRunResult } from "../types/scoring.js";
-import type { ReportManifest } from "../types/report.js";
+import type {
+  CategoryScore,
+  InteractionAudit,
+  RunReliability,
+  ScoreResult,
+  ScoreSpread,
+  ScoredOutput,
+  ScoredRunResult,
+} from "../types/scoring.js";
+import type { ReportManifest, ReportResultEntry } from "../types/report.js";
 import type { Baseline, BaselineComparison } from "../types/baseline.js";
 
 // --- Layout constants ---
@@ -30,6 +38,16 @@ export function getBaseKey(scenarioKey: string): string {
 export function getVariantName(scenarioKey: string): string | null {
   const idx = scenarioKey.indexOf("@");
   return idx === -1 ? null : scenarioKey.slice(idx + 1);
+}
+
+/**
+ * ` (run 2 of 3)` for one run of a repeated pair, empty otherwise. Without it,
+ * `axis reports <id> <scenario>` prints several identical-looking blocks for
+ * the same agent with no way to tell which run each one is.
+ */
+function formatRunLabel(result: { runIndex?: number; runCount?: number }): string {
+  if (!result.runCount || result.runCount <= 1) return "";
+  return ` (run ${result.runIndex ?? 1} of ${result.runCount})`;
 }
 
 /** Build display agent name: "claude-code @variant" or plain "claude-code". */
@@ -143,6 +161,49 @@ const DIMENSION_KEYS = ["success", "speed", "weight", "relevance", "necessity"] 
  * Build a short insight string identifying the weakest dimension for each
  * category that scored below the threshold. Returns null if all categories are fine.
  */
+/**
+ * One-line summary of a repeated pair: how many runs, how many produced a
+ * score, which one headlines the row, and how far apart they landed.
+ *
+ * Returns null for a pair that ran once, so single-run reports are unchanged.
+ * The spread is the point of running repeats, so it sits directly under the
+ * row it qualifies rather than being buried in the JSON.
+ */
+export function formatSpreadLine(entry: {
+  runCount?: number;
+  spread?: ScoreSpread;
+  reliability?: RunReliability;
+}): string | null {
+  const runCount = entry.runCount ?? 1;
+  if (runCount <= 1) return null;
+
+  const parts: string[] = [`${runCount} runs`];
+
+  const reliability = entry.reliability;
+  if (reliability && reliability.succeeded !== runCount) {
+    const withheld = reliability.withheld > 0 ? ` (${reliability.withheld} withheld)` : "";
+    parts.push(`${reliability.succeeded}/${reliability.total} scored${withheld}`);
+  }
+
+  const spread = entry.spread;
+  if (spread) {
+    parts.push(`representative #${spread.representativeRunIndex}`);
+    parts.push(`median ${spread.axisScore.median}`);
+    if (spread.n > 1) {
+      parts.push(`range ${spread.axisScore.min}-${spread.axisScore.max}`);
+      parts.push(`\u03C3 ${spread.axisScore.stdev.toFixed(1)}`);
+    }
+  } else if (reliability && reliability.succeeded < runCount) {
+    // No spread despite runs that finished means scoring produced nothing for
+    // any of them. Only worth saying when some run actually failed: on a
+    // `--no-score` report every run succeeded and there was never a score to
+    // report, so claiming none scored would read as a problem.
+    parts.push("no run scored");
+  }
+
+  return parts.join(" \u00B7 ");
+}
+
 export function buildScoreInsight(score: ScoreResult): string | null {
   const parts: string[] = [];
 
@@ -380,7 +441,7 @@ function renderScoredResult(result: ScoredRunResult, verbose: boolean): string {
   }
   lines.push("");
 
-  lines.push(`  Agent: ${result.agentName}`);
+  lines.push(`  Agent: ${result.agentName}${formatRunLabel(result)}`);
 
   // Verbose: show rationale per criterion
   if (verbose) {
@@ -527,6 +588,7 @@ export function renderReportDetail(report: ReportManifest): string {
           `${formatDuration(r.durationMs).padEnd(COL_DURATION)} ` +
           `${cost > 0 ? "$" + cost.toFixed(4) : "\u2014"}`,
       );
+      lines.push(...formatSpreadDetail(r));
       if (r.error) {
         lines.push(`    ↳ ${friendlyError(r.error)}`);
       } else if (s) {
@@ -550,6 +612,7 @@ export function renderReportDetail(report: ReportManifest): string {
           `${status.padEnd(COL_STATUS)} ${formatDuration(r.durationMs).padEnd(COL_DURATION)} ` +
           `${cost > 0 ? "$" + cost.toFixed(4) : "\u2014"}`,
       );
+      lines.push(...formatSpreadDetail(r));
       if (r.error) {
         lines.push(`    ↳ ${friendlyError(r.error)}`);
       }
@@ -562,6 +625,31 @@ export function renderReportDetail(report: ReportManifest): string {
   lines.push("");
 
   return lines.join("\n") + "\n";
+}
+
+/**
+ * Indented spread summary plus a per-run breakdown, for one manifest row.
+ * Empty for a pair that ran once.
+ */
+function formatSpreadDetail(entry: ReportResultEntry): string[] {
+  const summary = formatSpreadLine(entry);
+  if (!summary) return [];
+
+  const lines = [`    \u21B3 ${summary}`];
+  const runs = entry.runs;
+  // On an unscored report every chip would read the same, so the breakdown is
+  // only worth the line when the runs actually differ from one another.
+  const worthListing = runs?.some((run) => run.axisScore !== undefined || run.failed || run.withheld);
+  if (runs?.length && worthListing) {
+    const chips = runs.map((run) => {
+      const mark = run.representative ? "*" : "";
+      if (run.withheld) return `#${run.runIndex} withheld${mark}`;
+      if (run.failed) return `#${run.runIndex} failed${mark}`;
+      return `#${run.runIndex} ${run.axisScore ?? "ok"}${mark}`;
+    });
+    lines.push(`      runs: ${chips.join(", ")}   (* representative)`);
+  }
+  return lines;
 }
 
 export function renderScenarioDetail(result: RunResult | ScoredRunResult): string {
@@ -578,7 +666,7 @@ export function renderScenarioDetail(result: RunResult | ScoredRunResult): strin
   // Unscored: basic result detail
   lines.push(`  AXIS Result: ${result.scenarioName} [${result.scenarioKey}]`);
   lines.push(`  ${sep}`);
-  lines.push(`  Agent:    ${result.agentName}`);
+  lines.push(`  Agent:    ${result.agentName}${formatRunLabel(result)}`);
   const scenarioFailed = isFailedRun(result.output);
   lines.push(`  Status:   ${scenarioFailed ? `Failed (exit ${result.output.metadata.exitCode})` : "Complete"}`);
   if (result.output.metadata.error) {
@@ -671,6 +759,12 @@ export function renderBaselineShow(baseline: Baseline): string {
           `${formatDuration(entry.durationMs).padEnd(COL_DURATION)} ` +
           entry.fromReportId,
       );
+      if (entry.runs && entry.runs > 1) {
+        const bits = [`${entry.runs} runs`];
+        if (entry.stdev !== undefined) bits.push(`\u03C3 ${entry.stdev.toFixed(1)}`);
+        if (entry.reliability !== undefined) bits.push(`reliability ${formatPercent(entry.reliability)}`);
+        lines.push(`    \u21B3 ${bits.join(" \u00B7 ")}`);
+      }
     }
   }
 
@@ -680,10 +774,20 @@ export function renderBaselineShow(baseline: Baseline): string {
   return lines.join("\n") + "\n";
 }
 
-function deltaIndicator(delta: number): string {
-  if (Math.abs(delta) <= 1) return `${delta > 0 ? "+" : ""}${delta}`;
+/**
+ * `+4 ▲` / `-6 ▼` for a real move, a bare number when the delta is inside the
+ * row's noise band. The band comes from the baseline's own measured spread, so
+ * a noisy scenario needs a bigger move before it gets an arrow.
+ */
+function deltaIndicator(delta: number, band = 1): string {
+  if (Math.abs(delta) <= band) return `${delta > 0 ? "+" : ""}${delta}`;
   if (delta > 0) return `+${delta} ▲`;
   return `${delta} ▼`;
+}
+
+/** `67%` from a 0-1 fraction. */
+function formatPercent(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
 }
 
 export function renderBaselineComparison(diff: BaselineComparison): string {
@@ -705,8 +809,18 @@ export function renderBaselineComparison(diff: BaselineComparison): string {
       `  ${getBaseKey(entry.scenarioKey).padEnd(COL_BASELINE_SCENARIO)} ${displayAgent(entry.scenarioKey, entry.agentName).padEnd(COL_BASELINE_AGENT)} ` +
         `${String(entry.baseline).padEnd(COL_BASELINE_SCORE)} ` +
         `${String(entry.current).padEnd(COL_BASELINE_SCORE)} ` +
-        deltaIndicator(entry.delta),
+        deltaIndicator(entry.delta, entry.band),
     );
+    // Surface a widened band so a delta that looks large but counted as
+    // unchanged is explainable rather than looking like a bug.
+    if (entry.band > 1) {
+      lines.push(`    \u21B3 tolerance \u00B1${entry.band.toFixed(1)} from the baseline's measured run spread`);
+    }
+    const rel = entry.reliability;
+    if (rel && Math.abs(rel.delta) > 0.01) {
+      const arrow = rel.delta < 0 ? "\u25BC" : "\u25B2";
+      lines.push(`    \u21B3 reliability ${formatPercent(rel.baseline)} \u2192 ${formatPercent(rel.current)} ${arrow}`);
+    }
   }
 
   lines.push(`  ${sep}`);

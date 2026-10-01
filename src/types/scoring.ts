@@ -180,6 +180,72 @@ export interface ScoreResult {
    * `BaseRunResult.agentConfig`) so the report can always show who scored what.
    */
   judging?: AgentConfig;
+  /**
+   * True when this score was withheld rather than measured: the judge died
+   * with no output, or returned something unparseable. The numbers are zeros
+   * standing in for "unknown", not a grade the agent earned.
+   *
+   * Aggregation depends on this flag to tell a judge outage apart from an
+   * agent failure — both carry `axisScore: 0` and an error on
+   * `output.metadata`, but only the latter counts against the agent's
+   * reliability. Never set for a run the agent itself failed.
+   */
+  withheld?: boolean;
+}
+
+// --- Multi-run aggregation ---
+
+/** Descriptive statistics for one metric across a pair's successful runs. */
+export interface SpreadStats {
+  /** Middle value. Even run counts average the two middle values. */
+  median: number;
+  min: number;
+  max: number;
+  mean: number;
+  /** Sample standard deviation (n-1). Zero when fewer than two runs scored. */
+  stdev: number;
+}
+
+/** A run's four dimension scores, 0-100 each. */
+export interface DimensionScores {
+  goalAchievement: number;
+  environment: number;
+  service: number;
+  agent: number;
+}
+
+/**
+ * Spread across the repeated runs of one scenario/agent pair, computed over
+ * successful runs only so a crash does not widen the band with a zero.
+ *
+ * Per-dimension variance is not summarised here. Each run carries its own
+ * {@link DimensionScores} in the report's `runs` list, which shows the whole
+ * distribution ("goal is steady, the agent dimension swings") rather than four
+ * medians that hide it.
+ */
+export interface ScoreSpread {
+  /** How many successful runs the statistics were computed from. */
+  n: number;
+  /** Composite AXIS statistics across those runs. */
+  axisScore: SpreadStats;
+  /** 1-based index of the run chosen to headline the pair. */
+  representativeRunIndex: number;
+}
+
+/**
+ * How many of a pair's runs produced a usable score.
+ *
+ * `total` counts attempts that could be measured, so runs whose score was
+ * withheld because the judge failed are removed from the denominator rather
+ * than held against the agent.
+ */
+export interface RunReliability {
+  /** Runs that completed and were scored. */
+  succeeded: number;
+  /** Measurable attempts (every run minus the withheld ones). */
+  total: number;
+  /** Runs whose score was withheld because judging failed, not the agent. */
+  withheld: number;
 }
 
 // --- Scored run result ---
@@ -206,11 +272,20 @@ export interface ScoredSummary extends RunSummary {
 
 // --- Scoring options ---
 
+/** Identifies the run whose scoring phase changed. */
+export interface ScoringProgressEvent {
+  scenarioKey: string;
+  agentName: string;
+  /** 1-based run index within the pair. Omitted when the pair runs once. */
+  runIndex?: number;
+  phase: "start" | "done" | "failed";
+}
+
 export interface ScoringOptions {
   weights?: ScoringWeights;
   logger?: Logger;
   /** Called when scoring starts/finishes for a result. */
-  onProgress?: (scenarioKey: string, agentName: string, phase: "start" | "done" | "failed") => void;
+  onProgress?: (event: ScoringProgressEvent) => void;
   /** Report directory for writing raw data before judges run. */
   reportDir?: string;
   /**

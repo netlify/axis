@@ -15,6 +15,7 @@ import { listReports, readReport, readScenarioResults } from "./reports/reader.j
 import { setBaseline, readBaseline, listBaselines, deleteBaseline, DEFAULT_BASELINE_NAME } from "./baselines/store.js";
 import { compareBaseline } from "./baselines/compare.js";
 import { getBuiltinAdapterNames } from "./adapters/registry.js";
+import { assertValidRunCount } from "./config/validator.js";
 import {
   renderReportList,
   renderReportDetail,
@@ -34,6 +35,59 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"
 const program = new Command();
 
 program.name("axis").description("AXIS — Agent Experience Index Score").version(pkg.version);
+
+// --- Plural option aliases ---
+
+/**
+ * Plural spellings accepted for options that take a comma-separated list.
+ *
+ * `--scenario` and `--agent` both take several values, so the plural is the
+ * form that comes to hand first and commander would otherwise reject it as an
+ * unknown option. Commander has no alias support (it refuses a second long
+ * flag outright), so the spelling is normalized on argv before parsing.
+ *
+ * Keyed by command, because `axis init --scenarios <path>` is a real and
+ * entirely different option (where to write the scenarios directory). Folding
+ * it into `--scenario` there would silently break it, so `init` aliases only
+ * `--agents`.
+ */
+const OPTION_ALIASES: Record<string, Record<string, string>> = {
+  run: { "--scenarios": "--scenario", "--agents": "--agent" },
+  reports: { "--agents": "--agent" },
+  init: { "--agents": "--agent" },
+};
+
+/**
+ * Rewrite plural option spellings to their canonical form for the command
+ * being invoked. Handles both `--agents foo` and `--agents=foo`, and stops at
+ * a bare `--` so anything a user explicitly marked as positional is untouched.
+ */
+export function applyOptionAliases(argv: string[]): string[] {
+  // The command is the first bare word after the node and script paths; a
+  // leading global flag such as `--version` simply matches no alias map.
+  const command = argv.slice(2).find((arg) => !arg.startsWith("-"));
+  const aliases = command ? OPTION_ALIASES[command] : undefined;
+  if (!aliases) return argv;
+
+  let passthrough = false;
+  return argv.map((arg) => {
+    if (passthrough) return arg;
+    if (arg === "--") {
+      passthrough = true;
+      return arg;
+    }
+
+    const direct = aliases[arg];
+    if (direct) return direct;
+
+    const eq = arg.indexOf("=");
+    if (eq > 0) {
+      const canonical = aliases[arg.slice(0, eq)];
+      if (canonical) return canonical + arg.slice(eq);
+    }
+    return arg;
+  });
+}
 
 // --- Signal handling: kill child processes and clean up on Ctrl-C ---
 
@@ -143,7 +197,7 @@ program
   .command("init")
   .description("Initialize a new AXIS configuration and sample scenario")
   .option("-s, --scenarios <path>", "path to scenarios directory", "./scenarios")
-  .option("-a, --agent <names>", "agent(s) to include (comma-separated, e.g. claude-code,codex)")
+  .option("-a, --agent <names>", "agent(s) to include (comma-separated, e.g. claude-code,codex; alias --agents)")
   .option("--format <format>", `config file format (${CONFIG_FORMATS.join(", ")})`, "json")
   .option("-f, --force", "overwrite existing files")
   .option("--no-skills", "skip installing AXIS skills via the `skills` npm package")
@@ -248,6 +302,7 @@ interface RunPipelineOptions {
   scenarios?: string[];
   agents?: string[];
   concurrency?: number;
+  runs?: number;
   score: boolean;
   verbose: boolean;
   debug: boolean;
@@ -256,6 +311,24 @@ interface RunPipelineOptions {
   refreshSkills: boolean;
   refreshRepos: boolean;
   jobFilter?: Array<{ scenarioKey: string; agentName: string }>;
+}
+
+/**
+ * Identifies one live job row. `runIndex` is only meaningful for a repeated
+ * pair; a pair that runs once leaves it undefined, which is treated as run 1.
+ */
+interface JobRef {
+  scenarioKey: string;
+  agentName: string;
+  runIndex?: number;
+}
+
+/** Find the live job row a scoring callback refers to. */
+function findJob(jobs: JobState[], ref: JobRef): JobState | undefined {
+  return jobs.find(
+    (j) =>
+      j.scenarioKey === ref.scenarioKey && j.agentName === ref.agentName && (j.runIndex ?? 1) === (ref.runIndex ?? 1),
+  );
 }
 
 /**
@@ -279,7 +352,7 @@ async function executeRunPipeline(
   opts: RunPipelineOptions,
   logger: Logger,
   /** Called when a job finishes and scoring begins (interactive mode only). */
-  onScoringStart?: (scenarioKey: string, agentName: string) => void,
+  onScoringStart?: (ref: JobRef) => void,
   /** Called when scoring completes for a job (interactive mode only). */
   onScoringDone?: (scored: ScoredRunResult) => void,
 ): Promise<{ output: ScoredOutput | RunOutput; reportId: string; configDir: string }> {
@@ -313,7 +386,7 @@ async function runPipelineBody(
   configDir: string,
   runAbort: AbortController,
   scoringPromises: Promise<ScoredRunResult>[],
-  onScoringStart?: (scenarioKey: string, agentName: string) => void,
+  onScoringStart?: (ref: JobRef) => void,
   onScoringDone?: (scored: ScoredRunResult) => void,
 ): Promise<{ output: ScoredOutput | RunOutput; reportId: string; configDir: string }> {
   const concurrency = opts.concurrency ?? config.settings?.concurrency;
@@ -350,6 +423,7 @@ async function runPipelineBody(
       jobFilter: opts.jobFilter,
       signal: runAbort.signal,
       concurrency,
+      runs: opts.runs,
       logger,
       registerCleanup,
       debug: opts.debug,
@@ -367,8 +441,8 @@ async function runPipelineBody(
               logger,
               reportDir,
               judging,
-              onProgress: (scenarioKey, agentName, phase) => {
-                if (phase === "start") onScoringStart?.(scenarioKey, agentName);
+              onProgress: (event) => {
+                if (event.phase === "start") onScoringStart?.(event);
               },
             }).then((scored) => {
               onScoringDone?.(scored);
@@ -383,7 +457,11 @@ async function runPipelineBody(
     if (opts.score && runOutput.results.length > 0) {
       // After cancel, bound the wait so a slow LLM judge can't strand the report.
       const settled = await waitForScoring(scoringPromises, runAbort.signal, ABORT_SCORING_GRACE_MS);
-      const settledKey = (r: { scenarioKey: string; agentName: string }) => `${r.scenarioKey}\x00${r.agentName}`;
+      // Keyed per run, not per pair: with repeats several results share a
+      // scenario and agent and would otherwise collapse into one entry, leaving
+      // the rest to be needlessly re-scored by the fill-in pass below.
+      const settledKey = (r: { scenarioKey: string; agentName: string; runIndex?: number }) =>
+        `${r.scenarioKey}\x00${r.agentName}\x00${r.runIndex ?? 1}`;
       const scoredByKey = new Map(settled.map((s) => [settledKey(s), s]));
       // Any result without a scoring entry (pre-aborted jobs that never hit
       // onResult, or scoring skipped because cancel fired) gets scored now.
@@ -407,9 +485,7 @@ async function runPipelineBody(
       const allScored = [...settled, ...fillIns.filter((s): s is ScoredRunResult => s !== undefined)];
       // Propagate artifacts and teardown notes from runOutput onto scored results.
       for (const scored of allScored) {
-        const match = runOutput.results.find(
-          (r) => r.scenarioKey === scored.scenarioKey && r.agentName === scored.agentName,
-        );
+        const match = runOutput.results.find((r) => settledKey(r) === settledKey(scored));
         if (!match) continue;
         if (match.artifacts && match.artifacts.length > 0) scored.artifacts = match.artifacts;
         if (match.setupOutput) scored.setupOutput = match.setupOutput;
@@ -497,14 +573,22 @@ program
   .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
   .option(
     "-s, --scenario <keys>",
-    "run specific scenarios (comma-separated, supports globs e.g. 'cms/*' or 'hello-*,foo')",
+    "run specific scenarios (comma-separated, supports globs e.g. 'cms/*' or 'hello-*,foo'; alias --scenarios)",
   )
-  .option("-a, --agent <names>", "run with specific agents (comma-separated, supports globs e.g. 'claude-code|*')")
+  .option(
+    "-a, --agent <names>",
+    "run with specific agents (comma-separated, supports globs e.g. 'claude-code|*'; alias --agents)",
+  )
   .option("-p, --profile <name>", "apply a named profile from the config's `profiles` map")
   .option("--json", "output results as JSON to stdout", false)
   .option("-v, --verbose", "show detailed per-step logging", false)
   .option("-o, --output-dir <dir>", "also write axis-report-[timestamp].json to this directory")
   .option("--concurrency <n>", "max parallel jobs (default: 15)", parseInt)
+  .option(
+    "--runs <n>",
+    "run each scenario/agent pair n times and report the representative run (default: 1, or settings.runs)",
+    parseInt,
+  )
   .option("--debug", "show debug output (workspace paths, env, lifecycle)", false)
   .option("--failed [reportId]", "re-run only the failed scenario/agent pairs from a previous report (default: latest)")
   .option("--no-score", "skip scoring (raw results only)")
@@ -526,6 +610,17 @@ program
     const scenarios = splitCsv(opts.scenario);
     const agents = splitCsv(opts.agent)?.map((a) => a.toLowerCase());
 
+    // Validate here as well as in the runner so the message names the flag the
+    // user actually typed rather than the option it maps to.
+    if (opts.runs !== undefined) {
+      try {
+        assertValidRunCount(opts.runs, "--runs");
+      } catch (err) {
+        process.stderr.write(`\n  Error: ${formatError(err)}\n\n`);
+        process.exit(1);
+      }
+    }
+
     // --- --failed: resolve failed jobs from a previous report ---
     let jobFilter: Array<{ scenarioKey: string; agentName: string }> | undefined;
     if (opts.failed !== undefined) {
@@ -540,14 +635,24 @@ program
         process.stderr.write(`\n  Error: report "${requestedId}" not found\n\n`);
         process.exit(1);
       }
+      // A pair is worth retrying when the pair itself failed or any of its
+      // runs did. The whole pair is re-run either way: a repeated pair's score
+      // is a property of its complete sample, so refilling only the failed
+      // slots would leave the retry report holding a partial (possibly
+      // even-sized) sample that no single run can represent.
       jobFilter = manifest.results
-        .filter((r) => r.failed ?? (r.exitCode !== 0 || r.error))
+        .filter((r) => {
+          const pairFailed = r.failed ?? (r.exitCode !== 0 || r.error);
+          const anyRunFailed = r.runs?.some((run) => run.failed ?? (run.exitCode !== 0 || run.error)) ?? false;
+          return pairFailed || anyRunFailed;
+        })
         .map((r) => ({ scenarioKey: r.scenarioKey, agentName: r.agentName }));
       if (jobFilter.length === 0) {
         process.stderr.write(`\n  No failed jobs in report ${manifest.reportId}. Nothing to retry.\n\n`);
         process.exit(0);
       }
-      process.stderr.write(`\n  Retrying ${jobFilter.length} failed job(s) from report ${manifest.reportId}\n`);
+      const pairLabel = jobFilter.length === 1 ? "pair" : "pairs";
+      process.stderr.write(`\n  Retrying ${jobFilter.length} failed ${pairLabel} from report ${manifest.reportId}\n`);
     }
 
     const pipelineOpts: RunPipelineOptions = {
@@ -556,6 +661,7 @@ program
       scenarios,
       agents,
       concurrency: opts.concurrency,
+      runs: opts.runs,
       score: opts.score,
       verbose: opts.verbose,
       debug: opts.debug,
@@ -642,8 +748,8 @@ program
         pipelineOpts,
         logger,
         // onScoringStart
-        (scenarioKey, agentName) => {
-          const job = lastJobs.find((j) => j.scenarioKey === scenarioKey && j.agentName === agentName);
+        (ref) => {
+          const job = findJob(lastJobs, ref);
           if (job && job.status !== "failed") {
             job.status = "scoring";
             onUpdate?.([...lastJobs], skippedCount);
@@ -651,7 +757,7 @@ program
         },
         // onScoringDone
         (scored) => {
-          const job = lastJobs.find((j) => j.scenarioKey === scored.scenarioKey && j.agentName === scored.agentName);
+          const job = findJob(lastJobs, scored);
           if (job) {
             // Scoring can withhold a score (dead/unparseable judge), flipping a
             // run that finished cleanly into a failure. Reflect that in the row
@@ -698,7 +804,7 @@ program
   .argument("[reportId]", "report ID or 'latest' (omit to list all)")
   .argument("[scenarioKey]", "scenario key to view detailed result")
   .option("-c, --config <path>", "path to axis.config file (.ts, .js, .mjs, .json)")
-  .option("-a, --agent <name...>", "filter scenario detail to specific agent(s), repeatable")
+  .option("-a, --agent <name...>", "filter scenario detail to specific agent(s), repeatable; alias --agents")
   .option("--json", "output as JSON", false)
   .option("--html", "open report as HTML in browser", false)
   .option("-n, --limit <count>", "max reports to list", "10")
@@ -973,7 +1079,7 @@ baselineCmd
     }
   });
 
-program.parse();
+program.parse(applyOptionAliases(process.argv));
 
 // --- Legacy report file writing (for --output-dir) ---
 

@@ -150,6 +150,36 @@ export function initInteractions(): void {
     }
   });
 
+  // Run switcher — selecting a row in the Runs table swaps which run's score
+  // breakdown is shown. Every run's panel is already in the DOM, so this is a
+  // visibility toggle and works with the report opened over file://.
+  const selectRun = (pair: string, runIndex: string): void => {
+    const scope = `[data-pair="${CSS.escape(pair)}"]`;
+
+    document.querySelectorAll<HTMLElement>(`.runs-row${scope}`).forEach((row) => {
+      row.classList.toggle("runs-row-selected", row.dataset.run === runIndex);
+    });
+    document.querySelectorAll<HTMLButtonElement>(`.runs-select${scope}`).forEach((btn) => {
+      btn.setAttribute("aria-pressed", String(btn.dataset.run === runIndex));
+    });
+    document.querySelectorAll<HTMLElement>(`.run-panel${scope}`).forEach((panel) => {
+      panel.classList.toggle("visible", panel.dataset.run === runIndex);
+    });
+  };
+
+  // Bound on the row so the whole row is a target, and resolved with `closest`
+  // so the button inside it goes through the same path instead of needing its
+  // own handler.
+  document.querySelectorAll<HTMLElement>(".runs-row[data-pair][data-run]").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const source = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-pair][data-run]") ?? row;
+      const { pair, run } = source.dataset;
+      if (pair === undefined || run === undefined) return;
+      selectRun(pair, run);
+    });
+  });
+
   // Interaction breadcrumb links — jump from breakdown to transcript line
   document.querySelectorAll<HTMLElement>(".interaction-link[data-interaction-id]").forEach((link) => {
     link.addEventListener("click", (e) => {
@@ -157,7 +187,10 @@ export function initInteractions(): void {
       e.preventDefault();
       const id = link.dataset.interactionId;
       if (!id) return;
-      const panel = link.closest<HTMLElement>(".detail-panel");
+      // A repeated pair holds one `.run-panel` per run inside a single
+      // `.detail-panel`, so resolving against the detail panel would find
+      // run 1's transcript line no matter which run's link was clicked.
+      const panel = link.closest<HTMLElement>(".run-panel") ?? link.closest<HTMLElement>(".detail-panel");
       if (!panel) return;
       const target = panel.querySelector<HTMLElement>(`.sparse-line[data-interaction-id="${CSS.escape(id)}"]`);
       if (!target) return;

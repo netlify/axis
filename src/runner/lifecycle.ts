@@ -82,6 +82,15 @@ export interface LifecyclePhaseContext {
   scenario: string;
   /** Variant name, when the scenario key contains an `@variant` suffix. Becomes `AXIS_VARIANT`. */
   variant?: string;
+  /**
+   * 1-based index of this run within its scenario/agent pair. Becomes
+   * `AXIS_RUN_INDEX`, and is always set (it is `1` for an unrepeated pair) so
+   * a script can namespace shared external resources per run without first
+   * checking whether repeats are configured.
+   */
+  runIndex?: number;
+  /** Total runs configured for this pair. Becomes `AXIS_RUN_COUNT`. */
+  runCount?: number;
 }
 
 /**
@@ -118,6 +127,8 @@ export async function runLifecyclePhase(
     env.AXIS_SCENARIO = context.scenario;
     if (context.model) env.AXIS_MODEL = context.model;
     if (context.variant) env.AXIS_VARIANT = context.variant;
+    env.AXIS_RUN_INDEX = String(context.runIndex ?? 1);
+    env.AXIS_RUN_COUNT = String(context.runCount ?? 1);
   }
 
   let error: Error | undefined;

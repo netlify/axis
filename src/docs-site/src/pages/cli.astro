@@ -25,7 +25,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <span class="cli-flag-name"><code>-a, --agent &lt;names&gt;</code></span>
         <span class="cli-flag-desc">
           Agent(s) to include — comma-separated (e.g. <code>claude-code,codex,gemini</code>). Default:
-          <code>claude-code</code>.
+          <code>claude-code</code>. <code>--agents</code> is accepted as an alias.
         </span>
       </div>
       <div class="cli-flag">
@@ -65,6 +65,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <span class="cli-flag-desc">
           Run specific scenarios. Accepts a comma-separated list and glob patterns, e.g.
           <code>cms/*</code>, <code>hello-world,cms/create-post@*</code>.
+          <code>--scenarios</code> is accepted as an alias, since the option takes a list.
         </span>
       </div>
       <div class="cli-flag">
@@ -72,6 +73,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <span class="cli-flag-desc">
           Run with specific agents. Accepts a comma-separated list and glob patterns, e.g.
           <code>claude-code|*</code>, <code>codex|gpt,claude-code|opus</code>.
+          <code>--agents</code> is accepted as an alias.
         </span>
       </div>
       <div class="cli-flag">
@@ -99,6 +101,18 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <span class="cli-flag-desc">Max parallel jobs (default: 15).</span>
       </div>
       <div class="cli-flag">
+        <span class="cli-flag-name"><code>--runs &lt;n&gt;</code></span>
+        <span class="cli-flag-desc">
+          Run each scenario/agent pair <code>n</code> times and report the
+          representative run (default: 1, or <code>settings.runs</code>). Overrides
+          both <code>settings.runs</code> and any per-scenario <code>runs</code>. Must be
+          <a href="/running#odd-runs">odd</a> (1, 3, 5, …) and at most 19; an even value is an
+          error rather than being rounded. Each extra run costs a full agent execution plus its
+          judge calls, so the spend scales linearly. See
+          <a href="/running#multiple-runs">multiple runs</a>.
+        </span>
+      </div>
+      <div class="cli-flag">
         <span class="cli-flag-name"><code>--debug</code></span>
         <span class="cli-flag-desc">Capture raw agent stdout for debugging.</span>
       </div>
@@ -111,7 +125,10 @@ import DocsLayout from "../layouts/DocsLayout.astro";
           <code>--agent</code>, but combinable with <code>--profile</code>: retry the
           report under the same profile that produced it, since pairs outside the
           selected suite (or named by another suite's agent matrix) match nothing and
-          the run exits non-zero with no jobs discovered.
+          the run exits non-zero with no jobs discovered. A repeated pair is retried in
+          full rather than run by run: its score is a property of the whole sample, so
+          refilling only the failed slots would leave the retry report holding a partial
+          sample that no single run can represent.
         </span>
       </div>
       <div class="cli-flag">
@@ -138,6 +155,13 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       </div>
     </div>
   </div>
+
+  <p>
+    Because <code>--scenario</code> and <code>--agent</code> both take a list, their plural
+    spellings (<code>--scenarios</code>, <code>--agents</code>) are accepted as aliases wherever
+    they appear. The one exception is <code>axis init --scenarios &lt;path&gt;</code>, which is a
+    real and different option: it sets where the scenarios directory is written.
+  </p>
 
   <h3 id="run-exit-codes">Exit codes</h3>
   <p>
@@ -189,7 +213,7 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       </div>
       <div class="cli-flag">
         <span class="cli-flag-name"><code>-a, --agent &lt;name...&gt;</code></span>
-        <span class="cli-flag-desc">Filter by agent(s), repeatable.</span>
+        <span class="cli-flag-desc">Filter by agent(s), repeatable. <code>--agents</code> is accepted as an alias.</span>
       </div>
       <div class="cli-flag">
         <span class="cli-flag-name"><code>--json</code></span>

@@ -86,6 +86,12 @@ Full annotated shape:
   // Per-scenario time/token limits. Defaults: 15 minutes, no token cap.
   "limits": { "time_minutes": 10, "tokens": 200000 },
 
+  // How many times to run this scenario against each agent. Overrides
+  // settings.runs. Defaults to 1. Must be ODD (1, 3, 5, …), max 19. Raise it
+  // for a scenario whose score swings between runs; each extra run costs a
+  // full agent execution plus its judge calls. See "Repeated runs" below.
+  "runs": 3,
+
   // Glob patterns (relative to the workspace) of files to capture into the
   // report after teardown. Merged with the top-level artifacts list.
   "artifacts": ["src/**/*.js", "test-output.log"],
@@ -118,7 +124,9 @@ Each repo + ref is cloned once into `.axis/repos/` and reused by every scenario,
 
 ### Variants
 
-When a scenario should run multiple times with small differences, define `variants`. The parent does not run by itself; each variant inherits all parent fields and may override `prompt`, `judge`, `setup`, `teardown`, `agents`, `skills`, `mcp_servers`, `limits`, `artifacts`, or `skip`.
+When a scenario should run multiple times with small differences, define `variants`. The parent does not run by itself; each variant inherits all parent fields and may override `prompt`, `judge`, `setup`, `teardown`, `agents`, `skills`, `mcp_servers`, `limits`, `runs`, `artifacts`, or `skip`.
+
+Variants and `runs` are different axes and should not be confused. A variant is a deliberately different configuration that gets its own key and its own score. `runs` repeats the _same_ configuration to measure how much its score moves. A scenario with two variants and `runs: 3` executes six times and reports two results.
 
 ```jsonc
 {
@@ -247,6 +255,12 @@ Full annotated shape:
   // Run-wide settings.
   "settings": {
     "concurrency": 8,
+
+    // How many times each scenario/agent pair runs. Defaults to 1. Overridden
+    // by a scenario's own "runs", and by `--runs` on the CLI. Must be ODD,
+    // max 19. Raising this does NOT scale limits.run, a whole-run budget.
+    "runs": 1,
+
     "limits": {
       "run": { "time_minutes": 60, "tokens": 5000000 },
       "scenario": { "time_minutes": 10, "tokens": 200000 },
@@ -328,6 +342,48 @@ The name is used verbatim in report paths, baselines, and `-a` filters. It must 
 ### Judging precedence
 
 For each run, AXIS finds a judge by scanning `judging.agents` in order and picking the first entry whose adapter name differs from the agent being scored. If every entry matches, the first entry is used. When `judging` is omitted, the run's own agent judges itself.
+
+### Repeated runs
+
+Agents are stochastic, so a scenario's score moves between identical runs. Set `runs` above 1 to sample a pair several times and let AXIS report a representative result plus the spread around it.
+
+Precedence, most specific first: `--runs <n>` on the CLI, then a scenario's or variant's `runs`, then `settings.runs`, then 1. Must be a positive **odd** integer (1, 3, 5, …), capped at 19.
+
+Odd is enforced, and it is worth being able to explain why if a user asks for `runs: 2`. An even sample has no middle run, so the median of the composites falls between two runs and the reported number belongs to none of them. At exactly two runs it is worse: both runs sit at identical distance from the per-dimension medians, so the tie-break returns run 1 whether run 1 was the good one or the bad one. Steer users to 3.
+
+```json
+{
+  "scenarios": "./scenarios",
+  "agents": ["claude-code"],
+  "settings": { "runs": 3 }
+}
+```
+
+What to tell the user when you configure this:
+
+- **It is not free.** Each extra run is a full agent execution plus its four judge calls, so `runs: 3` costs roughly 3x the tokens and 3x the wall clock. Default it off and raise it where score stability matters: baselines, CI gates, and scenarios known to be volatile.
+- **Scope it narrowly first.** Prefer `runs` on the two or three scenarios that actually swing over `settings.runs` across a whole suite.
+- **Run limits do not scale with it.** `settings.limits.run` is a budget for the entire run, so three runs per pair exhaust it about three times sooner. Raise it alongside `runs` or the run aborts partway through.
+- **Shared external state needs namespacing.** Repeats get isolated workspaces but not isolated cloud resources. If `setup` provisions a real site, database, or queue, include `$AXIS_RUN_INDEX` in its name:
+
+```json
+{
+  "setup": [
+    {
+      "action": "run_script",
+      "command": "netlify sites:create --name \"axis-$AXIS_SCENARIO-$AXIS_RUN_INDEX\""
+    }
+  ],
+  "teardown": [
+    {
+      "action": "run_script",
+      "command": "netlify sites:delete --name \"axis-$AXIS_SCENARIO-$AXIS_RUN_INDEX\" --force"
+    }
+  ]
+}
+```
+
+`AXIS_RUN_INDEX` and `AXIS_RUN_COUNT` are always set, reading `1` and `1` for an unrepeated pair, so a script never has to branch on whether repeats are configured.
 
 ## Recipes
 
@@ -464,7 +520,9 @@ For interpreting reports, comparing runs, finding regressions, or explaining sco
 11. When asked to make a targeted edit (add a field, fix a single bug), edit ONLY what the prompt specifies. Do not reorganize, reformat, or add unrelated fields. Preserve every field the prompt did not name. The judge often checks "original X and Y fields are preserved unchanged".
 12. Minimize unnecessary tool calls. Every tool call is evaluated as an agent decision; redundant `ls`, repeated `cat` of the same file, exploratory `find` that you do not act on, all tank the agent dimension via the `necessity` sub-dimension. Read each file you need once. Write each edit once. Stop when the task is done.
 13. Profiles are config-side only. A scenario never declares which profile it belongs to: there is no `profiles` field on a scenario, and inventing one is the most common mistake here. Suite membership is declared in the config with `include` / `exclude` key globs, which keeps scenario files portable across repos that clone them. Use `skip: true` to disable a scenario everywhere; use `exclude` to hold it out of the default suite so a profile can claim it. Excluding a scenario that no profile includes fails the run.
-14. Field-name discipline. AXIS uses snake_case in all JSON config fields: `mcp_servers` not `mcpServers`, `time_minutes` not `timeMinutes`, `run_script` not `runScript` or `shell`. The deprecated alias `rubric` exists for backwards compat; prefer `judge`. Other commonly-invented names that are WRONG: `criteria`, `success_criteria`, `expected`, `tasks`, `evaluators`, `models`, `timeout`, `maxTokens`, `tokenLimit`, `timeoutMinutes`.
+14. `runs` must be odd. If a user asks for 2 or 4, do not silently write 3 or 5; tell them why even counts are rejected (no middle run, and at 2 the representative is positional) and let them pick.
+15. Do not reach for `runs` to express different configurations. `runs` repeats one configuration to measure volatility; `variants` express deliberately different configurations that each deserve their own score. If the user wants "the same task with and without MCP", that is two variants, not two runs.
+16. Field-name discipline. AXIS uses snake_case in all JSON config fields: `mcp_servers` not `mcpServers`, `time_minutes` not `timeMinutes`, `run_script` not `runScript` or `shell`. The deprecated alias `rubric` exists for backwards compat; prefer `judge`. Other commonly-invented names that are WRONG: `criteria`, `success_criteria`, `expected`, `tasks`, `evaluators`, `models`, `timeout`, `maxTokens`, `tokenLimit`, `timeoutMinutes`.
 
 ## Validation
 

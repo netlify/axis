@@ -336,9 +336,17 @@ describe("scoreResults", () => {
 
       await scoreRunResult(output.results[0], { onProgress });
 
-      expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "start");
-      expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "failed");
-      expect(onProgress).not.toHaveBeenCalledWith("test-scenario", "claude-code", "done");
+      expect(onProgress).toHaveBeenCalledWith({
+        scenarioKey: "test-scenario",
+        agentName: "claude-code",
+        phase: "start",
+      });
+      expect(onProgress).toHaveBeenCalledWith({
+        scenarioKey: "test-scenario",
+        agentName: "claude-code",
+        phase: "failed",
+      });
+      expect(onProgress).not.toHaveBeenCalledWith(expect.objectContaining({ phase: "done" }));
     });
 
     it("short-circuits an empty-work run (no transcript, no result) without invoking judges", async () => {
@@ -367,8 +375,12 @@ describe("scoreResults", () => {
       expect(isFailedRun(scored.output)).toBe(true);
       expect(scored.output.metadata.error).toContain("Score withheld");
       expect(scored.output.metadata.error).toContain("Could not parse judge response");
-      expect(onProgress).toHaveBeenCalledWith("test-scenario", "claude-code", "failed");
-      expect(onProgress).not.toHaveBeenCalledWith("test-scenario", "claude-code", "done");
+      expect(onProgress).toHaveBeenCalledWith({
+        scenarioKey: "test-scenario",
+        agentName: "claude-code",
+        phase: "failed",
+      });
+      expect(onProgress).not.toHaveBeenCalledWith(expect.objectContaining({ phase: "done" }));
     });
 
     it("counts a withheld run as failed in the summary (fails loud)", async () => {

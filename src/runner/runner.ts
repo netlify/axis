@@ -14,6 +14,9 @@ import { runLifecyclePhase } from "./lifecycle.js";
 import { collectGitCopySources, defaultRepoCacheRoot, ensureRepo } from "./repo-cache.js";
 import type { GitCopySource } from "./repo-cache.js";
 import { captureArtifacts, resolveArtifactPatterns } from "./artifacts.js";
+import { artifactsPath, runSiblingPath } from "../reports/paths.js";
+import { assertValidRunCount, MAX_RUNS } from "../config/validator.js";
+import { groupRunsByPair } from "../scoring/aggregate.js";
 import type {
   ResolvedRunConfig,
   RunOutput,
@@ -51,6 +54,32 @@ function resolveJobLimits(scenario: Scenario, defaultLimits?: ScenarioLimitsConf
     timeoutMs: timeMinutes * 60 * 1000,
     tokenLimit: effective?.tokens,
   };
+}
+
+/** Default repeat count when none is configured. */
+const DEFAULT_RUN_COUNT = 1;
+
+/**
+ * How many times one scenario runs against one agent.
+ *
+ * Precedence mirrors `concurrency`: an explicit CLI value beats the scenario,
+ * which beats the suite default.
+ *
+ * Every source is validated before this runs: config values by
+ * `validateConfig` / `validateScenario`, and a `--runs` or `run({ runs })`
+ * override by `assertValidRunCount` at the top of `run()`. All of them are
+ * therefore positive, odd, and within `MAX_RUNS`, and the clamp here is only
+ * a floor against a non-finite value slipping through.
+ *
+ * Nothing is silently adjusted on the way in. Rounding an even count to an odd
+ * one would change both the sample size and the bill without saying so, and
+ * clamping a `0` would guess at an intent the caller never expressed, so both
+ * are rejected upstream instead.
+ */
+function resolveRunCount(scenario: Scenario, axisConfig: AxisConfig, override?: number): number {
+  const raw = override ?? scenario.runs ?? axisConfig.settings?.runs ?? DEFAULT_RUN_COUNT;
+  if (!Number.isFinite(raw)) return DEFAULT_RUN_COUNT;
+  return Math.max(1, Math.min(MAX_RUNS, Math.floor(raw)));
 }
 
 function formatLimitMinutes(ms: number): string {
@@ -141,10 +170,24 @@ export interface RunOptions {
    */
   reportDir?: string;
   /**
+   * How many times to run each scenario/agent pair, overriding
+   * `settings.runs` and any per-scenario `runs`. Repeats reduce the volatility
+   * of a result by sampling the agent several times; the report headlines one
+   * representative run and records the spread across the rest.
+   */
+  runs?: number;
+  /**
    * Explicit allowlist of scenario/agent pairs. When set, only jobs whose
    * (scenarioKey, agentName) appears in this list survive discovery — applied
    * AFTER `scenarioFilter` and `agentFilter`. Pairs not currently configured
    * (scenario removed, agent removed) are silently dropped.
+   *
+   * Filtering is per pair, never per run. A repeated pair's score is a property
+   * of its whole sample, so re-running a subset of a pair's runs would produce
+   * a report whose entry for that pair is built from an incomplete (and
+   * possibly even-sized) sample, which is the case odd run counts exist to
+   * rule out. Retrying the pair costs the runs that already passed and buys a
+   * result that can actually be read.
    */
   jobFilter?: Array<{ scenarioKey: string; agentName: string }>;
   /**
@@ -161,6 +204,10 @@ interface Job {
   scenario: Scenario;
   configDir: string;
   axisConfig: AxisConfig;
+  /** 1-based run index within this scenario/agent pair. */
+  runIndex: number;
+  /** Total runs configured for this pair. */
+  runCount: number;
 }
 
 /** System vars always passed through to isolated environments. */
@@ -176,6 +223,12 @@ const DEFAULT_PASS_ENV = ["ANTHROPIC_API_KEY", "CODEX_API_KEY", "GEMINI_API_KEY"
 export async function run(options: RunOptions = {}): Promise<RunOutput> {
   const logger = options.logger ?? defaultLogger;
   const runStart = Date.now();
+
+  // Check the caller's override before loading anything, so a bad `--runs`
+  // fails immediately rather than after discovery and pre-flight.
+  if (options.runs !== undefined) {
+    assertValidRunCount(options.runs, "runs");
+  }
   const { config, configDir, baseConfig } = await loadConfig(options.configPath, { profile: options.profile });
 
   // Remote scenarios: clone any remote URL entries once up front so the
@@ -249,17 +302,35 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
       if (scenario.agents && !scenarioAgentFilterMatches(scenario.agents, agentName, agentConfig.agent)) {
         continue;
       }
-      jobs.push({ index: jobs.length, agentName, agentConfig, scenario, configDir, axisConfig: config });
+      // One job per repeat. Pushed together so the run-major sort below can
+      // keep pairs in discovery order while spreading their repeats apart.
+      const runCount = resolveRunCount(scenario, config, options.runs);
+      for (let runIndex = 1; runIndex <= runCount; runIndex++) {
+        jobs.push({
+          index: 0,
+          agentName,
+          agentConfig,
+          scenario,
+          configDir,
+          axisConfig: config,
+          runIndex,
+          runCount,
+        });
+      }
     }
   }
+
+  orderRunMajor(jobs);
 
   // Apply explicit job allowlist (e.g. --retry). Jobs not in the list are
   // dropped silently — handles the case where a previously-failed scenario
   // or agent has since been removed from the config.
   if (options.jobFilter?.length) {
-    const allow = new Set(options.jobFilter.map((p) => `${p.scenarioKey} ${p.agentName}`));
+    const allow = new Set(options.jobFilter.map((p) => `${p.scenarioKey}\x00${p.agentName}`));
     const before = jobs.length;
-    const filtered = jobs.filter((j) => allow.has(`${j.scenario.key} ${j.agentName}`));
+    // Every run of an allowed pair survives, so a retried pair produces a
+    // complete sample rather than a partial one.
+    const filtered = jobs.filter((j) => allow.has(`${j.scenario.key}\x00${j.agentName}`));
     // Reindex so JobState[].index aligns with array position
     filtered.forEach((j, i) => (j.index = i));
     jobs.length = 0;
@@ -273,6 +344,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   const failedToLoad = [...loadFailures.values()];
 
   logDiscoverySummary(logger, jobs, skippedKeys, failedToLoad);
+  logRepeatBudgetNote(logger, jobs, config);
 
   if (jobs.length === 0) {
     return buildOutput(runStart, [], skippedCount, failedToLoad);
@@ -282,6 +354,7 @@ export async function run(options: RunOptions = {}): Promise<RunOutput> {
   const jobStates: JobState[] = jobs.map((job) => ({
     scenarioKey: job.scenario.key,
     agentName: job.agentName,
+    ...(job.runCount > 1 ? { runIndex: job.runIndex, runCount: job.runCount } : {}),
     status: "pending" as JobStatus,
   }));
   const jobMeta = skippedCount > 0 ? { skipped: skippedCount } : undefined;
@@ -626,9 +699,15 @@ function logDiscoverySummary(
   } else {
     const scenarioCount = new Set(jobs.map((j) => j.scenario.key)).size;
     const agentCount = new Set(jobs.map((j) => j.agentName)).size;
-    logger.info(
-      `Discovered ${plural(scenarioCount, "scenario")} across ${plural(agentCount, "agent")}: ${plural(jobs.length, "job")}`,
-    );
+    const pairCount = new Set(jobs.map((j) => `${j.scenario.key}\x00${j.agentName}`)).size;
+    const maxRuns = Math.max(...jobs.map((j) => j.runCount));
+    // With repeats the job count is no longer the pair count, and the gap is
+    // exactly the extra spend, so name both rather than just the larger one.
+    const tail =
+      maxRuns > 1
+        ? `${plural(pairCount, "pair")}, ${plural(jobs.length, "job")} (up to ${maxRuns} runs each)`
+        : plural(jobs.length, "job");
+    logger.info(`Discovered ${plural(scenarioCount, "scenario")} across ${plural(agentCount, "agent")}: ${tail}`);
   }
 
   if (skippedKeys.size > 0) {
@@ -643,6 +722,30 @@ function logDiscoverySummary(
         `${loadFailures.length === 1 ? "its" : "their"} scenarios did not run.`,
     );
   }
+}
+
+/**
+ * Warn that run-level limits are shared by every repeat.
+ *
+ * `settings.limits.run` is a budget for the whole run, and
+ * `checkOverallTokenLimit` sums live tokens across all jobs, so raising `runs`
+ * to 3 exhausts the same budget roughly three times sooner. Without this note
+ * the run aborts partway through and looks like the agents got slower.
+ */
+function logRepeatBudgetNote(logger: Logger, jobs: Job[], config: AxisConfig): void {
+  const maxRuns = jobs.length > 0 ? Math.max(...jobs.map((j) => j.runCount)) : 1;
+  if (maxRuns <= 1) return;
+
+  const runLimits = config.settings?.limits?.run;
+  if (!runLimits?.tokens && !runLimits?.time_minutes) return;
+
+  const parts: string[] = [];
+  if (runLimits.tokens) parts.push(`${runLimits.tokens} tokens`);
+  if (runLimits.time_minutes) parts.push(`${runLimits.time_minutes}m`);
+  logger.info(
+    `Run limits (${parts.join(", ")}) are shared by all ${plural(jobs.length, "job")}; ` +
+      `raise settings.limits.run if ${maxRuns} runs per pair should get ${maxRuns}x the budget.`,
+  );
 }
 
 interface JobOutput {
@@ -666,8 +769,13 @@ async function executeJob(
   checkOverallTokenLimit?: () => void,
   reportDir?: string,
 ): Promise<JobOutput> {
-  const { index, agentName, agentConfig, scenario, axisConfig, configDir } = job;
-  const label = `${scenario.key} (${agentName})`;
+  const { index, agentName, agentConfig, scenario, axisConfig, configDir, runIndex, runCount } = job;
+  const isRepeated = runCount > 1;
+  const label = isRepeated
+    ? `${scenario.key} (${agentName}) run ${runIndex}/${runCount}`
+    : `${scenario.key} (${agentName})`;
+  /** Identifies this run's slot in the report tree. */
+  const runRef = { scenarioKey: scenario.key, agentName, runIndex, runCount };
   const jobStart = Date.now();
 
   // Create isolated workspace + home as siblings under one parent. The agent's
@@ -689,6 +797,11 @@ async function executeJob(
     scenario: scenario.key,
     ...(agentConfig.model ? { model: agentConfig.model } : {}),
     ...(atIndex >= 0 ? { variant: scenario.key.slice(atIndex + 1) } : {}),
+    // Always exposed, even for a single run, so a setup script can namespace
+    // shared external resources by run without branching on whether repeats
+    // are configured.
+    runIndex,
+    runCount,
   };
   logger.verbose?.(`[${label}] Workspace: ${workspace}`);
   logger.verbose?.(`[${label}] Home: ${home}`);
@@ -726,7 +839,7 @@ async function executeJob(
       }
     }
     if (resultRef && reportDir && artifactPatterns.length > 0) {
-      const destDir = path.join(reportDir, "scenarios", scenario.key, agentName, "artifacts");
+      const destDir = path.join(reportDir, artifactsPath(runRef));
       try {
         const captured = captureArtifacts(workspace, artifactPatterns, destDir, logger);
         if (captured.length > 0) {
@@ -769,10 +882,9 @@ async function executeJob(
   let onRawLine: ((line: string) => void) | undefined;
   let onStderr: ((chunk: string) => void) | undefined;
   if (debug && reportDir) {
-    const scenarioDir = path.join(reportDir, "scenarios", scenario.key);
-    fs.mkdirSync(scenarioDir, { recursive: true });
-    const debugPath = path.join(scenarioDir, `${agentName}.debug.ndjson`);
-    const debugStderrPath = path.join(scenarioDir, `${agentName}.debug.stderr.log`);
+    const debugPath = path.join(reportDir, runSiblingPath(runRef, "debug.ndjson"));
+    const debugStderrPath = path.join(reportDir, runSiblingPath(runRef, "debug.stderr.log"));
+    fs.mkdirSync(path.dirname(debugPath), { recursive: true });
     debugStream = fs.createWriteStream(debugPath);
     debugStderrStream = fs.createWriteStream(debugStderrPath);
     onRawLine = (line) => {
@@ -873,6 +985,7 @@ async function executeJob(
       scenarioKey: scenario.key,
       scenarioName: scenario.name,
       agentName,
+      ...(isRepeated ? { runIndex, runCount } : {}),
       prompt: scenario.prompt,
       judge: scenario.judge,
       agentConfig,
@@ -892,6 +1005,25 @@ async function executeJob(
     debugStream?.end();
     debugStderrStream?.end();
   }
+}
+
+/**
+ * Reorder jobs run-major: every pair's run 1 before any pair's run 2, and so
+ * on, preserving discovery order within each pass.
+ *
+ * Repeats exist to sample the agent, so they should not all execute at the
+ * same instant. Left in discovery order, a pair's three runs sit adjacent in
+ * the queue and start together, which maximizes contention on the same
+ * provider rate limit and turns correlated 429s into what looks like variance
+ * in the agent. Spreading them across passes is the cheap version of what
+ * Lighthouse gets by serializing its runs outright.
+ *
+ * `Array.prototype.sort` is stable, so sorting on `runIndex` alone is enough.
+ * Reassigns `index` so `jobStates[i]` still lines up with `jobs[i]`.
+ */
+function orderRunMajor(jobs: Job[]): void {
+  jobs.sort((a, b) => a.runIndex - b.runIndex);
+  jobs.forEach((job, i) => (job.index = i));
 }
 
 /**
@@ -1021,6 +1153,7 @@ function buildFailedResult(job: Job, error: string): RunResult {
     scenarioKey: job.scenario.key,
     scenarioName: job.scenario.name,
     agentName: job.agentName,
+    ...(job.runCount > 1 ? { runIndex: job.runIndex, runCount: job.runCount } : {}),
     prompt: job.scenario.prompt,
     judge: job.scenario.judge,
     agentConfig: job.agentConfig,
@@ -1039,13 +1172,31 @@ function buildFailedResult(job: Job, error: string): RunResult {
   };
 }
 
+/**
+ * Roll per-run results up into pair-level totals.
+ *
+ * `total`/`completed`/`failed` count scenario/agent pairs so the headline
+ * numbers keep their meaning when `runs` is raised: a pair counts as completed
+ * if any of its runs produced usable output, and only a pair where every run
+ * failed is a failure. Individual flaky runs surface through `runsFailed` and
+ * the report's per-pair reliability, not by failing the suite.
+ *
+ * When every pair ran once, pairs and runs are the same thing and the run
+ * counters are omitted so single-run output is unchanged.
+ */
 function buildOutput(
   runStart: number,
   results: RunResult[],
   skippedCount = 0,
   loadFailures: ScenarioLoadFailure[] = [],
 ): RunOutput {
-  const completed = results.filter((r) => !isFailedRun(r.output)).length;
+  const pairs = groupRunsByPair(results);
+  let completed = 0;
+  for (const runs of pairs.values()) {
+    if (runs.some((r) => !isFailedRun(r.output))) completed++;
+  }
+  const runsFailed = results.filter((r) => isFailedRun(r.output)).length;
+  const repeated = results.length !== pairs.size;
 
   return {
     version: "0.1.0",
@@ -1053,9 +1204,10 @@ function buildOutput(
     durationMs: Date.now() - runStart,
     results,
     summary: {
-      total: results.length,
+      total: pairs.size,
       completed,
-      failed: results.length - completed,
+      failed: pairs.size - completed,
+      ...(repeated ? { runsTotal: results.length, runsFailed } : {}),
       ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
       ...(loadFailures.length > 0 ? { loadFailed: loadFailures.length } : {}),
     },

@@ -59,6 +59,13 @@ export function setBaseline(configDir: string, report: ReportManifest, name: str
       durationMs: result.durationMs,
       tokens:
         (result.tokenUsage?.input ?? 0) + (result.tokenUsage?.output ?? 0) + (result.tokenUsage?.cacheReadInput ?? 0),
+      // Carry the measured spread forward: this is what lets `compareBaseline`
+      // size its noise band from data instead of a constant.
+      ...(result.runCount && result.runCount > 1 ? { runs: result.runCount } : {}),
+      ...(result.spread && result.spread.n > 1 ? { stdev: result.spread.axisScore.stdev } : {}),
+      ...(result.reliability && result.reliability.total > 0
+        ? { reliability: result.reliability.succeeded / result.reliability.total }
+        : {}),
       fromReportId: report.reportId,
       timestamp: report.timestamp,
     };

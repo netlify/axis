@@ -2372,3 +2372,163 @@ a.wf-id.interaction-link {
     display: block !important;
   }
 }
+
+/* ── Multi-run (repeated pairs) ─────────────────────── */
+
+/*
+ * A repeated pair's row shows one representative score, so without this pill
+ * the row is indistinguishable from a single-run row while meaning something
+ * different. Sits beside the agent name, ahead of the action buttons.
+ */
+.runs-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 100px;
+  background: var(--bg-alt);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: help;
+}
+
+.runs-section {
+  margin-bottom: 20px;
+}
+
+.runs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.runs-table th {
+  padding: 6px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.runs-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+  color: var(--text);
+}
+
+.runs-table tr:last-child td {
+  border-bottom: none;
+}
+
+.runs-table .col-right {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+/*
+ * Run rows select which breakdown is shown below, so they have to read as
+ * controls rather than as a static table.
+ */
+.runs-row {
+  cursor: pointer;
+}
+
+.runs-row:hover td {
+  background: var(--bg-alt);
+}
+
+/* The real control inside the Run cell; the row around it is a convenience. */
+.runs-select {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.runs-select:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.runs-select[aria-pressed="true"] {
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The selected run is the one the breakdown below is describing. */
+.runs-row-selected td {
+  background: var(--bg-alt);
+  font-weight: 500;
+}
+
+/*
+ * A left edge on the selected row ties it to the panel underneath. Applied to
+ * the first cell so it does not disturb the table's border collapse.
+ */
+.runs-row-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--text);
+}
+
+/*
+ * Every run's panel is rendered up front and only the selected one is shown.
+ * Switching is then a class toggle with nothing to fetch, which is what lets
+ * the report work when opened straight off disk.
+ */
+.run-panel {
+  display: none;
+}
+
+.run-panel.visible {
+  display: block;
+}
+
+/*
+ * Representative marker, in its own column. Centred and narrow so every Run
+ * cell stays the same width; as an inline tag beside the run number it made
+ * one row visibly wider than its neighbours.
+ */
+.runs-rep-col {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.runs-rep-mark {
+  color: var(--success);
+  font-size: 0.875rem;
+}
+
+/*
+ * The header's info tooltip renders below the button, overlapping the first
+ * body rows. Giving the cell a stacking context keeps the tooltip above them;
+ * table painting order would otherwise let row content cover it.
+ */
+.runs-table th.runs-rep-col {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * Full width rather than capped at a reading measure: these notes sit inside an
+ * already-narrow expanded panel, where wrapping them early only adds height.
+ */
+.runs-note {
+  margin: 12px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

@@ -89,6 +89,17 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <td>Time and token limits for this scenario. Overrides <a href="/configuration#limits">default scenario limits</a>. Fields: <code>time_minutes</code>, <code>tokens</code>.</td>
       </tr>
       <tr>
+        <td><code>runs</code></td>
+        <td><code>number</code></td>
+        <td><span class="req-no">No</span></td>
+        <td>
+          How many times to run this scenario against each agent. Overrides
+          <a href="/configuration#runs"><code>settings.runs</code></a>; defaults to 1. Must be
+          <a href="/running#odd-runs">odd</a>. Raise it for a scenario whose score swings between
+          runs. See <a href="/running#multiple-runs">Multiple Runs</a>.
+        </td>
+      </tr>
+      <tr>
         <td><code>artifacts</code></td>
         <td><code>string[]</code></td>
         <td><span class="req-no">No</span></td>
@@ -252,9 +263,9 @@ export default {
       <tr>
         <td>
           Has scenario fields (<code>variants</code>, <code>setup</code>, <code>teardown</code>,
-          <code>limits</code>, <code>skip</code>, <code>agents</code>, <code>skills</code>,
-          <code>mcp_servers</code>, <code>artifacts</code>) but no <code>prompt</code> or
-          <code>judge</code>
+          <code>limits</code>, <code>runs</code>, <code>skip</code>, <code>agents</code>,
+          <code>skills</code>, <code>mcp_servers</code>, <code>artifacts</code>) but no
+          <code>prompt</code> or <code>judge</code>
         </td>
         <td>
           <strong>Hard error.</strong> This is an unfinished scenario, and dropping it would
@@ -665,6 +676,23 @@ export default {
         <td>Branching setup per variant &mdash; e.g. seeding different data for <code>@baseline</code> vs <code>@stress</code>.</td>
       </tr>
       <tr>
+        <td><code>AXIS_RUN_INDEX</code></td>
+        <td>
+          1-based index of this run within its scenario/agent pair. Always set, reading
+          <code>1</code> for a pair that runs once, so a script never has to check whether
+          <a href="/running#multiple-runs">repeats</a> are configured.
+        </td>
+        <td>
+          Namespacing shared external resources per run, so several repeats of the same scenario
+          do not collide on one site, database, or queue.
+        </td>
+      </tr>
+      <tr>
+        <td><code>AXIS_RUN_COUNT</code></td>
+        <td>Total runs configured for this pair. Always set; <code>1</code> when not repeating.</td>
+        <td>Logging progress, or skipping expensive seeding on all but the first run.</td>
+      </tr>
+      <tr>
         <td><code>HOME</code></td>
         <td>Set to a per-job <em>sibling</em> directory of the workspace (not the workspace itself), so the agent's own config files (<code>.claude/</code>, <code>.codex/</code>, etc.) never appear in the directory it is scanning.</td>
         <td>Workspace isolation &mdash; tools that read <code>$HOME</code> stay scoped to the run without polluting the workspace.</td>
@@ -695,9 +723,10 @@ export default {
 scenarios/
   my-scenario.json              # setup: copy ./scenario-fixtures/my-project/** -> .`}</code></pre>
   <p>
-    The <code>AXIS_AGENT</code>, <code>AXIS_MODEL</code>, <code>AXIS_SCENARIO</code>, and
-    <code>AXIS_VARIANT</code> variables let a single <code>run_script</code> action branch on
-    what is actually running without baking that information into the command string:
+    The <code>AXIS_AGENT</code>, <code>AXIS_MODEL</code>, <code>AXIS_SCENARIO</code>,
+    <code>AXIS_VARIANT</code>, and <code>AXIS_RUN_INDEX</code> variables let a single
+    <code>run_script</code> action branch on what is actually running without baking that
+    information into the command string:
   </p>
   <pre><code>{`"setup": [
   {
@@ -707,6 +736,10 @@ scenarios/
   {
     "action": "run_script",
     "command": "if [ \\"$AXIS_VARIANT\\" = \\"stress\\" ]; then cp -R \\"$AXIS_CONFIG_DIR/fixtures/large/.\\" .; else cp -R \\"$AXIS_CONFIG_DIR/fixtures/small/.\\" .; fi"
+  },
+  {
+    "action": "run_script",
+    "command": "netlify sites:create --name \\"axis-$AXIS_SCENARIO-$AXIS_RUN_INDEX\\""
   }
 ]`}</code></pre>
 
@@ -955,6 +988,11 @@ scenarios/
         <td><code>limits</code></td>
         <td><code>object</code></td>
         <td>Replaces the parent's limits. Fields: <code>time_minutes</code>, <code>tokens</code>.</td>
+      </tr>
+      <tr>
+        <td><code>runs</code></td>
+        <td><code>number</code></td>
+        <td>Replaces the parent's repeat count. Must be <a href="/running#odd-runs">odd</a>.</td>
       </tr>
       <tr>
         <td><code>artifacts</code></td>

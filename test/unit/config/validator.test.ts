@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { validateConfig, validateScenario, resolveJudgeWeights } from "../../../src/config/validator.js";
+import {
+  validateConfig,
+  validateScenario,
+  resolveJudgeWeights,
+  assertValidRunCount,
+  MAX_RUNS,
+} from "../../../src/config/validator.js";
 
 describe("validateConfig profiles, include and exclude", () => {
   const base = { scenarios: "./scenarios", agents: ["claude-code"] };
@@ -1052,5 +1058,101 @@ describe("resolveJudgeWeights", () => {
     expect(judge[0].weight).toBe(0.4);
     expect(judge[1].weight).toBeCloseTo(0.3, 10);
     expect(judge[2].weight).toBeCloseTo(0.3, 10);
+  });
+});
+
+describe("runs validation", () => {
+  const base = { scenarios: "./scenarios", agents: ["claude-code"] };
+
+  it("accepts a positive integer at settings.runs", () => {
+    expect(() => validateConfig({ ...base, settings: { runs: 3 } }, "c.json")).not.toThrow();
+  });
+
+  it("rejects a non-integer settings.runs", () => {
+    expect(() => validateConfig({ ...base, settings: { runs: 2.5 } }, "c.json")).toThrow(
+      /"settings.runs" must be a positive integer/,
+    );
+  });
+
+  it("rejects a zero or negative settings.runs", () => {
+    expect(() => validateConfig({ ...base, settings: { runs: 0 } }, "c.json")).toThrow(/positive integer/);
+    expect(() => validateConfig({ ...base, settings: { runs: -1 } }, "c.json")).toThrow(/positive integer/);
+  });
+
+  it("caps settings.runs so a typo cannot spend a whole budget", () => {
+    expect(() => validateConfig({ ...base, settings: { runs: MAX_RUNS } }, "c.json")).not.toThrow();
+    expect(() => validateConfig({ ...base, settings: { runs: MAX_RUNS + 2 } }, "c.json")).toThrow(
+      new RegExp(`above the maximum of ${MAX_RUNS}`),
+    );
+  });
+
+  it("keeps the cap itself odd so it is a usable value", () => {
+    expect(MAX_RUNS % 2).toBe(1);
+  });
+
+  it("rejects an even settings.runs and names the nearest legal values", () => {
+    expect(() => validateConfig({ ...base, settings: { runs: 4 } }, "c.json")).toThrow(/must be odd/);
+    expect(() => validateConfig({ ...base, settings: { runs: 4 } }, "c.json")).toThrow(/Use 3 or 5/);
+  });
+
+  it("rejects runs: 2, where representative selection would be positional", () => {
+    expect(() => validateConfig({ ...base, settings: { runs: 2 } }, "c.json")).toThrow(/must be odd/);
+  });
+
+  it("accepts odd run counts", () => {
+    for (const runs of [1, 3, 5, 7]) {
+      expect(() => validateConfig({ ...base, settings: { runs } }, "c.json")).not.toThrow();
+    }
+  });
+
+  it("validates runs on a scenario", () => {
+    const scenario = { name: "s", prompt: "p", judge: "j", runs: 3 };
+    expect(() => validateScenario(scenario, "s.json")).not.toThrow();
+    expect(() => validateScenario({ ...scenario, runs: 0 }, "s.json")).toThrow(/"runs" must be a positive integer/);
+    expect(() => validateScenario({ ...scenario, runs: 2 }, "s.json")).toThrow(/must be odd/);
+  });
+
+  it("validates runs on a variant", () => {
+    const scenario = {
+      name: "s",
+      prompt: "p",
+      judge: "j",
+      variants: [{ name: "fast", runs: 3 }],
+    };
+    expect(() => validateScenario(scenario, "s.json")).not.toThrow();
+
+    const bad = { ...scenario, variants: [{ name: "fast", runs: 99 }] };
+    expect(() => validateScenario(bad, "s.json")).toThrow(/variants\[0\].runs/);
+
+    const even = { ...scenario, variants: [{ name: "fast", runs: 4 }] };
+    expect(() => validateScenario(even, "s.json")).toThrow(/must be odd/);
+  });
+
+  it("rejects an even variant runs value", () => {
+    const scenario = { name: "s", prompt: "p", judge: "j", variants: [{ name: "fast", runs: 2 }] };
+    expect(() => validateScenario(scenario, "s.json")).toThrow(/must be odd/);
+  });
+});
+
+describe("assertValidRunCount", () => {
+  it("accepts odd counts up to the cap", () => {
+    for (const runs of [1, 3, 5, MAX_RUNS]) {
+      expect(() => assertValidRunCount(runs, "--runs")).not.toThrow();
+    }
+  });
+
+  it("rejects even counts, naming both neighbours", () => {
+    expect(() => assertValidRunCount(2, "--runs")).toThrow(/--runs is 2, but run counts must be odd/);
+    expect(() => assertValidRunCount(2, "--runs")).toThrow(/Use 1 or 3/);
+  });
+
+  it("rejects zero, negatives, and fractions", () => {
+    expect(() => assertValidRunCount(0, "--runs")).toThrow(/positive integer/);
+    expect(() => assertValidRunCount(-3, "--runs")).toThrow(/positive integer/);
+    expect(() => assertValidRunCount(2.5, "--runs")).toThrow(/positive integer/);
+  });
+
+  it("rejects counts above the cap", () => {
+    expect(() => assertValidRunCount(MAX_RUNS + 2, "--runs")).toThrow(/above the maximum/);
   });
 });

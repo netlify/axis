@@ -54,6 +54,14 @@ export interface BaseRunResult {
   scenarioKey: string;
   scenarioName: string;
   agentName: string;
+  /**
+   * 1-based index of this run within its scenario/agent pair. Omitted when the
+   * pair ran once, which keeps single-run results byte-identical to reports
+   * written before multi-run support.
+   */
+  runIndex?: number;
+  /** Total runs configured for this pair. Omitted when it is 1. */
+  runCount?: number;
   prompt: string;
   judge: string | JudgeCriterion[];
   agentConfig: AgentConfig;
@@ -72,10 +80,27 @@ export interface BaseRunResult {
 
 export interface RunResult extends BaseRunResult {}
 
+/**
+ * Run totals.
+ *
+ * `total`, `completed`, and `failed` count scenario/agent **pairs**, not
+ * individual runs, so a suite's headline numbers don't change shape when
+ * `runs` is raised. A pair counts as completed when at least one of its runs
+ * produced a score; a pair with no scored run is failed. Flakiness inside a
+ * pair shows up in the report's per-pair `reliability`, not here.
+ *
+ * `runsTotal` and `runsFailed` count the individual executions, and are
+ * omitted when every pair ran once (where they would duplicate `total` and
+ * `failed`).
+ */
 export interface RunSummary {
   total: number;
   completed: number;
   failed: number;
+  /** Individual agent executions attempted. Omitted when every pair ran once. */
+  runsTotal?: number;
+  /** Individual agent executions that failed. Omitted when every pair ran once. */
+  runsFailed?: number;
   /** Scenarios deliberately opted out via `skip: true`. */
   skipped?: number;
   /** Files in the scenarios tree that could not be loaded. */
@@ -87,6 +112,10 @@ export type JobStatus = "pending" | "setup" | "starting" | "running" | "teardown
 export interface JobState {
   scenarioKey: string;
   agentName: string;
+  /** 1-based run index within the scenario/agent pair. Omitted when the pair runs once. */
+  runIndex?: number;
+  /** Total runs configured for this pair. Omitted when it is 1. */
+  runCount?: number;
   status: JobStatus;
   durationMs?: number;
   axisScore?: number;

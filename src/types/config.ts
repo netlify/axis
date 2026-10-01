@@ -143,6 +143,19 @@ export interface SettingsConfig {
   scoring_weights?: ScoringWeights;
   /** Maximum number of parallel jobs. Defaults to 15. */
   concurrency?: number;
+  /**
+   * How many times to run each scenario/agent pair. Defaults to 1.
+   *
+   * Values above 1 reduce the volatility of a result by sampling the agent
+   * several times: the report keeps every run but headlines a single
+   * representative one (the run closest to the per-dimension medians), plus
+   * the spread and a reliability fraction. Per-scenario `runs` overrides this,
+   * and `--runs` on the CLI overrides both.
+   *
+   * Each extra run costs a full agent execution plus its judge calls, so the
+   * cost is linear in this number.
+   */
+  runs?: number;
   /** Time and token spend limits for the run and individual scenarios. */
   limits?: LimitsConfig;
   /**

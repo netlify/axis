@@ -14,6 +14,7 @@ import type {
   Interaction,
   JudgeCriterion,
   ArtifactEntry,
+  RunEntry,
 } from "./types";
 import { isScoredSummary } from "./types";
 import { getLandedTierIndex, getSpeedTierKind, getSpeedTiers, tierKindLabel, tierLabel } from "./speed-tiers";
@@ -391,6 +392,34 @@ function renderScenarioHeaderRow(group: ScenarioGroup, _startIndex: number, hasS
     </tr>`;
 }
 
+/**
+ * `3 runs · σ 5.1` pill shown next to the agent name for a repeated pair.
+ *
+ * The headline score belongs to one representative run, so the row would
+ * otherwise look identical to a single-run row while meaning something
+ * different. The pill makes the sampling visible at the top level and the
+ * detail panel breaks it down.
+ */
+function runsPill(entry: ResultEntry): string {
+  const runCount = entry.runCount ?? 1;
+  if (runCount <= 1) return "";
+
+  const bits = [`${runCount} runs`];
+  const reliability = entry.reliability;
+  if (reliability && reliability.succeeded !== runCount) {
+    bits.push(`${reliability.succeeded}/${reliability.total} scored`);
+  }
+  if (entry.spread && entry.spread.n > 1) {
+    bits.push(`σ ${entry.spread.axisScore.stdev.toFixed(1)}`);
+  }
+
+  const title = entry.spread
+    ? `Representative run #${entry.spread.representativeRunIndex} (the run nearest the median); median ${entry.spread.axisScore.median}, range ${entry.spread.axisScore.min}-${entry.spread.axisScore.max}`
+    : `${runCount} runs, none scored`;
+
+  return `<span class="runs-pill" title="${escapeHtml(title)}">${escapeHtml(bits.join(" · "))}</span>`;
+}
+
 function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, scenarioKey: string): string {
   const s = entry.score;
   const isFailed = entry.failed ?? (entry.exitCode !== 0 || !!entry.error);
@@ -406,7 +435,7 @@ function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, s
     return `
       <tr class="result-row agent-row" data-index="${index}" data-scenario="${escapeHtml(scenarioKey)}">
         <td class="col-expand-indent"><span class="expand-icon">\u25B6</span></td>
-        <td class="col-agent">${escapeHtml(displayAgentName(entry))}${infoBtn}${errorBtn}</td>
+        <td class="col-agent">${escapeHtml(displayAgentName(entry))}${runsPill(entry)}${infoBtn}${errorBtn}</td>
         <td class="col-score">${scoreBadge(s?.axisScore)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.goalAchievement.score)}</td>
         <td class="col-score hide-mobile">${scoreBadge(s?.environment.score)}</td>
@@ -425,7 +454,7 @@ function renderAgentRow(entry: ResultEntry, index: number, hasScores: boolean, s
   return `
     <tr class="result-row agent-row" data-index="${index}" data-scenario="${escapeHtml(scenarioKey)}">
       <td class="col-expand-indent"><span class="expand-icon">\u25B6</span></td>
-      <td class="col-agent">${escapeHtml(displayAgentName(entry))}${infoBtn}${errorBtn}</td>
+      <td class="col-agent">${escapeHtml(displayAgentName(entry))}${runsPill(entry)}${infoBtn}${errorBtn}</td>
       <td class="col-score">${status}</td>
       <td class="col-right hide-mobile">${fmtTokens(entry.tokenUsage)}</td>
       <td class="col-right hide-mobile">${fmtDuration(entry.durationMs)}</td>
@@ -441,11 +470,188 @@ function renderDetailRow(entry: ResultEntry, index: number, scenarioKey?: string
       <td colspan="${colspan}">
         <div class="detail-panel">
           ${entry.error ? `<div class="error-banner">${escapeHtml(entry.error)}</div>` : ""}
-          ${entry.score ? renderScoreDetail(entry.score, entry.durationMs) : renderUnscoredDetail(entry)}
+          ${renderRunsSection(entry, index)}
+          ${renderBreakdowns(entry, index)}
           ${renderLifecycleNotes(entry)}
           ${entry.artifacts && entry.artifacts.length > 0 ? renderArtifactsSection(entry.artifacts, index) : ""}
         </div>
       </td>
+    </tr>`;
+}
+
+/**
+ * The score breakdown (or breakdowns).
+ *
+ * A pair that ran once emits exactly what it always did. A repeated pair emits
+ * one panel per run, all pre-rendered and all hidden but the representative's,
+ * so the runs table above can switch between them with no fetching. That
+ * matters because reports are routinely opened straight off disk over
+ * `file://`, where a browser would refuse to load a sibling JSON file.
+ *
+ * Each panel is its own `.run-panel`, which also scopes the interaction-link
+ * handler: those links resolve a target within their nearest panel, so without
+ * a boundary a click in run 3 would scroll run 1's transcript.
+ */
+function renderBreakdowns(entry: ResultEntry, index: number): string {
+  const runs = entry.runs;
+  if (!runs || runs.length <= 1) {
+    return entry.score ? renderScoreDetail(entry.score, entry.durationMs) : renderUnscoredDetail(entry);
+  }
+
+  return runs
+    .map((run) => {
+      const selected = isSelectedRun(run, runs);
+      const body = run.score ? renderScoreDetail(run.score, run.durationMs) : renderUnscoredRunPanel(run);
+      return `
+        <div class="run-panel${selected ? " visible" : ""}" data-pair="${index}" data-run="${run.runIndex}">
+          ${body}
+        </div>`;
+    })
+    .join("");
+}
+
+/**
+ * Which run the breakdown opens on: the representative, falling back to the
+ * first run when no run earned one (every run failed, so there is nothing to
+ * prefer).
+ */
+function isSelectedRun(run: RunEntry, runs: RunEntry[]): boolean {
+  const representative = runs.find((r) => r.representative);
+  return representative ? run.runIndex === representative.runIndex : run.runIndex === runs[0].runIndex;
+}
+
+/** Panel body for a run with no score: why it has none, plus what it did spend. */
+function renderUnscoredRunPanel(run: RunEntry): string {
+  const reason = run.withheld
+    ? "Scoring was withheld for this run: the judge failed, so no score could be trusted. This is a measurement failure, not an agent failure."
+    : "This run failed, so it was excluded from the pair's score and counted against its reliability.";
+
+  const tokenParts: string[] = [];
+  if (run.tokenUsage) {
+    tokenParts.push(`Input: ${run.tokenUsage.input.toLocaleString()}`);
+    tokenParts.push(`Output: ${run.tokenUsage.output.toLocaleString()}`);
+    if (run.tokenUsage.cacheReadInput) {
+      tokenParts.push(`Cache: ${run.tokenUsage.cacheReadInput.toLocaleString()}`);
+    }
+  }
+
+  return `
+    <div class="detail-sections">
+      <div class="detail-section">
+        <div class="section-header"><h3>Run ${run.runIndex}</h3></div>
+        ${run.error ? `<div class="error-banner">${escapeHtml(run.error)}</div>` : ""}
+        <p class="runs-note">${escapeHtml(reason)}</p>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">
+          Duration: ${fmtDuration(run.durationMs)}
+          ${tokenParts.length ? ` &middot; Tokens: ${tokenParts.join(", ")}` : ""}
+          ${run.totalCostUsd ? ` &middot; Cost: ${fmtCost(run.totalCostUsd)}` : ""}
+        </p>
+      </div>
+    </div>`;
+}
+
+/**
+ * Per-run breakdown for a repeated pair: every run's score, spend, and a link
+ * to its full result file, with the representative marked.
+ *
+ * Everything below this section in the detail panel (the audits, the
+ * waterfall, the sparse index) describes the representative run only, so the
+ * table says so explicitly rather than leaving a reader to assume the panel
+ * covers all three.
+ */
+function renderRunsSection(entry: ResultEntry, index: number): string {
+  const runs = entry.runs;
+  if (!runs || runs.length <= 1) return "";
+
+  const spread = entry.spread;
+  const summary = spread
+    ? `Median ${spread.axisScore.median} · range ${spread.axisScore.min}–${spread.axisScore.max}` +
+      (spread.n > 1 ? ` · σ ${spread.axisScore.stdev.toFixed(1)}` : "") +
+      ` · across ${spread.n} scored ${spread.n === 1 ? "run" : "runs"}`
+    : "No run produced a score.";
+
+  const rows = runs.map((run) => renderRunRow(run, runs, index)).join("");
+
+  return `
+    <div class="detail-section runs-section">
+      <div class="section-header">
+        <h3>Runs</h3>
+        <span class="section-score">${escapeHtml(summary)}</span>
+      </div>
+      <table class="runs-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th class="runs-rep-col">Representative${representativeInfoButton()}</th>
+            <th>AXIS</th>
+            <th class="col-right hide-mobile">Goal</th>
+            <th class="col-right hide-mobile">Env</th>
+            <th class="col-right hide-mobile">Svc</th>
+            <th class="col-right hide-mobile">Agent</th>
+            <th class="col-right">Tokens</th><th class="col-right">Duration</th><th class="col-right">Cost</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+/**
+ * What "representative" means, attached to the column header.
+ *
+ * This used to be a paragraph under the table, which cost vertical space on
+ * every expanded pair and, worse, said "showing the representative run below"
+ * even after the reader had switched to a different run. A tooltip explains the
+ * column without claiming anything about current state.
+ */
+function representativeInfoButton(): string {
+  const text =
+    "The run whose composite sits nearest the median of this pair's runs. Its score is what the " +
+    "pair reports, and the breakdown opens on it. Select any row to switch the breakdown to that run.";
+  return `<button class="info-btn" data-tooltip="${escapeHtml(text)}" aria-label="What is the representative run?" type="button">ℹ</button>`;
+}
+
+function renderRunRow(run: RunEntry, runs: RunEntry[], index: number): string {
+  const selected = isSelectedRun(run, runs);
+  // A real button rather than a role on the <tr>: overriding the row's role
+  // would drop it out of the table for assistive tech and lose the column
+  // header associations. The whole row stays clickable as a convenience.
+  const label =
+    `<button type="button" class="runs-select" data-pair="${index}" data-run="${run.runIndex}"` +
+    ` aria-pressed="${selected}" aria-label="Show the score breakdown for run ${run.runIndex}">` +
+    `#${run.runIndex}</button>`;
+
+  // Its own column rather than an inline tag beside the run number, which made
+  // the first cell much wider on one row than the others.
+  const repMark = run.representative ? `<span class="runs-rep-mark" title="Representative run">\u2713</span>` : "";
+  const score = run.withheld
+    ? `<span class="score-badge score-na" title="Judging failed, so no score was recorded">withheld</span>`
+    : run.failed
+      ? `<span class="score-badge score-red">failed</span>`
+      : scoreBadge(run.axisScore);
+
+  // A failed or withheld run has no dimensions to show; an en dash keeps the
+  // columns aligned without implying a zero.
+  const dims = run.dimensionScores;
+  const dimCell = (value: number | undefined) =>
+    `<td class="col-right hide-mobile">${value === undefined ? "\u2013" : value}</td>`;
+
+  const classes = ["runs-row"];
+  if (run.representative) classes.push("runs-row-rep");
+  if (selected) classes.push("runs-row-selected");
+
+  return `
+    <tr class="${classes.join(" ")}" data-pair="${index}" data-run="${run.runIndex}">
+      <td>${label}</td>
+      <td class="runs-rep-col">${repMark}</td>
+      <td>${score}</td>
+      ${dimCell(dims?.goalAchievement)}
+      ${dimCell(dims?.environment)}
+      ${dimCell(dims?.service)}
+      ${dimCell(dims?.agent)}
+      <td class="col-right">${fmtTokens(run.tokenUsage)}</td>
+      <td class="col-right">${fmtDuration(run.durationMs)}</td>
+      <td class="col-right">${fmtCost(run.totalCostUsd)}</td>
     </tr>`;
 }
 

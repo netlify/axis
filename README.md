@@ -57,6 +57,30 @@ axis run
 
 AXIS executes the scenario, scores the result, and writes a report to `.axis/reports/`.
 
+## Reducing score volatility
+
+Agents are stochastic, so the same scenario can score differently on two identical runs. Set `runs` above 1 to sample a pair several times:
+
+```bash
+axis run --runs 3
+```
+
+```json
+{
+  "settings": { "runs": 3 }
+}
+```
+
+AXIS keeps every run but headlines a single **representative** one: the real run whose composite sits nearest the median. Since run counts are odd, that run's score _is_ the median, so the headline equals the median of the runs listed beneath it and the live terminal output matches the report exactly. It also keeps the score explainable, since the transcript and audits you drill into belong to the run being reported, which an average would not.
+
+Alongside it the report records the spread (median, range, sigma), each run's four dimension scores, and a **reliability** fraction. A crashed run is excluded from the score and counted against reliability instead, so flakiness never masquerades as low quality; a run whose score was withheld because judging failed leaves the denominator entirely rather than being charged to the agent.
+
+The payoff lands in `--compare-baseline`: a baseline built from repeats knows its own standard deviation, so a regression is a move that exceeds the noise the suite actually measured rather than a fixed 1-point threshold.
+
+Run counts must be odd (1, 3, 5, up to 19). An even sample has no middle run, so the median falls between two runs and the headline belongs to none of them; at `runs: 2` the selection degenerates entirely and always returns run 1 regardless of merit. Even values are rejected rather than rounded.
+
+Repeats default to off. Each extra run is a full agent execution plus its judge calls, so cost scales linearly. See [running tests](https://axis.run/running#multiple-runs) for scheduling, `AXIS_RUN_INDEX`, and the report layout.
+
 ## Documentation
 
 Full documentation lives at **[axis.run](https://axis.run)**:
@@ -64,7 +88,7 @@ Full documentation lives at **[axis.run](https://axis.run)**:
 - [Quick start](https://axis.run/quickstart) - install through your first scored run
 - [Configuration](https://axis.run/configuration) - `axis.config.json`, scenarios, MCP servers, skills
 - [CLI reference](https://axis.run/cli) - `axis run`, `axis reports`, `axis baseline`
-- [Running tests](https://axis.run/running) - execution model, workspace isolation, custom adapters, CI integration
+- [Running tests](https://axis.run/running) - execution model, multiple runs, workspace isolation, custom adapters, CI integration
 - [Scoring framework](https://axis.run/scoring) - the four dimensions, signals, calibration
 
 ## Programmatic API
@@ -75,7 +99,7 @@ Use the programmatic API when you want to integrate AXIS into an existing test r
 
 ## Roadmap
 
-Delivered: scenario runner, four-dimension scoring pipeline, baselines with regression detection, MCP/skills wiring, custom adapter API, config profiles for running one repo's scenarios under several agent matrices, built-in adapters for Claude Code, Codex, and Gemini.
+Delivered: scenario runner, four-dimension scoring pipeline, baselines with regression detection, repeated runs with representative-run selection and noise-aware regression bands, MCP/skills wiring, custom adapter API, config profiles for running one repo's scenarios under several agent matrices, built-in adapters for Claude Code, Codex, and Gemini.
 
 Planned:
 

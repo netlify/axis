@@ -20,6 +20,7 @@ import { buildSparseIndex, populateInteractionContent } from "./sparse-index.js"
 import { runDeepEval } from "./deep-eval.js";
 import { computeCategoryScore } from "./category-score.js";
 import { computeComposite } from "./composite.js";
+import { aggregateByPair } from "./aggregate.js";
 
 const DEFAULT_WEIGHTS: ScoringWeights = {
   goal_achievement: 0.4,
@@ -39,10 +40,19 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   // report can record exactly which agent did the scoring.
   const judgeAgent = resolveJudgeAgent(result, options?.judging);
   const resolvedJudging = [judgeAgent];
-  const label = `${result.scenarioKey} (${result.agentName})`;
+  const label =
+    result.runCount && result.runCount > 1
+      ? `${result.scenarioKey} (${result.agentName}) run ${result.runIndex}/${result.runCount}`
+      : `${result.scenarioKey} (${result.agentName})`;
+  /** Identity every progress callback for this run is reported under. */
+  const progressRef = {
+    scenarioKey: result.scenarioKey,
+    agentName: result.agentName,
+    ...(result.runIndex !== undefined ? { runIndex: result.runIndex } : {}),
+  };
 
   logger?.verbose?.(`Scoring ${label} — judge: ${formatJudgeLabel(judgeAgent)}`);
-  options?.onProgress?.(result.scenarioKey, result.agentName, "start");
+  options?.onProgress?.({ ...progressRef, phase: "start" });
 
   // Step 1: Normalize transcript (existing, unchanged)
   const normalized = normalizeTranscript(result.output.transcript);
@@ -67,6 +77,8 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
       scenarioKey: result.scenarioKey,
       scenarioName: result.scenarioName,
       agentName: result.agentName,
+      ...(result.runIndex !== undefined ? { runIndex: result.runIndex } : {}),
+      ...(result.runCount !== undefined ? { runCount: result.runCount } : {}),
       prompt: result.prompt,
       judge: result.judge,
       agentConfig: result.agentConfig,
@@ -84,7 +96,7 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
   // quality — there's no process to grade. Without this, empty-transcript runs
   // get perfect-score defaults in env/service/agent because nothing was audited.
   if (isFailedRun(result.output)) {
-    options?.onProgress?.(result.scenarioKey, result.agentName, "failed");
+    options?.onProgress?.({ ...progressRef, phase: "failed" });
     return finish(buildZeroScore(result, weights, sparseIndexIfAny, judgeAgent));
   }
 
@@ -143,7 +155,7 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
       judging: judgeAgent,
     };
 
-    options?.onProgress?.(result.scenarioKey, result.agentName, "done");
+    options?.onProgress?.({ ...progressRef, phase: "done" });
     return finish(score);
   } catch (err) {
     // A ScoringError means the judges couldn't be trusted (died with no output,
@@ -160,28 +172,45 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
       result.output.metadata.error = reason;
     }
     logger?.verbose?.(`Withholding score for ${label}: ${err.message}`);
-    options?.onProgress?.(result.scenarioKey, result.agentName, "failed");
-    return finish(buildZeroScore(result, weights, sparseIndexIfAny, judgeAgent));
+    options?.onProgress?.({ ...progressRef, phase: "failed" });
+    // `withheld` marks these zeros as "unknown" rather than "earned". Multi-run
+    // aggregation drops withheld runs from the reliability denominator so a
+    // judge outage is never charged to the agent.
+    return finish({ ...buildZeroScore(result, weights, sparseIndexIfAny, judgeAgent), withheld: true });
   }
 }
 
 /**
  * Assemble a ScoredOutput from run metadata and scored results.
+ *
+ * The suite average is taken over one representative score per scenario/agent
+ * pair, not over every run. Averaging runs directly would weight a pair
+ * configured with `runs: 3` three times as heavily as a single-run pair, so
+ * raising the repeat count on one scenario would silently tilt the whole
+ * suite's number toward it.
+ *
+ * Completed/failed are recomputed here rather than trusting the runner's
+ * pre-scoring summary, because scoring can withhold a score (dead or
+ * unparseable judge) and flip a pair that exited cleanly into a failure.
  */
 export function buildScoredOutput(runOutput: RunOutput, scoredResults: ScoredRunResult[]): ScoredOutput {
-  const completedResults = scoredResults.filter((r) => !isFailedRun(r.output));
+  const pairs = aggregateByPair(scoredResults);
+  const representatives = [...pairs.values()]
+    .map((aggregate) => aggregate.representative)
+    .filter((r): r is ScoredRunResult => r !== undefined);
+
   const averageAxisScore =
-    completedResults.length > 0
-      ? completedResults.reduce((sum, r) => sum + r.score.axisScore, 0) / completedResults.length
+    representatives.length > 0
+      ? representatives.reduce((sum, r) => sum + r.score.axisScore, 0) / representatives.length
       : 0;
 
-  // Recompute completed/failed from the SCORED results rather than trusting the
-  // runner's pre-scoring summary: scoring can withhold a score (unparseable or
-  // dead judge), flipping a run that exited cleanly into a failure. Deriving
-  // `failed` from the run total keeps `completed + failed === total` even if a
+  // A pair is completed when any of its runs scored. `failed` is derived from
+  // the runner's pair total so `completed + failed === total` holds even if a
   // fill-in scoring pass dropped a result entirely.
-  const completed = completedResults.length;
+  const completed = representatives.length;
   const failed = runOutput.summary.total - completed;
+  const runsFailed = scoredResults.filter((r) => isFailedRun(r.output)).length;
+  const repeated = runOutput.summary.runsTotal !== undefined || scoredResults.length !== pairs.size;
 
   return {
     version: runOutput.version,
@@ -192,6 +221,7 @@ export function buildScoredOutput(runOutput: RunOutput, scoredResults: ScoredRun
       total: runOutput.summary.total,
       completed,
       failed,
+      ...(repeated ? { runsTotal: runOutput.summary.runsTotal ?? scoredResults.length, runsFailed } : {}),
       ...(runOutput.summary.skipped ? { skipped: runOutput.summary.skipped } : {}),
       ...(runOutput.summary.loadFailed ? { loadFailed: runOutput.summary.loadFailed } : {}),
       averageAxisScore: Math.round(averageAxisScore),

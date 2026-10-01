@@ -34,6 +34,64 @@ export interface ScoredSummary extends RunSummary {
   averageAxisScore: number;
 }
 
+/** One run of a repeated scenario/agent pair. */
+export interface RunEntry {
+  runIndex: number;
+  durationMs: number;
+  exitCode: number;
+  failed?: boolean;
+  /** True when the score was withheld because judging failed, not the agent. */
+  withheld?: boolean;
+  axisScore?: number;
+  /** The run's four dimension scores. Omitted when unscored or withheld. */
+  dimensionScores?: DimensionScores;
+  tokenUsage?: TokenUsage;
+  totalCostUsd?: number;
+  error?: string;
+  /** Report-relative path to this run's full result file. */
+  file: string;
+  /** This run's complete score, so the breakdown can switch between runs. Omitted when unscored or withheld. */
+  score?: ScoreResult;
+  /** True for the run whose numbers headline the pair. */
+  representative?: boolean;
+}
+
+/** Descriptive statistics for one metric across a pair's successful runs. */
+export interface SpreadStats {
+  median: number;
+  min: number;
+  max: number;
+  mean: number;
+  stdev: number;
+}
+
+/** A run's four dimension scores, 0-100 each. */
+export interface DimensionScores {
+  goalAchievement: number;
+  environment: number;
+  service: number;
+  agent: number;
+}
+
+/** Spread across the repeated runs of one pair. */
+export interface ScoreSpread {
+  n: number;
+  axisScore: SpreadStats;
+  representativeRunIndex: number;
+}
+
+/** How many of a pair's runs produced a usable score. */
+export interface RunReliability {
+  succeeded: number;
+  total: number;
+  withheld: number;
+}
+
+/**
+ * One scenario/agent pair. When the pair ran several times, the top-level
+ * score, duration, and token fields describe the representative run, while
+ * `runs`, `spread`, and `reliability` describe the whole set.
+ */
 export interface ResultEntry {
   scenarioKey: string;
   scenarioName: string;
@@ -41,6 +99,14 @@ export interface ResultEntry {
   durationMs: number;
   exitCode: number;
   failed?: boolean;
+  /** Total runs configured for this pair. Omitted when it ran once. */
+  runCount?: number;
+  /** Every run, ordered by index. Omitted when the pair ran once. */
+  runs?: RunEntry[];
+  /** Score spread across successful runs. Omitted when the pair ran once or none scored. */
+  spread?: ScoreSpread;
+  /** Reliability fraction source. Omitted when the pair ran once. */
+  reliability?: RunReliability;
   tokenUsage?: TokenUsage;
   totalCostUsd?: number;
   score?: ScoreResult;

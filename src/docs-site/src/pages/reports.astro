@@ -45,6 +45,101 @@ const ciExample = `# GitHub Actions example
     per-interaction signal scores, and the judge assessment.
   </p>
 
+  <h3 id="multi-run-layout">Repeated pairs</h3>
+  <p>
+    When a pair runs more than once (see
+    <a href="/running#multiple-runs">Multiple Runs</a>), each run gets its own directory instead of
+    sharing one file, so nothing is overwritten and every run keeps its own transcript, raw stdout,
+    and artifacts:
+  </p>
+  <pre><code>{`.axis/reports/{reportId}/
+  report.json
+  scenarios/{key}/{agent}/run-1/result.json
+  scenarios/{key}/{agent}/run-1/raw.ndjson
+  scenarios/{key}/{agent}/run-1/sparse-index.txt
+  scenarios/{key}/{agent}/run-1/artifacts/
+  scenarios/{key}/{agent}/run-2/result.json
+  ...`}</code></pre>
+  <p>
+    A pair that runs once keeps the flat layout above, unchanged, so reports written before repeats
+    existed stay readable and nothing needs migrating.
+  </p>
+  <p>
+    The manifest still carries <strong>one entry per scenario/agent pair</strong> regardless of the
+    repeat count, so anything scripting against <code>report.json</code> keeps working. For a
+    repeated pair, the entry's <code>score</code>, <code>durationMs</code>, <code>tokenUsage</code>,
+    and <code>file</code> all describe the
+    <a href="/running#representative-run">representative run</a>, which keeps them mutually
+    consistent and means <code>file</code> always explains the headline score. Three fields are
+    added:
+  </p>
+  <table>
+    <thead>
+      <tr><th>Field</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>runCount</code></td>
+        <td>Total runs configured for the pair. Absent when it ran once.</td>
+      </tr>
+      <tr>
+        <td><code>runs</code></td>
+        <td>
+          One entry per run, ordered by <code>runIndex</code>: its composite, its four
+          <code>dimensionScores</code>, its complete <code>score</code>, duration, tokens, cost,
+          result file, and whether it <code>failed</code> or was <code>withheld</code>. Exactly
+          one is flagged <code>representative</code>, and its <code>score</code> is the same
+          object as the pair's top-level one. A withheld run publishes no score at all, since its
+          zeros stand in for "unknown" rather than a grade; a failed run publishes its zeros,
+          which it earned.
+        </td>
+      </tr>
+      <tr>
+        <td><code>spread</code></td>
+        <td>
+          Statistics across the pair's successful runs: <code>axisScore</code> median, min, max,
+          mean, and sample standard deviation, plus <code>representativeRunIndex</code>. Failed
+          and withheld runs are excluded, so the band describes the agent's variance when it
+          works rather than mixing in zeros. Per-dimension variance is not summarised here; each
+          entry in <code>runs</code> carries its own <code>dimensionScores</code>, which shows
+          the whole distribution instead of four medians that hide it.
+        </td>
+      </tr>
+      <tr>
+        <td><code>reliability</code></td>
+        <td>
+          <code>{`{ succeeded, total, withheld }`}</code>. <code>total</code> counts only the runs
+          that could be measured, so a judge outage shrinks the denominator instead of looking like
+          an agent crash.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The run-level counts appear in <code>summary</code> as <code>runsTotal</code> and
+    <code>runsFailed</code>. <code>summary.total</code>, <code>completed</code>, and
+    <code>failed</code> always count <em>pairs</em>, so the headline numbers keep their meaning when
+    <code>runs</code> changes.
+  </p>
+
+  <h3 id="switching-runs">Switching between runs</h3>
+  <p>
+    In the HTML report, a repeated pair's detail panel opens on the
+    <a href="/running#representative-run">representative run</a> and lists every run in a table
+    above the breakdown. Selecting a row switches the whole breakdown (the waterfall, the
+    per-dimension cards, the interaction audits, the transcript) to that run. A
+    <strong>Representative</strong> column marks which run the pair reports, and its header
+    carries a tooltip explaining what that means.
+  </p>
+  <p>
+    Each run's full score is embedded in the page, so switching fetches nothing and works with
+    the report opened straight off disk over <code>file://</code>, where a browser would refuse
+    to load a sibling JSON file. The cost is report size: every run carries its own score and
+    sparse index, so a 20-scenario suite at <code>runs: 3</code> produces roughly a 3&nbsp;MB
+    <code>report.html</code> against 0.9&nbsp;MB at <code>runs: 1</code>. The per-run
+    <code>result.json</code> files are still on disk if you want them, at the paths shown above.
+  </p>
+
   <h2>Viewing Reports</h2>
   <pre><code>{`# List all reports
 npx @netlify/axis reports
@@ -115,9 +210,21 @@ npx @netlify/axis baseline compare
 # Compare against a named baseline
 npx @netlify/axis baseline compare v1.0`}</code></pre>
   <p>
-    The comparison shows deltas for each score. Score changes within the noise tolerance (0 to 1
-    point) are reported as unchanged. Regressions are highlighted and the command exits with
-    code 1 if any are detected.
+    The comparison shows deltas for each score. Changes within the noise tolerance are reported as
+    unchanged. Regressions are highlighted and the command exits with code 1 if any are detected.
+  </p>
+  <p>
+    The tolerance is <strong>1 point</strong> by default. A baseline captured from a pair that ran
+    several times also records the standard deviation it measured, and the tolerance for that row
+    widens to two sigma of that spread (the 1-point floor still applies). A noisy scenario
+    therefore has to move further before it counts as a regression, which is the main reason to
+    build baselines from <a href="/running#multiple-runs">repeated runs</a>: a single-run baseline
+    cannot know its own variance and will report ordinary noise as a regression.
+  </p>
+  <p>
+    Reliability is compared alongside the score. A pair that still scores as well on the runs it
+    completes, but now completes fewer of them, is reported as a regression on its own, so
+    increasing flakiness cannot pass as unchanged.
   </p>
 
   <h3>When to set baselines</h3>

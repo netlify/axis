@@ -493,6 +493,7 @@ const SCENARIO_INTENT_FIELDS = [
   "setup",
   "teardown",
   "limits",
+  "runs",
   "skip",
   "agents",
   "skills",
@@ -677,6 +678,7 @@ function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: stri
     mcp_servers:
       variant.mcp_servers !== undefined ? { ...parent.mcp_servers, ...variant.mcp_servers } : parent.mcp_servers,
     limits: variant.limits ?? parent.limits,
+    runs: variant.runs ?? parent.runs,
     artifacts: variant.artifacts !== undefined ? variant.artifacts : parent.artifacts,
   };
 
@@ -688,6 +690,7 @@ function expandVariant(parent: Scenario, variant: ScenarioVariant, baseKey: stri
   if (expanded.skills === undefined) delete expanded.skills;
   if (expanded.mcp_servers === undefined) delete expanded.mcp_servers;
   if (expanded.limits === undefined) delete expanded.limits;
+  if (expanded.runs === undefined) delete expanded.runs;
   if (expanded.artifacts === undefined) delete expanded.artifacts;
 
   return expanded;

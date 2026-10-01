@@ -23,6 +23,12 @@ export interface Scenario {
   /** Per-scenario time/token limits. Overrides settings.limits.scenario defaults. */
   limits?: ScenarioLimitsConfig;
   /**
+   * How many times to run this scenario against each agent. Overrides
+   * `settings.runs`. Defaults to 1. Raise it for scenarios whose results
+   * swing between runs; see {@link SettingsConfig.runs} for the cost.
+   */
+  runs?: number;
+  /**
    * Glob patterns (relative to the workspace) of files to capture into the report
    * after teardown. Merged with top-level `artifacts` from {@link AxisConfig}.
    */
@@ -48,6 +54,8 @@ export interface ScenarioVariant {
   mcp_servers?: Record<string, McpServerConfig>;
   /** Per-variant time/token limits. Overrides parent scenario and default limits. */
   limits?: ScenarioLimitsConfig;
+  /** How many times to run this variant against each agent. Overrides the parent scenario's `runs`. */
+  runs?: number;
   /** Glob patterns of files to capture as artifacts. Replaces parent scenario's artifacts when set. */
   artifacts?: string[];
 }
