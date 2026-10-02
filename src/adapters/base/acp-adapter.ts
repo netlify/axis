@@ -28,6 +28,7 @@ import type {
 import type { McpServerConfig } from "../../types/config.js";
 import { resolveCommand, type ResolvedCommand } from "../utils/resolve.js";
 import { createTokenEstimator } from "../utils/token-estimator.js";
+import { killProcessTree, MAX_STDERR_BYTES, SIGTERM_TO_SIGKILL_MS } from "../utils/process.js";
 import type { SetupContext } from "./agent-adapter.js";
 
 // Re-export SetupContext so ACP adapter specs can reference it
@@ -35,12 +36,6 @@ export type { SetupContext } from "./agent-adapter.js";
 
 /** Default timeout for agent execution (10 minutes). */
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
-
-/** Maximum bytes of stderr to buffer before truncating. */
-const MAX_STDERR_BYTES = 100_000;
-
-/** Grace period between SIGTERM and SIGKILL for non-responsive processes. */
-const SIGTERM_TO_SIGKILL_MS = 5_000;
 
 // ---------------------------------------------------------------------------
 // Spec — the declarative description for an ACP-based adapter
@@ -483,32 +478,6 @@ export function createAcpBasedAdapter(spec: AcpAdapterSpec): AgentAdapter {
       };
     },
   };
-}
-
-/**
- * Signal the agent's entire process group, then the child itself.
- *
- * The child is spawned `detached`, so on POSIX its pid doubles as its
- * process-group id and `process.kill(-pid, …)` reaches every descendant —
- * reaping subprocesses (e.g. `node --test`) the agent shelled out to. Without
- * this, killing only the CLI can leave grandchildren running, which both leak
- * resources and can hold the child's stdio pipes open so its `close` event
- * never fires. The group kill is best-effort (the group may already be gone);
- * the direct `child.kill` is the fallback and the belt-and-suspenders path.
- */
-function killProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
-  if (child.pid !== undefined) {
-    try {
-      process.kill(-child.pid, signal);
-    } catch {
-      // Group already gone, or the child was never a group leader.
-    }
-  }
-  try {
-    child.kill(signal);
-  } catch {
-    // already dead
-  }
 }
 
 // ---------------------------------------------------------------------------

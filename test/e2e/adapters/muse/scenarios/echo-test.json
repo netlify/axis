@@ -1,0 +1,5 @@
+{
+  "name": "Muse echo test",
+  "prompt": "Hello from AXIS Muse adapter",
+  "judge": "The agent should echo back the prompt text."
+}

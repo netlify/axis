@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { EventEmitter, Readable } from "node:stream";
 import { silentLogger } from "../../../src/types/output.js";
+import { createMspMockProcess, agentMessage } from "../../helpers/msp-mock.js";
 
 // Mock spawn, lifecycle, and resolve
 vi.mock("node:child_process", () => ({
@@ -157,6 +158,71 @@ describe("MCP e2e — Codex", () => {
     expect(capturedToml).toContain("[mcp_servers.filesystem]");
     expect(capturedToml).toContain('command = "npx"');
     expect(capturedToml).toContain('args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]');
+  });
+
+  it("produces correct results with MCP servers configured", async () => {
+    const output = await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
+
+    expect(output.results).toHaveLength(1);
+    expect(output.results[0].output.result).toBe("Done");
+    expect(output.summary.completed).toBe(1);
+  });
+});
+
+// ─── Muse ──────────────────────────────────────────────────────────────────────
+
+describe("MCP e2e — Muse", () => {
+  const E2E_DIR = path.resolve(import.meta.dirname, "../../e2e/adapters/mcp-muse");
+  const origKey = process.env.META_API_KEY;
+  let requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+  let configHome = "";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.META_API_KEY = "test-key";
+    requests = [];
+    configHome = "";
+
+    mockSpawn.mockImplementation(((_cmd: string, _args: string[], opts: any) => {
+      configHome = opts.env?.XDG_CONFIG_HOME ?? "";
+      const mock = createMspMockProcess({ turnNotifications: [agentMessage("Done")] });
+      requests = mock.requests;
+      return mock.proc;
+    }) as any);
+  });
+
+  afterEach(() => {
+    if (origKey !== undefined) process.env.META_API_KEY = origKey;
+    else delete process.env.META_API_KEY;
+  });
+
+  it("passes MCP servers over the wire in session/start, writing no config file", async () => {
+    await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
+
+    // Muse takes MCP config through the protocol, like Gemini's ACP session/new,
+    // so nothing is written to disk that a scenario could pick up.
+    const config = requests.find((r) => r.method === "session/start")!.params.config as Record<string, unknown>;
+    // MSP discriminates on `transport`, not the Claude-style `type`, so this
+    // deliberately does NOT reuse EXPECTED_JSON_MCP.
+    expect(config.mcpServers).toEqual({
+      netlify: {
+        transport: "streamableHttp",
+        url: "https://mcp.netlify.com",
+        headers: { Authorization: "Bearer test-token" },
+      },
+      filesystem: {
+        transport: "stdio",
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      },
+    });
+    // The host rejects session MCP config unless this was granted at handshake.
+    const caps = (requests.find((r) => r.method === "initialize")!.params.capabilities ?? {}) as Record<
+      string,
+      unknown
+    >;
+    expect(caps.requestedCapabilities).toEqual(["sessionMcp"]);
+    expect(fs.existsSync(path.join(configHome, "muse", "settings.json"))).toBe(false);
   });
 
   it("produces correct results with MCP servers configured", async () => {

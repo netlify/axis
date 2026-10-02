@@ -23,6 +23,7 @@ import { createKiroCliAdapter } from "./kiro-cli.js";
 import { createKiloAdapter } from "./kilo.js";
 import { createQoderAdapter } from "./qoder.js";
 import { createCopilotAdapter } from "./copilot.js";
+import { createMuseAdapter } from "./muse.js";
 
 const BUILTIN_FACTORIES: Record<string, () => AgentAdapter> = {
   "claude-sdk": createClaudeSdkAdapter,
@@ -49,6 +50,7 @@ const BUILTIN_FACTORIES: Record<string, () => AgentAdapter> = {
   kilo: createKiloAdapter,
   qoder: createQoderAdapter,
   copilot: createCopilotAdapter,
+  muse: createMuseAdapter,
 };
 
 const instanceCache = new Map<string, AgentAdapter>();

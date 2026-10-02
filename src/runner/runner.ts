@@ -218,7 +218,7 @@ const SYSTEM_VARS = ["PATH", "USER", "SHELL", "LANG", "TERM", "TMPDIR"];
  * `config.env`. Without this, declaring `env: [...]` for lifecycle scripts
  * would silently strip the keys adapters need to authenticate.
  */
-const DEFAULT_PASS_ENV = ["ANTHROPIC_API_KEY", "CODEX_API_KEY", "GEMINI_API_KEY"];
+const DEFAULT_PASS_ENV = ["ANTHROPIC_API_KEY", "CODEX_API_KEY", "GEMINI_API_KEY", "META_API_KEY"];
 
 export async function run(options: RunOptions = {}): Promise<RunOutput> {
   const logger = options.logger ?? defaultLogger;

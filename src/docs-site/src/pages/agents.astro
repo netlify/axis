@@ -54,6 +54,14 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         </td>
       </tr>
       <tr>
+        <td><code>muse</code></td>
+        <td>no</td>
+        <td>
+          <code>META_API_KEY</code>
+          <br /><small>a local <code>muse login</code> session only works when it is file-backed; see <a href="#muse">below</a></small>
+        </td>
+      </tr>
+      <tr>
         <td><code>claude-sdk</code></td>
         <td>yes</td>
         <td><code>ANTHROPIC_API_KEY</code></td>
@@ -206,8 +214,82 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       machine.
     </li>
     <li>
-      <strong>Only <code>claude-code</code> and <code>codex</code> support this fallback today.</strong>
-      Other agents still require their configured env var.
+      <strong>Only <code>claude-code</code>, <code>codex</code>, and <code>muse</code> support this
+      fallback today.</strong> Other agents still require their configured env var.
+    </li>
+  </ul>
+
+  <h2 id="muse">Muse Code</h2>
+  <p>
+    <code>muse</code> runs Meta's Muse Code CLI headlessly. Muse has no native ACP mode, so AXIS
+    speaks Muse's own protocol instead: it launches <code>muse serve</code> and drives a session over
+    MSP (Muse Session Protocol), newline-delimited JSON-RPC over stdio.
+  </p>
+  <p>
+    AXIS uses MSP rather than the simpler <code>muse exec --json</code> because <strong>exec reports
+    no token usage and no cost</strong>. MSP publishes both on its stable surface, so it is the only
+    way to get them. It also describes tool calls as first-class items, so tool names come off the
+    wire rather than being inferred.
+  </p>
+  <p>
+    Install it with <code>curl https://dev.meta.ai/install.sh | bash</code>. There is no npm package, so
+    AXIS cannot auto-install it through the <code>npx</code> fallback; the <code>muse</code> binary has
+    to already be on <code>PATH</code>.
+  </p>
+  <ul>
+    <li>
+      <strong>Set <code>META_API_KEY</code>.</strong> This is the reliable path. A local
+      <code>muse login</code> session is used as a fallback only when the credential is stored in a
+      file. On macOS, <code>muse login</code> stores the token in the Keychain and records
+      <code>"storage": "keychain"</code> in <code>auth.json</code>; that credential cannot be carried
+      into AXIS's isolated config dir, so AXIS treats it as <em>no</em> local session and fails
+      pre-flight with a clear message rather than letting the run die mid-flight on
+      <code>missing meta credentials</code>.
+    </li>
+    <li>
+      <strong>Approval and the sandbox are disabled by default.</strong> Muse ships with tool
+      approval and an OS sandbox enabled, and treats an unfamiliar workspace as untrusted (which also
+      suppresses its own skills and rules). AXIS turns off all three, exactly as it passes
+      <code>--dangerously-skip-permissions</code> to <code>claude-code</code>: isolation comes from the
+      throwaway workspace and remapped <code>HOME</code>, not from the agent's sandbox. Approval mode
+      is selected on the wire; the sandbox flags are fixed for the host's lifetime and go on the
+      command line. Opt out with <code>{'{ "flags": { "yolo": false } }'}</code>.
+    </li>
+    <li>
+      <strong>Auto-update is pinned off.</strong> The <code>muse</code> on <code>PATH</code> is a
+      launcher that checks for a newer build roughly hourly and installs it in the background. Left
+      alone, one job can swap the binary out from under the jobs still running, so AXIS sets
+      <code>MUSE_NO_AUTO_UPDATE=1</code> to keep every job in a run on the same build. Update
+      deliberately, between runs.
+    </li>
+    <li>
+      <strong>Token counts and USD cost are reported.</strong> AXIS reads Muse's
+      <code>session/tokenUsage</code> notification, preferring the session cumulative block, which
+      carries input, output, and cache-read counters plus a server-computed USD cost. When Muse
+      prices nothing for a run, AXIS reports <em>no</em> cost rather than <code>$0</code>, so an
+      unpriced run never looks free. Muse counts cache reads inside its prompt total, so AXIS
+      subtracts them back out of <code>input</code> to avoid double counting them in the token total.
+    </li>
+    <li>
+      <strong>Muse's own sub-runs show up on the timeline.</strong> Muse often keeps working after
+      the visible answer, running reminder and verification children that can take longer than the
+      reply itself. AXIS records those as agent-category interactions so the report's timeline
+      accounts for the whole run, instead of leaving the time unexplained at the end.
+    </li>
+    <li>
+      <strong>Duration is the agent's turn, not the process lifetime.</strong> AXIS reports the
+      duration Muse itself gives for the turn, so <code>muse serve</code> startup and the shutdown
+      AXIS triggers are not charged to the agent's speed score.
+    </li>
+    <li>
+      <strong>The prompt travels on the wire.</strong> It is sent as a <code>turn/start</code> input
+      part, so there is no argv length limit and the agent never finds its own task description while
+      scanning its working directory.
+    </li>
+    <li>
+      <strong>MCP servers are passed over the protocol</strong>, in <code>session/start</code>, the
+      same way the Gemini adapter uses ACP. No MCP config file is written, so a scenario gets exactly
+      the servers it declares.
     </li>
   </ul>
 

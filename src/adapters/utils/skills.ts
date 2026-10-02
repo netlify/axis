@@ -57,3 +57,19 @@ function copyDirRecursive(src: string, dest: string): void {
     }
   }
 }
+
+/**
+ * Write skills for Muse Code.
+ * Copies each skill directory to {museConfigDir}/skills/{name}/.
+ *
+ * Muse discovers user-scoped skills under its config dir, NOT its data dir:
+ * `muse skills install --scope user` reports the install path as
+ * `$CONFIG_DIR/skills/<id>`. The runner points XDG_CONFIG_HOME under the
+ * agent's HOME, so skills never appear in the workspace the agent scans.
+ */
+export function writeMuseSkills(museConfigDir: string, skills: ResolvedSkill[]): void {
+  for (const skill of skills) {
+    const target = path.join(museConfigDir, "skills", skill.name);
+    copyDirRecursive(skill.path, target);
+  }
+}

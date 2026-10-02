@@ -1116,8 +1116,15 @@ function truncateForTooltip(text: string, max: number): string {
 }
 
 function renderLifecycleBar(label: string, startMs: number, durationMs: number, totalMs: number): string {
-  const leftPct = (startMs / totalMs) * 100;
-  const widthPct = Math.max(0.4, (durationMs / totalMs) * 100);
+  // Clamp to the track. `wallClockMs` is derived from the interactions, while
+  // startup/shutdown are measured against the agent process lifetime, so a
+  // run whose last transcript entry lands well before the process exits can
+  // produce a shutdown longer than the whole axis (observed: a 19.2s shutdown
+  // on a 7.9s chart, drawn at left:-143% width:243%). An off-track bar is
+  // never meaningful, so pin it inside and let the label carry the real figure.
+  const rawLeftPct = (startMs / totalMs) * 100;
+  const leftPct = Math.min(100, Math.max(0, rawLeftPct));
+  const widthPct = Math.min(100 - leftPct, Math.max(0.4, (durationMs / totalMs) * 100));
   const title = `${label} — ${fmtDuration(durationMs)}`;
   return `
     <div class="wf-row wf-lifecycle">

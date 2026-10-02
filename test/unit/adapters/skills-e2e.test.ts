@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { EventEmitter, Readable, Writable } from "node:stream";
 import { silentLogger } from "../../../src/types/output.js";
+import { createMspMockProcess, agentMessage } from "../../helpers/msp-mock.js";
 
 // Mock spawn, lifecycle, and resolve
 vi.mock("node:child_process", () => ({
@@ -221,6 +222,61 @@ describe("Skills e2e — Gemini", () => {
     expect(capturedSkillMd).toContain("AXIS Calculation Skill");
     expect(capturedSkillMd).toContain("magic constant");
     expect(capturedSkillMd).toContain("42");
+  });
+
+  it("produces correct results with skills configured", async () => {
+    const output = await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
+
+    expect(output.results).toHaveLength(1);
+    expect(output.results[0].output.result).toBe("Done");
+    expect(output.summary.completed).toBe(1);
+  });
+});
+
+// ─── Muse ──────────────────────────────────────────────────────────────────────
+
+describe("Skills e2e — Muse", () => {
+  const E2E_DIR = path.resolve(import.meta.dirname, "../../e2e/adapters/skills-muse");
+  const origKey = process.env.META_API_KEY;
+  let capturedSkillMd: string | null = null;
+  let dataDirSkillExists = true;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.META_API_KEY = "test-key";
+    capturedSkillMd = null;
+    dataDirSkillExists = true;
+
+    mockSpawn.mockImplementation(((_cmd: string, _args: string[], opts: any) => {
+      // Muse discovers user-scoped skills under its CONFIG dir, not its data
+      // dir: `muse skills install --scope user` reports $CONFIG_DIR/skills/<id>.
+      const configHome = opts.env?.XDG_CONFIG_HOME;
+      if (configHome) {
+        const skillPath = path.join(configHome, "muse", "skills", "test-skill", "SKILL.md");
+        if (fs.existsSync(skillPath)) capturedSkillMd = fs.readFileSync(skillPath, "utf-8");
+      }
+      // Writing to the data dir instead is the easy mistake; assert we didn't.
+      const dataHome = opts.env?.XDG_DATA_HOME;
+      dataDirSkillExists = dataHome ? fs.existsSync(path.join(dataHome, "muse", "skills", "test-skill")) : false;
+      // Skills must NOT appear in the workspace the agent scans.
+      expect(fs.existsSync(path.join(opts.cwd, ".config"))).toBe(false);
+      return createMspMockProcess({ turnNotifications: [agentMessage("Done")] }).proc;
+    }) as any);
+  });
+
+  afterEach(() => {
+    if (origKey !== undefined) process.env.META_API_KEY = origKey;
+    else delete process.env.META_API_KEY;
+  });
+
+  it("writes SKILL.md to {XDG_CONFIG_HOME}/muse/skills/ (in HOME, not workspace) before spawning agent", async () => {
+    await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
+
+    expect(capturedSkillMd).not.toBeNull();
+    expect(capturedSkillMd).toContain("AXIS Calculation Skill");
+    expect(capturedSkillMd).toContain("magic constant");
+    expect(capturedSkillMd).toContain("42");
+    expect(dataDirSkillExists).toBe(false);
   });
 
   it("produces correct results with skills configured", async () => {
