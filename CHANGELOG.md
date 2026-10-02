@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.20.0](https://github.com/netlify/axis/compare/v1.19.0...v1.20.0) (2026-10-02)
+
+
+### Features
+
+* add significance and direction aware baseline verdicts ([e5890b7](https://github.com/netlify/axis/commit/e5890b7d18f770dae008afc2db052b8441bee6cd))
+* support --runs ([efb4348](https://github.com/netlify/axis/commit/efb434823b8adc77731e3bf727c6426f0f06bdc4))
+* support --runs ([abb8e60](https://github.com/netlify/axis/commit/abb8e60994748a1ce9966893705121615489c491))
+
 ## [1.19.0](https://github.com/netlify/axis/compare/v1.18.0...v1.19.0) (2026-09-29)
 
 
