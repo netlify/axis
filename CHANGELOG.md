@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.0](https://github.com/netlify/axis/compare/v1.20.0...v1.21.0) (2026-10-02)
+
+
+### Features
+
+* support muse code ([8eb3cf3](https://github.com/netlify/axis/commit/8eb3cf3909670747f821b91a5e2b0f96cbdf06a2))
+
 ## [1.20.0](https://github.com/netlify/axis/compare/v1.19.0...v1.20.0) (2026-10-02)
 
 
