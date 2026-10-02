@@ -1,0 +1,31 @@
+{
+  "name": "Event landing page from a complete brief",
+  "about": "Non-storefront counterpart to the bakery: table stakes are date, venue, agenda, and a registration CTA rather than hours and a menu.",
+  "site_type": "event",
+  "prompt": [
+    "Landing page for Tidewater JS, a one-day JavaScript conference.",
+    "It's on Saturday, March 13 2027 at the Harbor Hall in Norfolk, VA.",
+    "Talks: \"Signals in Practice\" (9:30), \"Edge Functions at Scale\" (11:00), \"Testing Without Mocks\" (14:00), and a closing panel (16:00).",
+    "Tickets are $89 and registration is at https://tickets.example.com/tidewater-js.",
+    "We want it to feel coastal and friendly, not corporate."
+  ],
+  "rubric": {
+    "recall": {
+      "content": [
+        "The event name \"Tidewater JS\"",
+        "The date Saturday, March 13 2027",
+        "The venue Harbor Hall in Norfolk, VA",
+        "The ticket price $89",
+        "\"Signals in Practice\" at 9:30",
+        "\"Edge Functions at Scale\" at 11:00",
+        "\"Testing Without Mocks\" at 14:00",
+        "A closing panel at 16:00",
+        "Registration links to https://tickets.example.com/tidewater-js"
+      ]
+    },
+    "precision": ["facts"],
+    "pass": {
+      "content": ["The styling and tone read as coastal and friendly, not corporate"]
+    }
+  }
+}

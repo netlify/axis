@@ -1,0 +1,18 @@
+{
+  "name": "Commit to a direction from a vague prompt",
+  "about": "Nearly no direction. Grades whether the model commits to a clear concept and still covers what band sites need, without inventing a band.",
+  "site_type": "band",
+  "prompt": ["make something cool for my band"],
+  "rubric": {
+    "precision": ["facts"],
+    "pass": {
+      "input-handling": [
+        "The site commits to one clear creative direction (a specific genre, mood, or aesthetic) instead of a bland, one-size-fits-all template",
+        "The agent's final message explains the direction it chose and what the user should swap in (band name, links, dates)"
+      ],
+      "visual": [
+        "The design has a distinctive visual identity (bold type, texture, motion, or an unexpected layout) and doesn't read as a corporate landing page"
+      ]
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$comment": "Table stakes per kind of site. A spec picks one with `site_type` and gets these recall items. Placeholder values count as present, so a site with `[Your phone]` still has contact details.",
+  "local-business": {
+    "recall": {
+      "table-stakes": [
+        "A hero section in the first screen that names the business and says what it does",
+        "A navigation menu linking to the main sections",
+        "Opening hours",
+        "A menu, products, or services section",
+        "A contact call to action: a `mailto:` or `tel:` link, or a contact form",
+        "Contact details (email or phone) visible as text, not only behind a button",
+        "The address, with a map or directions link"
+      ]
+    }
+  },
+  "event": {
+    "recall": {
+      "table-stakes": [
+        "A hero section in the first screen that says what the event is, when, and where",
+        "A registration or ticket call to action in the first screen",
+        "The registration call to action repeated or reachable further down the page (e.g. near the agenda)",
+        "An agenda or schedule laid out so it's easy to scan",
+        "Venue details with a map or directions link",
+        "A navigation menu or in-page anchors to the main sections"
+      ]
+    }
+  },
+  "portfolio": {
+    "recall": {
+      "table-stakes": [
+        "A hero or intro that names the person and what they do",
+        "A gallery or grid of work",
+        "An about section or page",
+        "A contact call to action: a `mailto:` link or a contact form",
+        "Navigation between the work categories or sections"
+      ]
+    }
+  },
+  "band": {
+    "recall": {
+      "table-stakes": [
+        "A hero section that names the band",
+        "Music or listen links (streaming platforms or an embedded player)",
+        "Upcoming shows or tour dates",
+        "An about section",
+        "A booking or contact call to action",
+        "Social media links"
+      ]
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "$comment": "Checks every generated site gets, whatever the scenario. Same shape as a spec's `rubric`: recall items must be present, precision audits count supported vs unsupported items, pass checks are PASS/FAIL.",
+  "recall": {
+    "imagery": [
+      "At least one image, illustration, icon set, or inline SVG that visibly relates to the subject of the site"
+    ]
+  },
+  "precision": [
+    {
+      "vertical": "imagery",
+      "items": "images, illustrations, icons, and decorative graphics",
+      "supported": "relates to the subject of the site and actually renders (the file exists in `./site/`, or the SVG/CSS is inline)",
+      "unsupported": "generic filler unrelated to the subject, or a broken or missing image reference"
+    }
+  ],
+  "pass": {
+    "functional": [
+      "`site/index.html` exists and opens directly in a browser without a build step",
+      "Every local stylesheet, script, and image the site references resolves to a file in `./site/`",
+      "Every nav link and in-page anchor points at a page or section that exists",
+      "Every button and form does something: buttons are wired up, and forms have an action or a clearly marked placeholder"
+    ],
+    "js-errors": [
+      "Scripts are syntactically valid and don't reference undefined elements, functions, or variables. If a headless browser is available, load each page and check the console; otherwise read the scripts. PASS if the site has no JavaScript",
+      "Interactive behaviour (menu toggles, tabs, carousels, form handling) runs without throwing. PASS if the site has none"
+    ],
+    "mobile": [
+      "Declares `<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">`",
+      "At a 375px-wide viewport nothing forces horizontal scrolling: no fixed widths wider than the screen, and images scale down",
+      "The layout adapts at narrow widths (media queries, flex/grid wrapping, or fluid units) instead of shrinking the desktop layout",
+      "Navigation stays usable on mobile (collapses, wraps, or stays compact) and tap targets are roughly 44px or well spaced"
+    ],
+    "accessibility": [
+      "Each page has exactly one `<h1>`, and headings don't skip levels",
+      "Landmarks are used: `<header>`, `<nav>`, `<main>`, and `<footer>`",
+      "Every meaningful image has descriptive `alt` text; decorative images have `alt=\"\"` or are CSS backgrounds",
+      "Body text meets WCAG AA contrast (4.5:1) against its background. Compute it from the CSS color values",
+      "Button and link text meets WCAG AA contrast (4.5:1, or 3:1 for large text)",
+      "The `<html>` element has a `lang` attribute",
+      "Interactive elements are real `<a>` or `<button>` elements (no clickable `<div>`s) and every form field has a label"
+    ],
+    "visual": [
+      "Body text is at least 16px, with line height around 1.4–1.8 and lines under ~80 characters",
+      "Uses at most three font families, with a clear size step between headings and body text",
+      "Spacing between sections and elements follows a consistent scale rather than one-off values, and content isn't pressed against the viewport edges",
+      "The headline and primary call to action are the most visually prominent elements in the first screen",
+      "The color palette is cohesive (a small set of colors used consistently) and suits the subject"
+    ]
+  }
+}

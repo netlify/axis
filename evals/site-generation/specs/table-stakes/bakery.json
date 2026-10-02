@@ -1,0 +1,28 @@
+{
+  "name": "Local business site from a complete brief",
+  "about": "Well-specified local business. The baseline: if a model misses table stakes here, the hard-input scenarios aren't telling us anything new.",
+  "site_type": "local-business",
+  "prompt": [
+    "Make a website for my bakery, Crumb & Co. We're at 214 Alder Street, Portland, OR.",
+    "Hours are Tue–Fri 7am–3pm, Sat–Sun 8am–2pm, closed Mondays.",
+    "We're known for sourdough, cardamom buns, and seasonal fruit galettes.",
+    "People should be able to see the menu, find us, and email us at hello@crumbandco.com for custom cake orders."
+  ],
+  "rubric": {
+    "recall": {
+      "content": [
+        "The business name \"Crumb & Co.\", written exactly",
+        "The address 214 Alder Street, Portland, OR",
+        "Hours Tue–Fri 7am–3pm",
+        "Hours Sat–Sun 8am–2pm",
+        "That the bakery is closed on Mondays",
+        "Sourdough",
+        "Cardamom buns",
+        "Seasonal fruit galettes",
+        "The email hello@crumbandco.com as a `mailto:` link",
+        "Custom cake orders, with email named as the way to request one"
+      ]
+    },
+    "precision": ["facts"]
+  }
+}
