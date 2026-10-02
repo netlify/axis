@@ -209,6 +209,7 @@ Reading these correctly:
 
 - Quote the representative's `axisScore` as the pair's result, and quote `spread` when discussing stability. "86, with runs spanning 79 to 91 (sigma 5.1)" is the honest phrasing.
 - `reliability.total` excludes withheld runs, so `2/2 scored (1 withheld)` means the agent succeeded on both runs it was actually measured on. Do not report a withheld run as an agent failure.
+- Never report a `p` value as if it were an effect size, or the reverse. "p=0.002" says the move is unlikely to be chance; "d=-3.3" says it is large. A move can be significant and trivial (tight runs, tiny gap) or huge and insignificant (scattered runs). Quote both.
 - A wide `spread` with a healthy median is a volatility finding, not a quality finding. Say so rather than reporting the median alone.
 - When the composite is steady but a dimension is not, compare `runs[].dimensionScores` across runs. "AXIS held at 84 across three runs, but goal achievement ranged 62 to 95" is a finding the composite alone hides.
 - Per-run detail lives at `.axis/reports/<reportId>/scenarios/<key>/<agent>/run-<i>/result.json`, but you rarely need it: every run's full score is already in `report.json` under `runs[].score`. The HTML report opens on the representative and lets you select any row to switch the breakdown to that run.
@@ -225,6 +226,16 @@ Look at which dimension dropped, then inspect:
 ### Comparing against a baseline
 
 Match by `scenarioKey` (variants like `foo@bar` are distinct keys). Subtract `axisScore` from the baseline entry's `axisScore`. The dimension that moved the most is the failure mode.
+
+Each row reports **two** verdicts and you should quote whichever the question calls for.
+
+The **tolerance band** is the simple view: did the representative value move further than the baseline's own measured spread. The **significance test** is Welch's two-sample t-test over both distributions, present only when baseline and current each ran the pair more than once, and reported per metric as `d=` (Cohen's effect size) and `p=`. Markers: `●` significant with a large effect, `◐` significant but smaller, `○` not separable from noise.
+
+The two can disagree, and that is not a bug. At three runs a side the test needs about 2.27 sigma where the band needs 2.00, so the band flags slightly more. The test only becomes the sharper instrument at higher run counts, where it tightens and the band does not.
+
+Significance covers duration and tokens as well as the scores, and its verdicts are direction-aware: duration or tokens going _down_ is an improvement, the same drop in a score dimension is a regression.
+
+The **exit code follows the band**, not the test. `summary.significant` is a separate tally.
 
 Deltas are judged against a per-row noise band, not a flat threshold. The band is `max(1, 2 * stdev)`, where `stdev` is the spread the baseline measured across its own runs; a baseline captured from a single run has no measured sigma and falls back to the 1-point floor. Each comparison row reports the `band` it used, so a large delta counted as unchanged is explainable. A drop in `reliability` is a regression on its own, even when the score holds.
 

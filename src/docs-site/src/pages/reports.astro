@@ -227,6 +227,50 @@ npx @netlify/axis baseline compare v1.0`}</code></pre>
     increasing flakiness cannot pass as unchanged.
   </p>
 
+  <h3 id="significance">Statistical significance</h3>
+  <p>
+    When both the baseline and the current report ran a pair more than once, every metric also
+    gets a <strong>Welch's two-sample t-test</strong> over the two distributions, reported
+    alongside the tolerance band rather than replacing it. The two answer different questions:
+    the band asks whether the value moved further than this scenario usually wobbles, and the test
+    asks whether the difference could be chance. They can legitimately disagree, so both are
+    shown and you decide which to act on.
+  </p>
+  <pre><code>{`cms/create-post        claude-code|opus          87         74         -13 ▼
+  ↳ tolerance ±8.0 from the baseline's measured run spread
+    AXIS Result        87.0 → 74.0             d=-3.29   p=0.016  ● large regression
+    Goal Achievement   88.0 → 70.0             d=-6.00   p=0.002  ● large regression
+    Environment        92.0 → 91.0             d=-1.00   p=0.288  ○ not significant
+    Duration           62.0s → 91.0s           d=+9.67   p<0.001  ● large regression
+    Tokens             150,000 → 152,000       d=+0.35   p=0.708  ○ not significant`}</code></pre>
+  <p>
+    <code>d</code> is Cohen's effect size and <code>p</code> is the two-sided p-value. A filled
+    marker means a significant move with a large effect, half-filled means significant but
+    smaller, and open means the test could not separate the two samples. The verdict is
+    direction-aware: <strong>Duration</strong> and <strong>Tokens</strong> are lower-is-better, so
+    a drop in either reads as an improvement while the same drop in a score dimension reads as a
+    regression.
+  </p>
+  <p>
+    Significance testing covers more than the band does. Alongside the four score dimensions and
+    the composite, <strong>duration</strong> and <strong>tokens</strong> are compared too, each
+    with its own measured spread.
+  </p>
+  <p>
+    Worth knowing before reading too much into it: at three runs a side, a t-test needs about
+    2.27 standard deviations of separation where the band needs 2.00, so at the usual
+    <code>runs: 3</code> the test is marginally <em>less</em> sensitive and the two mostly agree.
+    The test earns its place at higher run counts, where it tightens and the fixed band does not:
+    nine runs a side detects a 1.00 sigma move, eighteen detects 0.68 sigma, while the band stays
+    at 2.00 sigma however much you sample.
+  </p>
+  <p>
+    The <strong>exit code still follows the tolerance band</strong>, so turning repeats on cannot
+    silently change which runs fail CI. The significance tally is reported separately in
+    <code>summary.significant</code>, and every metric's full test output is in
+    <code>entries[].metrics[].significance</code> for <code>--json</code> consumers.
+  </p>
+
   <h3>When to set baselines</h3>
   <ul>
     <li>

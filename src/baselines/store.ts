@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Baseline, BaselineEntry } from "../types/baseline.js";
 import type { ReportManifest } from "../types/report.js";
+import { collectMetricStats } from "./metrics.js";
 
 const BASELINE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const MAX_NAME_LENGTH = 64;
@@ -63,6 +64,10 @@ export function setBaseline(configDir: string, report: ReportManifest, name: str
       // size its noise band from data instead of a constant.
       ...(result.runCount && result.runCount > 1 ? { runs: result.runCount } : {}),
       ...(result.spread && result.spread.n > 1 ? { stdev: result.spread.axisScore.stdev } : {}),
+      ...(() => {
+        const stats = collectMetricStats(result);
+        return stats ? { stats } : {};
+      })(),
       ...(result.reliability && result.reliability.total > 0
         ? { reliability: result.reliability.succeeded / result.reliability.total }
         : {}),

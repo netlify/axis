@@ -1,5 +1,16 @@
-import type { Baseline, BaselineComparison, BaselineComparisonEntry, BaselineEntry } from "../types/baseline.js";
-import type { ReportManifest } from "../types/report.js";
+import type {
+  Baseline,
+  BaselineComparison,
+  BaselineComparisonEntry,
+  BaselineEntry,
+  MetricComparison,
+  MetricDirection,
+  MovementVerdict,
+} from "../types/baseline.js";
+import type { ReportManifest, ReportResultEntry } from "../types/report.js";
+import { collectMetricStats, METRICS } from "./metrics.js";
+import { welchTTest } from "./significance.js";
+import type { SampleStats } from "../types/baseline.js";
 
 /**
  * Floor for the noise tolerance: deltas within it are unchanged even when the
@@ -26,6 +37,90 @@ const NOISE_SIGMAS = 2;
  */
 export function noiseBand(entry: BaselineEntry): number {
   return Math.max(NOISE_THRESHOLD, NOISE_SIGMAS * (entry.stdev ?? 0));
+}
+
+/**
+ * Turn a signed delta into a verdict, accounting for which way is better.
+ * A delta inside the tolerance is `unchanged` whichever way it fell.
+ */
+function verdictFor(delta: number, direction: MetricDirection, tolerance: number): MovementVerdict {
+  if (Math.abs(delta) <= tolerance) return "unchanged";
+  const better = direction === "higher-is-better" ? delta > 0 : delta < 0;
+  return better ? "improved" : "regressed";
+}
+
+/**
+ * Tolerance for a non-composite metric.
+ *
+ * Score dimensions share the composite's 0-100 scale, so the same flat floor
+ * applies. Duration and tokens do not: a 1 ms or 1 token floor is meaningless,
+ * so without a measured spread they fall back to a relative tolerance rather
+ * than an absolute one that would flag every run.
+ */
+function bandForMetric(unbounded: boolean, baselineValue: number, stats?: SampleStats): number {
+  const floor = unbounded ? Math.abs(baselineValue) * UNBOUNDED_METRIC_TOLERANCE : NOISE_THRESHOLD;
+  if (stats && stats.n > 1) return Math.max(floor, NOISE_SIGMAS * stats.stdev);
+  return floor;
+}
+
+/** Relative tolerance applied to unbounded metrics with no measured spread. */
+const UNBOUNDED_METRIC_TOLERANCE = 0.1;
+
+/**
+ * Build the per-metric view: for each metric, the representative delta judged
+ * against a tolerance, plus a Welch's t-test over the two distributions when
+ * both sides ran more than once.
+ */
+function buildMetricComparisons(baselineEntry: BaselineEntry, result: ReportResultEntry): MetricComparison[] {
+  const currentStats = collectMetricStats(result);
+  const comparisons: MetricComparison[] = [];
+
+  for (const metric of METRICS) {
+    const current = metric.fromResult(result);
+    if (current === undefined) continue;
+
+    const baseline = metric.fromBaseline(baselineEntry);
+    const delta = current - baseline;
+    const baselineSample = baselineEntry.stats?.[metric.key];
+    const currentSample = currentStats?.[metric.key];
+    const band = bandForMetric(metric.unbounded ?? false, baseline, baselineSample);
+
+    const comparison: MetricComparison = {
+      metric: metric.key,
+      label: metric.label,
+      direction: metric.direction,
+      baseline,
+      current,
+      delta,
+      band,
+      bandVerdict: verdictFor(delta, metric.direction, band),
+    };
+
+    if (baselineSample && currentSample) {
+      const test = welchTTest(baselineSample, currentSample);
+      if (test) {
+        comparison.significance = {
+          baseline: baselineSample,
+          current: currentSample,
+          delta: test.delta,
+          ...(test.t !== undefined ? { t: test.t } : {}),
+          df: test.df,
+          p: test.p,
+          ...(test.effectSize !== undefined ? { effectSize: test.effectSize } : {}),
+          ...(test.magnitude !== undefined ? { magnitude: test.magnitude } : {}),
+          significant: test.significant,
+          // A test that cannot separate the samples reports `unchanged` no
+          // matter which way the means fell, so a coin-flip difference is
+          // never dressed up as a direction.
+          verdict: test.significant ? verdictFor(test.delta, metric.direction, 0) : "unchanged",
+        };
+      }
+    }
+
+    comparisons.push(comparison);
+  }
+
+  return comparisons;
 }
 
 /**
@@ -86,6 +181,7 @@ export function compareBaseline(baseline: Baseline, report: ReportManifest): Bas
       delta,
       band: noiseBand(baselineEntry),
       ...(reliability ? { reliability } : {}),
+      metrics: buildMetricComparisons(baselineEntry, result),
       categories: {
         goalAchievement: {
           baseline: baselineEntry.goalAchievement,
@@ -118,6 +214,14 @@ export function compareBaseline(baseline: Baseline, report: ReportManifest): Bas
   /** Tolerance for reliability drift, so float noise isn't a regression. */
   const RELIABILITY_EPSILON = 0.01;
 
+  // Tallied by statistical significance in parallel, over the composite only.
+  // Separate counters rather than a replacement: the exit code reads the
+  // flat-band tally, so adding the test cannot change which runs fail CI.
+  let sigImproved = 0;
+  let sigRegressed = 0;
+  let sigUnchanged = 0;
+  let tested = 0;
+
   for (const entry of entries) {
     // A pair that became flakier is a regression even when the runs that did
     // finish scored as well as ever.
@@ -130,6 +234,14 @@ export function compareBaseline(baseline: Baseline, report: ReportManifest): Bas
     } else {
       regressed++;
     }
+
+    const composite = entry.metrics.find((m) => m.metric === "axisScore")?.significance;
+    if (composite) {
+      tested++;
+      if (composite.verdict === "improved") sigImproved++;
+      else if (composite.verdict === "regressed") sigRegressed++;
+      else sigUnchanged++;
+    }
   }
 
   return {
@@ -141,6 +253,9 @@ export function compareBaseline(baseline: Baseline, report: ReportManifest): Bas
       regressed,
       unchanged,
       newScenarios: newScenarioKeys.size,
+      ...(tested > 0
+        ? { significant: { improved: sigImproved, regressed: sigRegressed, unchanged: sigUnchanged } }
+        : {}),
     },
   };
 }

@@ -10,7 +10,7 @@ import type {
   ScoredRunResult,
 } from "../types/scoring.js";
 import type { ReportManifest, ReportResultEntry } from "../types/report.js";
-import type { Baseline, BaselineComparison } from "../types/baseline.js";
+import type { Baseline, BaselineComparison, MetricComparison, MovementVerdict } from "../types/baseline.js";
 
 // --- Layout constants ---
 const COL_SCENARIO = 22;
@@ -790,6 +790,72 @@ function formatPercent(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
 }
 
+const COL_METRIC_LABEL = 18;
+const COL_METRIC_VALUES = 22;
+
+/** Noun forms, so a marker reads as "large regression" not "large regressed". */
+const VERDICT_NOUNS: Record<MovementVerdict, string> = {
+  improved: "improvement",
+  regressed: "regression",
+  unchanged: "change",
+};
+
+/**
+ * Significance markers.
+ *
+ * Filled for a significant move with a large effect, half-filled for a
+ * significant but smaller one, open for anything the test could not separate
+ * from noise. Deliberately not the coloured circles used in chat: this renderer
+ * emits plain text, so the direction has to survive in the word rather than the
+ * hue, and emoji would throw the column alignment off by a cell.
+ */
+const SIGNIFICANCE_MARKS = { strong: "\u25CF", moderate: "\u25D0", none: "\u25CB" } as const;
+
+/** Format one metric's value pair for display, respecting its units. */
+function formatMetricValue(metric: MetricComparison, value: number): string {
+  if (metric.metric === "durationMs") return formatDuration(value);
+  if (metric.metric === "tokens") return Math.round(value).toLocaleString();
+  return value.toFixed(1);
+}
+
+/**
+ * One line per metric, carrying both verdicts side by side.
+ *
+ * The flat-band verdict and the t-test can legitimately disagree at three runs
+ * a side, where the test needs 2.27 sigma against the band's 2.00. Showing both
+ * is the point: the band answers "did it move further than this scenario
+ * usually wobbles" and the test answers "could this be chance", and a reader
+ * deciding whether to chase a regression wants both.
+ */
+export function formatMetricLines(metrics: MetricComparison[] | undefined): string[] {
+  if (!metrics || metrics.length === 0) return [];
+
+  return metrics.map((metric) => {
+    const from = formatMetricValue(metric, metric.baseline);
+    const to = formatMetricValue(metric, metric.current);
+    const values = `${from} \u2192 ${to}`;
+    const head = `${metric.label.padEnd(COL_METRIC_LABEL)} ${values.padEnd(COL_METRIC_VALUES)}`;
+
+    const sig = metric.significance;
+    if (!sig) {
+      // No distribution on one side, so only the band has an opinion.
+      return `      ${head}  band \u00B1${metric.band.toFixed(1)}  ${metric.bandVerdict}`;
+    }
+
+    const mark = !sig.significant
+      ? SIGNIFICANCE_MARKS.none
+      : sig.magnitude === "large" || sig.magnitude === undefined
+        ? SIGNIFICANCE_MARKS.strong
+        : SIGNIFICANCE_MARKS.moderate;
+    const verdict = sig.significant ? `${sig.magnitude ?? "certain"} ${VERDICT_NOUNS[sig.verdict]}` : "not significant";
+    const effect =
+      sig.effectSize !== undefined ? `d=${sig.effectSize >= 0 ? "+" : ""}${sig.effectSize.toFixed(2)}` : "d=    n/a";
+    const pValue = sig.p < 0.001 ? "p<0.001" : `p=${sig.p.toFixed(3)}`;
+
+    return `      ${head}  ${effect.padEnd(9)} ${pValue.padEnd(8)} ${mark} ${verdict}`;
+  });
+}
+
 export function renderBaselineComparison(diff: BaselineComparison): string {
   const lines: string[] = [];
   const sep = "─".repeat(SEP_BASELINE);
@@ -821,12 +887,22 @@ export function renderBaselineComparison(diff: BaselineComparison): string {
       const arrow = rel.delta < 0 ? "\u25BC" : "\u25B2";
       lines.push(`    \u21B3 reliability ${formatPercent(rel.baseline)} \u2192 ${formatPercent(rel.current)} ${arrow}`);
     }
+    lines.push(...formatMetricLines(entry.metrics));
   }
 
   lines.push(`  ${sep}`);
   lines.push(
     `  ${diff.summary.improved} improved, ${diff.summary.regressed} regressed, ${diff.summary.unchanged} unchanged`,
   );
+  const sig = diff.summary.significant;
+  if (sig) {
+    lines.push(
+      `  By significance: ${sig.improved} improved, ${sig.regressed} regressed, ${sig.unchanged} not significant`,
+    );
+    // Saying which tally drives the exit code matters when the two disagree,
+    // which they will at small run counts.
+    lines.push(`  (exit status follows the tolerance band above, not the test)`);
+  }
 
   if (diff.summary.newScenarios > 0) {
     lines.push(`  New (not in baseline): ${diff.summary.newScenarios}`);
