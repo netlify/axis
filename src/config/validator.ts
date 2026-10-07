@@ -140,6 +140,16 @@ function validateJudging(data: unknown, filePath: string): void {
     }
     throw new Error(`Invalid config at ${filePath}: "judging.agents[${i}]" must be a string or an AgentConfig object`);
   }
+  if (obj.timeout_minutes !== undefined) {
+    if (typeof obj.timeout_minutes !== "number" || !(obj.timeout_minutes > 0)) {
+      throw new Error(`Invalid config at ${filePath}: "judging.timeout_minutes" must be a positive number`);
+    }
+  }
+  if (obj.retries !== undefined) {
+    if (typeof obj.retries !== "number" || !Number.isInteger(obj.retries) || obj.retries < 0 || obj.retries > 5) {
+      throw new Error(`Invalid config at ${filePath}: "judging.retries" must be a whole number from 0 to 5`);
+    }
+  }
 }
 
 function validateScenariosField(data: unknown, filePath: string): void {

@@ -518,6 +518,12 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     Withholding keeps a transient infrastructure failure from polluting your gate: the run fails
     loudly and can be retried, instead of quietly dragging an average down with a fabricated number.
   </p>
+  <p>
+    To retry a dying or unparseable judge before withholding, and to give judges longer than the
+    adapter's 10-minute default, set <code>judging.retries</code> and
+    <code>judging.timeout_minutes</code> (see
+    <a href="/configuration#judging-limits">Judge timeout and retries</a>).
+  </p>
 
   <script is:inline>
     const wheel = document.querySelector(".dimension-wheel");
