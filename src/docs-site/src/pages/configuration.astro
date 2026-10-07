@@ -264,7 +264,9 @@ export default async () => {
         <td><span class="req-no">No</span></td>
         <td>
           Precedence-ordered list of judge agents for scoring. See <a href="#judging">Judging
-          Agents</a>. When omitted, each run is judged by its own agent.
+          Agents</a>. When omitted, each run is judged by its own agent. Optional
+          <code>timeout_minutes</code> and <code>retries</code> (see
+          <a href="#judging-limits">Judge timeout and retries</a>).
         </td>
       </tr>
       <tr>
@@ -866,6 +868,47 @@ curl -X POST "$SLACK_WEBHOOK" \\
       { "agent": "claude-code", "model": "opus" },
       "codex"
     ]
+  }
+}`}</code></pre>
+  <h3 id="judging-limits">Judge timeout and retries</h3>
+  <p>
+    A judge that dies or replies with something AXIS can't parse
+    <a href="/scoring#withheld">withholds the run's score</a>. Two optional fields make that rarer:
+  </p>
+  <table class="table-fields">
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Default</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>timeout_minutes</code></td>
+        <td>adapter default (10)</td>
+        <td>
+          Time limit for each judge invocation. Raise it when judges verify large workspaces and
+          time out.
+        </td>
+      </tr>
+      <tr>
+        <td><code>retries</code></td>
+        <td><code>0</code></td>
+        <td>
+          Extra attempts (0–5) when a judge invocation fails (crash, timeout, rate limit) or its
+          reply can't be parsed. Each retry is a full judge call and costs as much as the first.
+          Retries are logged with <code>--verbose</code>; a score withheld after retries says how
+          many attempts were made.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <pre><code>{`{
+  "judging": {
+    "agents": ["claude-code"],
+    "timeout_minutes": 15,
+    "retries": 1
   }
 }`}</code></pre>
 

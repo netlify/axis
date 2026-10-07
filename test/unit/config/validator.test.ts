@@ -503,6 +503,25 @@ describe("validateConfig", () => {
     expect(() => validateConfig(config, "test.json")).not.toThrow();
   });
 
+  it("accepts judging.timeout_minutes and judging.retries", () => {
+    const config = {
+      scenarios: "./s",
+      agents: ["x"],
+      judging: { agents: ["claude-code"], timeout_minutes: 15, retries: 1 },
+    };
+    expect(() => validateConfig(config, "test.json")).not.toThrow();
+  });
+
+  it("rejects a non-positive judging.timeout_minutes", () => {
+    const config = { scenarios: "./s", agents: ["x"], judging: { agents: ["claude-code"], timeout_minutes: 0 } };
+    expect(() => validateConfig(config, "test.json")).toThrow(`"judging.timeout_minutes" must be a positive number`);
+  });
+
+  it.each([-1, 1.5, 6, "1"])("rejects judging.retries %j", (retries) => {
+    const config = { scenarios: "./s", agents: ["x"], judging: { agents: ["claude-code"], retries } };
+    expect(() => validateConfig(config, "test.json")).toThrow(`"judging.retries" must be a whole number from 0 to 5`);
+  });
+
   it("rejects judging that is not an object", () => {
     const config = { scenarios: "./s", agents: ["x"], judging: "claude-code" };
     expect(() => validateConfig(config, "test.json")).toThrow(`"judging" must be an object`);

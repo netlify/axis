@@ -3,9 +3,10 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { getAdapter } from "../adapters/registry.js";
 import { buildAgentBaseName } from "../runner/agent-name.js";
-import type { AgentConfig } from "../types/config.js";
-import type { RunResult } from "../types/output.js";
+import type { AgentConfig, JudgingConfig } from "../types/config.js";
+import type { Logger, RunResult } from "../types/output.js";
 import { isFailedRun } from "../types/output.js";
+import type { JudgeLimits } from "../types/scoring.js";
 import { ScoringError } from "./errors.js";
 
 export interface JudgeCallOptions {
@@ -19,6 +20,10 @@ export interface JudgeCallOptions {
    * Otherwise see {@link resolveJudgeAgent} for selection rules.
    */
   judging?: AgentConfig[];
+  /** Timeout and retry limits for the judge invocation. */
+  limits?: JudgeLimits;
+  /** Receives a verbose line per retried attempt. */
+  logger?: Logger;
 }
 
 /**
@@ -79,6 +84,7 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
       },
       workingDirectory: workspace,
       homeDirectory: home,
+      ...(options.limits?.timeoutMs !== undefined ? { timeoutMs: options.limits.timeoutMs } : {}),
     });
 
     // A judge that died (crash, timeout, quota) or returned nothing can't be
@@ -109,4 +115,12 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
       }
     }
   }
+}
+
+/** Judge limits from the config's `judging` block; `{}` (adapter defaults, no retry) when unset. */
+export function judgeLimitsFromConfig(judging: JudgingConfig | undefined): JudgeLimits {
+  return {
+    ...(judging?.timeout_minutes !== undefined ? { timeoutMs: judging.timeout_minutes * 60_000 } : {}),
+    ...(judging?.retries !== undefined ? { retries: judging.retries } : {}),
+  };
 }

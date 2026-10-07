@@ -1,7 +1,8 @@
 import type { NormalizedEntry, NormalizedTranscript } from "../transcript/types.js";
-import type { RunResult } from "../types/output.js";
+import type { Logger, RunResult } from "../types/output.js";
 import type { AgentConfig, ScoringWeights } from "../types/config.js";
 import type {
+  JudgeLimits,
   CategoryEvalResult,
   DeepEvalResult,
   EvalPattern,
@@ -12,7 +13,7 @@ import type {
   SparseIndex,
 } from "../types/scoring.js";
 import { DEFAULT_AUDIT_SCORES } from "./category-score.js";
-import { callJudge } from "./judge.js";
+import { callJudgeAndParse } from "./judge-retry.js";
 import { parseJsonFromText } from "./parse-json.js";
 import { ScoringError } from "./errors.js";
 import { CATEGORY_GUIDANCE, getPromptTemplates, interpolate } from "./prompt-templates.js";
@@ -37,6 +38,10 @@ export interface DeepEvalOptions {
    * name differs from the run's own agent (or falls back to the first entry).
    */
   judging?: AgentConfig[];
+  /** Timeout and retry limits for each judge call. */
+  judgeLimits?: JudgeLimits;
+  /** Receives a verbose line per retried judge attempt. */
+  logger?: Logger;
 }
 
 /**
@@ -72,7 +77,7 @@ export async function runDeepEval(
         return buildDefaultCategoryResult(category);
       }
 
-      return runCategoryEval(result, sparseIndex, normalized, category, options?.reportDir, options?.judging);
+      return runCategoryEval(result, sparseIndex, normalized, category, options);
     }),
   );
 
@@ -138,25 +143,30 @@ async function runCategoryEval(
   sparseIndex: SparseIndex,
   normalized: NormalizedTranscript,
   category: InteractionCategory,
-  reportDir?: string,
-  judging?: AgentConfig[],
+  options?: DeepEvalOptions,
 ): Promise<CategoryEvalResult> {
-  const prompt = buildCategoryEvalPrompt(result, sparseIndex, normalized, category, reportDir);
-  const responseText = await callJudge(result, prompt, {
-    scenarioKey: `__${category}_eval__`,
-    scenarioName: `AXIS ${category} Evaluation`,
-    judging,
-  });
-
-  // A response with no parseable JSON means the judge didn't grade anything.
-  // Withhold rather than silently defaulting every interaction to a high score
-  // (which would inflate the category and hide the failure). A parsed response
-  // that omits some interactions is fine; those get per-interaction defaults.
-  if (!parseJsonFromText(responseText, isEvalVerdict)) {
-    throw new ScoringError(`Could not parse ${category} evaluation judge response`);
-  }
-
-  return parseCategoryEvalResponse(responseText, category, sparseIndex);
+  const prompt = buildCategoryEvalPrompt(result, sparseIndex, normalized, category, options?.reportDir);
+  return callJudgeAndParse(
+    result,
+    prompt,
+    {
+      scenarioKey: `__${category}_eval__`,
+      scenarioName: `AXIS ${category} Evaluation`,
+      judging: options?.judging,
+      limits: options?.judgeLimits,
+      logger: options?.logger,
+    },
+    (responseText) => {
+      // A response with no parseable JSON means the judge didn't grade anything.
+      // Withhold rather than silently defaulting every interaction to a high score
+      // (which would inflate the category and hide the failure). A parsed response
+      // that omits some interactions is fine; those get per-interaction defaults.
+      if (!parseJsonFromText(responseText, isEvalVerdict)) {
+        throw new ScoringError(`Could not parse ${category} evaluation judge response`);
+      }
+      return parseCategoryEvalResponse(responseText, category, sparseIndex);
+    },
+  );
 }
 
 function buildCategoryEvalPrompt(

@@ -241,3 +241,44 @@ describe("scoreGoalAchievement", () => {
     expect(adapter.run.mock.calls[0][0].config).toEqual(runResult.agentConfig);
   });
 });
+
+describe("scoreGoalAchievement judge limits", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("passes judging.timeout_minutes to the judge adapter as timeoutMs", async () => {
+    const adapter = createMockAdapter('{"score": 8, "rationale": "ok"}');
+    mockGetAdapter.mockReturnValue(adapter as never);
+    const result = makeRunResult("Did it work?");
+    await scoreGoalAchievement(result, getNormalizedEntries(result), undefined, { limits: { timeoutMs: 900_000 } });
+    expect(adapter.run.mock.calls[0][0].timeoutMs).toBe(900_000);
+  });
+
+  it("leaves the adapter's own timeout alone when no limit is set", async () => {
+    const adapter = createMockAdapter('{"score": 8, "rationale": "ok"}');
+    mockGetAdapter.mockReturnValue(adapter as never);
+    const result = makeRunResult("Did it work?");
+    await scoreGoalAchievement(result, getNormalizedEntries(result), undefined);
+    expect(adapter.run.mock.calls[0][0]).not.toHaveProperty("timeoutMs");
+  });
+
+  it("retries a judge that died, then scores the run", async () => {
+    const dead = createDeadAdapter("Agent timed out after 600s");
+    const ok = createMockAdapter('{"score": 9, "rationale": "ok"}');
+    const run = vi.fn().mockImplementationOnce(dead.run).mockImplementationOnce(ok.run);
+    mockGetAdapter.mockReturnValue({ name: "mock-judge", run } as never);
+    const result = makeRunResult("Did it work?");
+    const score = await scoreGoalAchievement(result, getNormalizedEntries(result), undefined, {
+      limits: { retries: 1 },
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(score.score).toBe(90);
+  });
+
+  it("withholds when every attempt fails", async () => {
+    mockGetAdapter.mockReturnValue(createDeadAdapter("Agent timed out after 600s") as never);
+    const result = makeRunResult("Did it work?");
+    await expect(
+      scoreGoalAchievement(result, getNormalizedEntries(result), undefined, { limits: { retries: 2 } }),
+    ).rejects.toThrow(/Agent timed out after 600s \(after 3 attempts\)$/);
+  });
+});
