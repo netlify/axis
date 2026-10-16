@@ -60,7 +60,7 @@ AXIS (Agent Experience Index Score) is a synthetic testing framework for AI agen
 
 ### Adapter Pattern
 
-Built-in adapters split into two factories. NDJSON-style adapters (`claude-code`, `codex`) are created via `createAgentAdapter(spec)` from `src/adapters/base/agent-adapter.ts`. ACP-based adapters (`claude-sdk`, `codex-sdk`, `gemini`, `goose`, `opencode`, `qwen-code`, `stakpak`, `blackbox`, `fast-agent`, `mistral-vibe`, `factory-droid`, `poolside`, `vtcode`, `cursor-agent`, `auggie`, `kimi`, `openhands`, `cline`, `kiro-cli`, `kilo`, `qoder`) are created via `createAcpBasedAdapter(spec)` from `src/adapters/base/acp-adapter.ts`. Each adapter is a plain factory function (e.g. `createGeminiAdapter()`) that returns an `AgentAdapter` -no classes, no inheritance. The factory owns the shared plumbing:
+Built-in adapters split into two factories. NDJSON-style adapters (`claude-code`, `codex`, `agy`) are created via `createAgentAdapter(spec)` from `src/adapters/base/agent-adapter.ts`. ACP-based adapters (`claude-sdk`, `codex-sdk`, `gemini`, `goose`, `opencode`, `qwen-code`, `stakpak`, `blackbox`, `fast-agent`, `mistral-vibe`, `factory-droid`, `poolside`, `vtcode`, `cursor-agent`, `auggie`, `kimi`, `openhands`, `cline`, `kiro-cli`, `kilo`, `qoder`) are created via `createAcpBasedAdapter(spec)` from `src/adapters/base/acp-adapter.ts`. Each adapter is a plain factory function (e.g. `createGeminiAdapter()`) that returns an `AgentAdapter` -no classes, no inheritance. The factory owns the shared plumbing:
 
 - Spawn + cleanup registration (SIGTERM on Ctrl-C); stdin is closed immediately by default, or written with the prompt then closed when `promptVia: "stdin"`
 - 10-minute timeout → SIGTERM → SIGKILL after 5s grace (timer cleared on clean exit)
@@ -127,6 +127,17 @@ Meta's Muse Code has **no native ACP mode** (checked against 1.4.2), so it is no
 - **Auth**: `META_API_KEY`. `hasLocalSession` reads `auth.json` and deliberately returns false for `"storage": "keychain"` (the macOS `muse login` shape) because that credential cannot be copied into the isolated config dir; verified, the run dies with `missing meta credentials`. Reporting it as a session would turn a clean pre-flight failure into a confusing mid-run one. File-backed credentials copy fine and do count
 - **No npm package**, so the `npx` fallback cannot install it: `muse` must already be on `PATH` (`curl https://dev.meta.ai/install.sh | bash`)
 - **Regenerating the wire contract**: `muse schema generate-json-schema --out DIR` / `generate-ts --out DIR` export the exact schema embedded in the installed binary. Use that rather than guessing when MSP changes
+
+#### Antigravity CLI (`agy`)
+
+NDJSON adapter on `createAgentAdapter`, driving `agy --output-format stream-json` with the prompt on stdin. Events are `init` (conversation id, model), `step_update` and `result`.
+
+- **Outcome is `result.status`, not the exit code**: agy exits 0 on most failures, including its own print timeout. With no `result` event, the `AGY_ERROR:` JSON line on stderr carries the reason
+- **Usage is summed from `step_update`, keyed by `step_index`**: `result.usage` is cumulative over the conversation. `input_tokens` excludes cache reads (a step can report 2,331 input against 17,177 cache reads) and `output_tokens` includes thinking, so they map straight onto AXIS's fields
+- **Cost is AXIS's own arithmetic**: `PRICES` in `agy.ts` holds Gemini API rates per model, priced per step so 3.1 Pro's >200k-prompt tier (input + cache reads) applies per call. The model comes from `init.model` with any `-low|-medium|-high` suffix stripped. Unpriced models report no cost, never `$0`
+- **Auth and isolation**: `GEMINI_API_KEY` only works with `{"modelProvider":"gemini"}` in `~/.gemini/antigravity-cli/settings.json`. `AGY_CLI_DISABLE_AUTO_UPDATE` must be exactly `true`. All state lives under `HOME/.gemini`
+- **Tool steps**: `tool_id` is the `step_index`, so pairing survives interleaved steps. A step ending in `ERROR` becomes an `error` entry (as in the ACP adapter), because scoring counts errors by entry type only
+- **No npm package**: `agy` must be on `PATH`
 
 ### Error Handling
 
