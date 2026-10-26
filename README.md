@@ -97,6 +97,8 @@ Use the programmatic API when you want to integrate AXIS into an existing test r
 
 `run({ profile })` and `loadConfig(path, { profile })` select a named profile from the config, the same overlay `axis run --profile` applies. `loadConfig` returns the resolved `config` alongside the pre-merge `baseConfig`, for callers that need the suite layout as a whole rather than the active suite.
 
+For per-category scoring without the full `scoreRunResult` pipeline, import `runDeepEval`, `computeCategoryScore` and `aggregateDimension` from `@netlify/axis`. Select your judge adapter, registered with `registerAdapter`, through `runDeepEval`’s `options.judging`. It makes one judge call per category with interactions; setting that category’s `options.weights` value to `0` skips the call. Skipped categories use AXIS’s defaults. Use `computeCategoryScore` for a category score or `aggregateDimension` for a single audit dimension. The package root also exports `computeHeuristicSpeed`, `parseCategoryEvalResponse`, `parseJsonFromText`, and the types `DeepEvalOptions` and `CalibrationParams`. These exports add no scoring behavior changes; existing deep imports keep working.
+
 ## Roadmap
 
 Delivered: scenario runner, four-dimension scoring pipeline, baselines with regression detection, repeated runs with representative-run selection and noise-aware regression bands, MCP/skills wiring, custom adapter API, config profiles for running one repo's scenarios under several agent matrices, built-in adapters for Claude Code, Codex, and Gemini.
