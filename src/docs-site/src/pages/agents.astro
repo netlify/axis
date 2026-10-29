@@ -77,6 +77,11 @@ import DocsLayout from "../layouts/DocsLayout.astro";
         <td><code>GEMINI_API_KEY</code></td>
       </tr>
       <tr>
+        <td><code>agy</code></td>
+        <td>no</td>
+        <td><code>GEMINI_API_KEY</code> <small>(see <a href="#agy">below</a>)</small></td>
+      </tr>
+      <tr>
         <td><code>kiro-cli</code></td>
         <td>no</td>
         <td>Local login only (<code>kiro-cli login</code>)</td>
@@ -290,6 +295,55 @@ import DocsLayout from "../layouts/DocsLayout.astro";
       <strong>MCP servers are passed over the protocol</strong>, in <code>session/start</code>, the
       same way the Gemini adapter uses ACP. No MCP config file is written, so a scenario gets exactly
       the servers it declares.
+    </li>
+  </ul>
+
+  <h2 id="agy">Antigravity CLI</h2>
+  <p>
+    <code>agy</code> runs Google's Antigravity CLI headlessly with
+    <code>--output-format stream-json</code>, the prompt on stdin, and
+    <code>--dangerously-skip-permissions</code> (opt out with
+    <code>{'{ "flags": { "dangerously-skip-permissions": false } }'}</code>).
+  </p>
+  <p>
+    There is no npm package, so AXIS cannot auto-install it: install a release from
+    <a href="https://github.com/google-antigravity/antigravity-cli/releases" target="_blank" rel="noopener">GitHub</a>
+    and put <code>agy</code> on <code>PATH</code>.
+  </p>
+  <ul>
+    <li>
+      <strong>Set <code>GEMINI_API_KEY</code>.</strong> AXIS writes
+      <code>{'{ "modelProvider": "gemini" }'}</code> to the isolated
+      <code>~/.gemini/antigravity-cli/settings.json</code>; without it agy ignores the key and tries an
+      interactive Google sign-in.
+    </li>
+    <li>
+      <strong>Models and effort.</strong> agy only accepts models from its own <code>agy models</code>
+      list. Pick an effort with <code>{'{ "flags": { "effort": "high" } }'}</code>, or put it in the
+      model name (<code>gemini-3.8-flash-high</code>) so effort variants get their own
+      <code>agent|model</code> identity. Gemini 3.1 Pro has no <code>medium</code> effort.
+    </li>
+    <li>
+      <strong>Auto-update is pinned off</strong> with <code>AGY_CLI_DISABLE_AUTO_UPDATE=true</code>
+      (agy ignores any other value), so every job in a run grades the same build.
+    </li>
+    <li>
+      <strong>The outcome comes from agy's final <code>result</code> event</strong>, not the exit
+      code: agy exits 0 on most failures.
+    </li>
+    <li>
+      <strong>Tokens are summed per model call.</strong> agy's <code>result.usage</code> is cumulative
+      over the whole conversation, so AXIS adds up the usage on each step instead.
+    </li>
+    <li>
+      <strong>Cost is computed by AXIS.</strong> agy reports none, so AXIS prices each model call from
+      Google's published Gemini API rates. A model without a published rate reports no cost rather
+      than <code>$0</code>, and so does a run with no <code>model</code> configured: agy only names
+      the model in its stream when one was passed.
+    </li>
+    <li>
+      <strong>MCP servers and skills</strong> go to <code>~/.gemini/config/mcp_config.json</code> and
+      <code>~/.gemini/config/skills/</code> under the isolated <code>HOME</code>.
     </li>
   </ul>
 

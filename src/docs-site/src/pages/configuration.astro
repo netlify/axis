@@ -846,7 +846,10 @@ curl -X POST "$SLACK_WEBHOOK" \\
     Each entry accepts the same shorthand as <code>agents</code>: a string (agent name) or a full
     <code>AgentConfig</code> object with <code>model</code> and adapter <code>flags</code>. Every
     candidate judge must be installed and have any required environment variables set; AXIS
-    validates this during pre-flight before any jobs run.
+    validates this during pre-flight before any jobs run. A judge runs the way a scenario agent
+    does: under a fresh <code>HOME</code> with its adapter's isolation variables, so a CLI login
+    reaches it only where the adapter copies one in, as <code>claude-code</code> and
+    <code>codex</code> do.
   </p>
   <pre><code>{`{
   "agents": ["claude-code", "codex", "gemini"],

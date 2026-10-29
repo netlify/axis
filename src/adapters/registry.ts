@@ -24,6 +24,7 @@ import { createKiloAdapter } from "./kilo.js";
 import { createQoderAdapter } from "./qoder.js";
 import { createCopilotAdapter } from "./copilot.js";
 import { createMuseAdapter } from "./muse.js";
+import { createAgyAdapter } from "./agy.js";
 
 const BUILTIN_FACTORIES: Record<string, () => AgentAdapter> = {
   "claude-sdk": createClaudeSdkAdapter,
@@ -51,6 +52,7 @@ const BUILTIN_FACTORIES: Record<string, () => AgentAdapter> = {
   qoder: createQoderAdapter,
   copilot: createCopilotAdapter,
   muse: createMuseAdapter,
+  agy: createAgyAdapter,
 };
 
 const instanceCache = new Map<string, AgentAdapter>();
