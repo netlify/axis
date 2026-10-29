@@ -338,7 +338,8 @@ import DocsLayout from "../layouts/DocsLayout.astro";
     <li>
       <strong>Cost is computed by AXIS.</strong> agy reports none, so AXIS prices each model call from
       Google's published Gemini API rates. A model without a published rate reports no cost rather
-      than <code>$0</code>.
+      than <code>$0</code>, and so does a run with no <code>model</code> configured: agy only names
+      the model in its stream when one was passed.
     </li>
     <li>
       <strong>MCP servers and skills</strong> go to <code>~/.gemini/config/mcp_config.json</code> and

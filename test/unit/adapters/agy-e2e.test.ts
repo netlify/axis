@@ -116,6 +116,7 @@ describe("agy adapter e2e", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     if (origKey !== undefined) process.env.GEMINI_API_KEY = origKey;
     else delete process.env.GEMINI_API_KEY;
   });
@@ -133,6 +134,7 @@ describe("agy adapter e2e", () => {
   });
 
   it("reports tokens and a cost computed from them", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-16T00:00:00Z") });
     const output = await run({ configPath: path.join(E2E_DIR, "axis.config.json"), logger: silentLogger });
 
     const meta = output.results[0].output.metadata;

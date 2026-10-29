@@ -86,6 +86,7 @@ describe("agy adapter", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
@@ -99,11 +100,11 @@ describe("agy adapter", () => {
 
     const [, args] = mockSpawn.mock.calls[0] as unknown as [string, string[]];
     expect(args).toEqual([
+      "--dangerously-skip-permissions",
       "--output-format",
       "stream-json",
       "--print-timeout",
       "24h",
-      "--dangerously-skip-permissions",
       "--model",
       "gemini-3.1-pro",
       "--effort",
@@ -119,6 +120,32 @@ describe("agy adapter", () => {
 
     const [, args] = mockSpawn.mock.calls[0] as unknown as [string, string[]];
     expect(args).not.toContain("--dangerously-skip-permissions");
+  });
+
+  it("lets a flag replace the default of the same name, except the output format", async () => {
+    await adapter.run(
+      makeInput({
+        config: {
+          agent: "agy",
+          model: "gemini-3.8-flash",
+          flags: { model: "gemini-3.1-pro-low", "print-timeout": "1h", "output-format": "json" },
+        },
+      }),
+    );
+
+    const [, args] = mockSpawn.mock.calls[0] as unknown as [string, string[]];
+    const valuesOf = (flag: string) => args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));
+    expect(valuesOf("--model")).toEqual(["gemini-3.1-pro-low"]);
+    expect(valuesOf("--print-timeout")).toEqual(["1h"]);
+    expect(valuesOf("--output-format")).toEqual(["stream-json"]);
+  });
+
+  it("keeps a default when its flag is false instead of dropping the option", async () => {
+    await adapter.run(makeInput({ config: { agent: "agy", flags: { "print-timeout": false, verbose: false } } }));
+
+    const [, args] = mockSpawn.mock.calls[0] as unknown as [string, string[]];
+    expect(args).toContain("24h");
+    expect(args).not.toContain("--verbose");
   });
 
   it("writes the gemini modelProvider setting under the isolated HOME", async () => {
@@ -145,7 +172,7 @@ describe("agy adapter", () => {
     );
     expect(config.mcpServers).toEqual({
       local: { command: "node", args: ["server.js"], env: {} },
-      remote: { url: "https://example.com/mcp", headers: { Authorization: "Bearer x" } },
+      remote: { serverUrl: "https://example.com/mcp", headers: { Authorization: "Bearer x" } },
     });
   });
 
@@ -223,6 +250,7 @@ describe("agy adapter", () => {
   });
 
   it("prices the run from per-step usage and the model init reports", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-16T00:00:00Z") });
     mockRun([
       init("gemini-3.8-flash-low"),
       step({
@@ -240,6 +268,19 @@ describe("agy adapter", () => {
     expect(output.metadata.totalCostUsd).toBeCloseTo(0.45 + 0.03 + 0.375);
   });
 
+  it("prices the run at the date it ran, so the 2027 Flash rates apply from then", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2027-01-01T00:00:00Z") });
+    mockRun([
+      init("gemini-3.8-flash"),
+      step({ step_index: 1, state: "DONE", step_type: "agent_response", text_delta: "ok", usage: usage(1_000_000, 0) }),
+      result({ status: "SUCCESS", response: "ok" }),
+    ]);
+
+    const output = await adapter.run(makeInput());
+
+    expect(output.metadata.totalCostUsd).toBeCloseTo(1.5);
+  });
+
   it("fails the run on a non-SUCCESS result even though agy exits 0", async () => {
     mockRun([
       init(),
@@ -253,6 +294,32 @@ describe("agy adapter", () => {
     expect(output.result).toBeNull();
     expect(output.metadata.error).toBe("API error (attempt 4): request failed (code 500)");
     expect(output.transcript.at(-1)?.type).toBe("error");
+  });
+
+  it("names the status when a non-SUCCESS result carries no error", async () => {
+    mockRun([init(), result({ status: "TIMEOUT", response: "" })]);
+
+    const output = await adapter.run(makeInput());
+
+    expect(output.result).toBeNull();
+    expect(output.metadata.error).toBe("agy finished with status TIMEOUT");
+  });
+
+  it("falls back to stderr when neither a result nor an AGY_ERROR line arrives", async () => {
+    mockRun([init()], { stderr: "panic: something agy did not report\n" });
+
+    const output = await adapter.run(makeInput());
+
+    expect(output.result).toBeNull();
+    expect(output.metadata.error).toBe("panic: something agy did not report");
+  });
+
+  it("names the missing result when agy exits silently", async () => {
+    mockRun([init()]);
+
+    const output = await adapter.run(makeInput());
+
+    expect(output.metadata.error).toBe("agy exited without a result");
   });
 
   it("reports agy's AGY_ERROR line when no result event arrives", async () => {
@@ -368,6 +435,6 @@ describe("agy pricing", () => {
   });
 
   it("reports no cost for an unpriced model rather than zero", () => {
-    expect(agyCostUsd("gemini-3.7-flash", [usage(1000, 10)], new Date())).toBeUndefined();
+    expect(agyCostUsd("gemini-3.7-flash", [usage(1000, 10)], new Date("2026-10-16"))).toBeUndefined();
   });
 });

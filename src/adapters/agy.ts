@@ -121,7 +121,8 @@ function writeAgyMcpConfig(configDir: string, servers: Record<string, McpServerC
     if (server.type === "stdio") {
       mcpServers[name] = { command: server.command, args: server.args ?? [], env: server.env ?? {} };
     } else {
-      mcpServers[name] = { url: server.url, ...(server.headers ? { headers: server.headers } : {}) };
+      // `agy mcp add` writes http servers as `serverUrl` (checked against 1.4.10).
+      mcpServers[name] = { serverUrl: server.url, ...(server.headers ? { headers: server.headers } : {}) };
     }
   }
   fs.writeFileSync(path.join(configDir, "mcp_config.json"), JSON.stringify({ mcpServers }, null, 2) + "\n");
@@ -159,17 +160,29 @@ export function createAgyAdapter(): AgentAdapter {
     },
 
     buildArgs: (input) => {
-      // agy's 5m default would cut runs short of AXIS's own timeout.
-      const args = ["--output-format", "stream-json", "--print-timeout", "24h"];
       const flags = input.config.flags ?? {};
+      const args: string[] = [];
       if (flags["dangerously-skip-permissions"] ?? true) args.push("--dangerously-skip-permissions");
-      if (input.config.model) args.push("--model", input.config.model);
 
+      // Each option appears once: a flag replaces the default of the same name
+      // rather than following it on argv. A `false` flag is left out, as in the
+      // sibling adapters, and leaves the default in place.
+      const options: Record<string, unknown> = {
+        "output-format": "stream-json",
+        // agy's 5m default would cut runs short of AXIS's own timeout.
+        "print-timeout": "24h",
+        ...(input.config.model ? { model: input.config.model } : {}),
+      };
       for (const [key, value] of Object.entries(flags)) {
-        if (key === "dangerously-skip-permissions") continue;
+        if (key !== "dangerously-skip-permissions" && value !== false) options[key] = value;
+      }
+      // The stream parser only understands stream-json.
+      options["output-format"] = "stream-json";
+
+      for (const [key, value] of Object.entries(options)) {
         if (value === true) {
           args.push(`--${key}`);
-        } else if (value !== false) {
+        } else {
           args.push(`--${key}`, String(value));
         }
       }
