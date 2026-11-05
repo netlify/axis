@@ -107,8 +107,10 @@ export async function scoreRunResult(result: RunResult, options?: ScoringOptions
         weights,
         reportDir: options?.reportDir,
         judging: resolvedJudging,
+        judgeLimits: options?.judgeLimits,
+        logger,
       }),
-      scoreGoalAchievement(result, normalized.entries, resolvedJudging),
+      scoreGoalAchievement(result, normalized.entries, resolvedJudging, { limits: options?.judgeLimits, logger }),
     ]);
 
     // Step 5: Compute category scores

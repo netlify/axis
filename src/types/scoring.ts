@@ -295,4 +295,14 @@ export interface ScoringOptions {
    * each run is judged by its own agent (the agent under test scores itself).
    */
   judging?: AgentConfig[];
+  /** Per-call judge limits (from `judging.timeout_minutes` / `judging.retries`). */
+  judgeLimits?: JudgeLimits;
+}
+
+/** Limits applied to every judge invocation for a run. */
+export interface JudgeLimits {
+  /** Judge invocation timeout in ms. Defaults to the judge adapter's own timeout. */
+  timeoutMs?: number;
+  /** Extra attempts when a judge call fails or its reply can't be parsed. Defaults to 0. */
+  retries?: number;
 }

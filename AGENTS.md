@@ -144,6 +144,8 @@ Two silent-failure modes used to leak a fabricated composite (goal 0 + default c
 - **Empty-work signature**: a run that produced no transcript AND no result. `hasEmptyOutput()` in `types/output.ts` defines it; `isFailedRun()` treats it as failed even on a clean exit; the base adapter (`agent-adapter.ts`) stamps `"Agent produced no output"` so the error column is descriptive.
 - **Judge death / unparseable judge response**: `callJudge()` throws `ScoringError` when the judge invocation failed or returned nothing; `goal-achievement.ts` and `deep-eval.ts` throw `ScoringError` when a judge response can't be parsed at all (a parsed-but-incomplete response still gets per-item defaults). `scoreRunResult()` catches `ScoringError`, stamps `"Score withheld: …"` on the run, and returns a zero/failed result. Non-`ScoringError` throws propagate (real bugs should fail loud).
 
+Before withholding, `callJudgeAndParse()` (`scoring/judge-retry.ts`) retries the judge call + parse up to `judging.retries` times (default 0) on `ScoringError` only; `judging.timeout_minutes` becomes `AgentInput.timeoutMs` for every judge call (default: the adapter's 10 min). It lives in its own module so tests that mock `judge.js`'s `callJudge` still drive it.
+
 `buildScoredOutput()` recomputes `completed`/`failed` from the scored results, so a run that scoring flips to failed is reflected in the summary and exit code.
 
 The withheld path also sets `score.withheld = true`. Multi-run aggregation depends on that flag to keep a judge outage out of the agent's reliability denominator, so a new withhold site must set it rather than relying on the stamped error message.

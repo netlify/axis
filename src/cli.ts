@@ -10,6 +10,7 @@ import { run, buildJobEnv } from "./runner/runner.js";
 import { runLifecyclePhase } from "./runner/lifecycle.js";
 import { loadConfig } from "./config/loader.js";
 import { scoreRunResult, buildScoredOutput } from "./scoring/index.js";
+import { judgeLimitsFromConfig } from "./scoring/judge.js";
 import { initReport, finalizeReport } from "./reports/writer.js";
 import { listReports, readReport, readScenarioResults } from "./reports/reader.js";
 import { setBaseline, readBaseline, listBaselines, deleteBaseline, DEFAULT_BASELINE_NAME } from "./baselines/store.js";
@@ -410,6 +411,7 @@ async function runPipelineBody(
   // AgentConfig. The list is preserved so the scoring layer can pick the
   // best-matching judge per run (skip the run's own agent when possible).
   const judging = config.judging?.agents.filter((a): a is AgentConfig => typeof a === "object");
+  const judgeLimits = judgeLimitsFromConfig(config.judging);
 
   let runOutput: RunOutput | undefined;
   let output: ScoredOutput | RunOutput | undefined;
@@ -441,6 +443,7 @@ async function runPipelineBody(
               logger,
               reportDir,
               judging,
+              judgeLimits,
               onProgress: (event) => {
                 if (event.phase === "start") onScoringStart?.(event);
               },
@@ -476,6 +479,7 @@ async function runPipelineBody(
               logger,
               reportDir,
               judging,
+              judgeLimits,
             }).catch((err) => {
               logger.error(`Scoring fallback failed for ${r.scenarioKey} (${r.agentName}): ${formatError(err)}`);
               return undefined;

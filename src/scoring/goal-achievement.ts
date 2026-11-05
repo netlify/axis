@@ -1,10 +1,10 @@
 import type { NormalizedEntry } from "../transcript/types.js";
 import type { JudgeCriterion } from "../types/scenario.js";
-import type { RunResult } from "../types/output.js";
+import type { Logger, RunResult } from "../types/output.js";
 import type { AgentMetadata } from "../types/agent.js";
 import type { AgentConfig } from "../types/config.js";
-import type { GoalAchievementScore, CriterionGrade } from "../types/scoring.js";
-import { callJudge } from "./judge.js";
+import type { GoalAchievementScore, CriterionGrade, JudgeLimits } from "../types/scoring.js";
+import { callJudgeAndParse } from "./judge-retry.js";
 import { parseJsonFromText } from "./parse-json.js";
 import { ScoringError } from "./errors.js";
 import { getPromptTemplates, interpolate } from "./prompt-templates.js";
@@ -13,19 +13,20 @@ export async function scoreGoalAchievement(
   result: RunResult,
   normalizedEntries: NormalizedEntry[],
   judging?: AgentConfig[],
+  judgeOptions: { limits?: JudgeLimits; logger?: Logger } = {},
 ): Promise<GoalAchievementScore> {
   const { judge } = result;
   const { result: finalResult } = result.output;
 
   if (typeof judge === "string") {
-    return scoreStringJudge(result, judge, normalizedEntries, finalResult, judging);
+    return scoreStringJudge(result, judge, normalizedEntries, finalResult, judging, judgeOptions);
   }
 
   if (!judge || judge.length === 0) {
     return { score: 0, criteria: [] };
   }
 
-  return scoreArrayJudge(result, judge, normalizedEntries, finalResult, judging);
+  return scoreArrayJudge(result, judge, normalizedEntries, finalResult, judging, judgeOptions);
 }
 
 async function scoreStringJudge(
@@ -34,20 +35,23 @@ async function scoreStringJudge(
   entries: NormalizedEntry[],
   finalResult: string | null,
   judging: AgentConfig[] | undefined,
+  judgeOptions: { limits?: JudgeLimits; logger?: Logger },
 ): Promise<GoalAchievementScore> {
   const prompt = buildStringJudgePrompt(runResult, entries, finalResult, judge);
-  const responseText = await callJudge(runResult, prompt, {
-    scenarioKey: "__judge__",
-    scenarioName: "AXIS Judge",
-    judging,
-  });
-
-  const parsed = parseJsonFromText(responseText, (c) => typeof c.score === "number");
-  if (!parsed || typeof parsed.score !== "number") {
-    // The judge produced something we can't grade against. Withhold rather than
-    // fabricate a zero that would look like a genuine failure to meet the goal.
-    throw new ScoringError("Could not parse goal-achievement judge response");
-  }
+  const parsed = await callJudgeAndParse(
+    runResult,
+    prompt,
+    { scenarioKey: "__judge__", scenarioName: "AXIS Judge", judging, ...judgeOptions },
+    (responseText) => {
+      const reply = parseJsonFromText(responseText, (c) => typeof c.score === "number");
+      if (!reply || typeof reply.score !== "number") {
+        // The judge produced something we can't grade against. Withhold rather than
+        // fabricate a zero that would look like a genuine failure to meet the goal.
+        throw new ScoringError("Could not parse goal-achievement judge response");
+      }
+      return reply as typeof reply & { score: number };
+    },
+  );
 
   const score = Math.max(0, Math.min(10, Math.round(parsed.score)));
   return {
@@ -69,15 +73,15 @@ async function scoreArrayJudge(
   entries: NormalizedEntry[],
   finalResult: string | null,
   judging: AgentConfig[] | undefined,
+  judgeOptions: { limits?: JudgeLimits; logger?: Logger },
 ): Promise<GoalAchievementScore> {
   const prompt = buildArrayJudgePrompt(runResult, entries, finalResult, judge);
-  const responseText = await callJudge(runResult, prompt, {
-    scenarioKey: "__judge__",
-    scenarioName: "AXIS Judge",
-    judging,
-  });
-
-  const criteria = parseArrayJudgeResponse(responseText, judge);
+  const criteria = await callJudgeAndParse(
+    runResult,
+    prompt,
+    { scenarioKey: "__judge__", scenarioName: "AXIS Judge", judging, ...judgeOptions },
+    (responseText) => parseArrayJudgeResponse(responseText, judge),
+  );
   const score = computeWeightedScore(criteria);
 
   return { score, criteria };

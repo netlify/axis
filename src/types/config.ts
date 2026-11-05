@@ -110,6 +110,19 @@ export interface JudgingConfig {
    * adapter flags.
    */
   agents: (string | AgentConfig)[];
+  /**
+   * Time limit for each judge invocation, in minutes. Defaults to the judge
+   * adapter's own timeout (10 minutes for the built-in adapters). Raise it when
+   * judges verify large workspaces and time out, which withholds the score.
+   */
+  timeout_minutes?: number;
+  /**
+   * Extra attempts for a judge invocation whose score would otherwise be
+   * withheld: the judge failed (crash, timeout, rate limit) or its reply
+   * couldn't be parsed. Defaults to 0 (no retry). Each retry is a full judge
+   * call, so it costs as much as the first.
+   */
+  retries?: number;
 }
 
 export interface AgentConfig {
