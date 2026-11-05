@@ -1,0 +1,7 @@
+# Autobump: https://github.com/netlify/autobump
+mode: active
+
+strategies:
+  request-approval:
+    allowed:
+      - netlify-coding[bot]
