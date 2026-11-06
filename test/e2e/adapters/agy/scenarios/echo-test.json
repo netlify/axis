@@ -1,0 +1,5 @@
+{
+  "name": "agy echo test",
+  "prompt": "Hello from AXIS agy adapter",
+  "judge": "The agent should echo back the prompt text."
+}

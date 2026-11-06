@@ -73,3 +73,11 @@ export function writeMuseSkills(museConfigDir: string, skills: ResolvedSkill[]):
     copyDirRecursive(skill.path, target);
   }
 }
+
+/** Write skills for the Antigravity CLI to `~/.gemini/config/skills/{name}/`; agy ignores `~/.agents/skills`. */
+export function writeAgySkills(configDir: string, skills: ResolvedSkill[]): void {
+  for (const skill of skills) {
+    const target = path.join(configDir, "skills", skill.name);
+    copyDirRecursive(skill.path, target);
+  }
+}

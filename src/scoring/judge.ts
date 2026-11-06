@@ -66,6 +66,16 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
   // shouldn't see) the agent's session state, and adapter `*_HOME` env vars
   // must point at a writable dir distinct from `workspace`.
   const home = fs.mkdtempSync(path.join(os.tmpdir(), `axis-judge-home-`));
+  // The adapter's isolation vars under that HOME, as the runner applies them.
+  // Without them the child inherits the operator's HOME and config dirs, so
+  // whatever `prepare` wrote under `home` is never read. Isolation goes last:
+  // the inherited env is unfiltered here, so an exported CODEX_HOME or
+  // XDG_CONFIG_HOME would otherwise point the judge at the operator's config.
+  const env = {
+    ...inheritedEnv(),
+    ...(adapter.isolationEnv?.({ workspace, home }) ?? {}),
+    HOME: home,
+  };
 
   try {
     const output = await adapter.run({
@@ -79,6 +89,7 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
       },
       workingDirectory: workspace,
       homeDirectory: home,
+      env,
     });
 
     // A judge that died (crash, timeout, quota) or returned nothing can't be
@@ -109,4 +120,12 @@ export async function callJudge(runResult: RunResult, prompt: string, options: J
       }
     }
   }
+}
+
+function inheritedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) env[key] = value;
+  }
+  return env;
 }
