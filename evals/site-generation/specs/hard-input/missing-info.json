@@ -1,0 +1,24 @@
+{
+  "name": "Handle a brief with missing business details",
+  "about": "Almost no facts. The failure mode is inventing a plausible phone number, address, and staff and presenting them as real. The `facts` audit catches that: every realistic-looking detail is unsupported.",
+  "site_type": "local-business",
+  "prompt": ["I need a website for my dental practice. Make it look trustworthy."],
+  "rubric": {
+    "precision": ["facts"],
+    "recall": {
+      "input-handling": [
+        "A clearly marked placeholder for the phone number",
+        "A clearly marked placeholder for the address",
+        "A clearly marked placeholder for the opening hours",
+        "A clearly marked placeholder for the practice or dentist name"
+      ]
+    },
+    "pass": {
+      "input-handling": [
+        "The agent's final message tells the user which details are missing and need to be filled in",
+        "A book-an-appointment call to action is the primary action on the page"
+      ],
+      "content": ["Copy and styling read as trustworthy: calm palette, professional tone, reassuring messaging"]
+    }
+  }
+}

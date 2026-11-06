@@ -1,0 +1,33 @@
+{
+  "name": "Resolve contradictory requirements",
+  "about": "Requirements that can't all hold. There's no single right answer, so each conflict is PASS/FAIL on whether it was resolved coherently, plus whether the agent said how.",
+  "site_type": "portfolio",
+  "prompt": [
+    "Portfolio site for Mara Okafor, a freelance illustrator.",
+    "Keep it super minimal, just one page, nothing extra.",
+    "It needs separate pages for Editorial, Children's Books, Packaging, and an About page with her full bio and client list.",
+    "Dark, moody theme. Bright white background so the illustrations pop.",
+    "No text at all, let the work speak. Make sure her email, mara@okafor.studio, is really prominent."
+  ],
+  "rubric": {
+    "recall": {
+      "content": [
+        "The name \"Mara Okafor\"",
+        "The email mara@okafor.studio as a `mailto:` link",
+        "An Editorial section or page",
+        "A Children's Books section or page",
+        "A Packaging section or page",
+        "An About section or page"
+      ]
+    },
+    "precision": ["facts"],
+    "pass": {
+      "input-handling": [
+        "The one-page vs. separate-pages conflict gets one coherent answer (one page with anchored sections, or a small multi-page site kept minimal), not a half-done mix of both",
+        "The dark-theme vs. white-background conflict is resolved deliberately (e.g. dark chrome with light illustration frames, or one choice applied consistently), and the result doesn't look accidental",
+        "The \"no text\" request is balanced against the prominent email: the email is clearly visible and other text is kept minimal",
+        "The agent's final message names the contradictions and explains how it resolved each one"
+      ]
+    }
+  }
+}

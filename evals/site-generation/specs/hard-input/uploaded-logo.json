@@ -1,0 +1,24 @@
+{
+  "name": "Build around an uploaded logo",
+  "about": "Simulates a user upload by copying a logo into the workspace. Grades whether the model uses the asset and takes its palette from it.",
+  "site_type": "local-business",
+  "setup": [{ "action": "copy", "match": "fixtures/uploaded-logo/*", "destination": "uploads" }],
+  "prompt": [
+    "I've uploaded our logo (it's in `uploads/logo.svg`). We're Fernhill Plant Co., a small houseplant shop.",
+    "Build us a homepage that matches the logo's look."
+  ],
+  "rubric": {
+    "recall": {
+      "content": ["The business name \"Fernhill Plant Co.\""]
+    },
+    "precision": ["facts"],
+    "pass": {
+      "input-handling": [
+        "The uploaded logo is used: it's copied into or referenced from `./site/` and shows in the header or hero, not redrawn from scratch or ignored",
+        "The palette is taken from the logo: deep green `#1F4D3A` and terracotta `#D9734E` (or close shades) are the main brand colors, with no unrelated scheme",
+        "The logo keeps its aspect ratio and is shown at a sensible size (not stretched, squashed, or cropped)"
+      ],
+      "accessibility": ["The logo image has `alt` text that includes the business name"]
+    }
+  }
+}

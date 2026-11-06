@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80" width="240" height="80" role="img" aria-label="Fernhill Plant Co.">
+  <circle cx="40" cy="40" r="32" fill="#D9734E"/>
+  <path d="M40 64 V30" stroke="#1F4D3A" stroke-width="4" stroke-linecap="round"/>
+  <path d="M40 42 C28 40 22 30 24 20 C34 22 40 30 40 42 Z" fill="#1F4D3A"/>
+  <path d="M40 36 C52 34 58 24 56 14 C46 16 40 24 40 36 Z" fill="#1F4D3A"/>
+  <text x="84" y="38" font-family="Georgia, serif" font-size="22" fill="#1F4D3A">Fernhill</text>
+  <text x="84" y="60" font-family="Georgia, serif" font-size="14" letter-spacing="3" fill="#D9734E">PLANT CO.</text>
+</svg>
