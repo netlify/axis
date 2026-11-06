@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.22.0](https://github.com/netlify/axis/compare/v1.21.0...v1.22.0) (2026-11-06)
+
+
+### Features
+
+* add agy (Antigravity CLI) adapter ([c69c30a](https://github.com/netlify/axis/commit/c69c30aa6a5cf27a6237482ec0bf41cc900abfd8))
+* add agy (Antigravity CLI) adapter (PAW-799) ([5a27bcf](https://github.com/netlify/axis/commit/5a27bcf71e580f6ba7f04caeebfc296802176750))
+
+
+### Bug Fixes
+
+* **agy:** address review on flags, pricing tests, MCP key and docs ([efa4dde](https://github.com/netlify/axis/commit/efa4dde7b8100b16d8bc824670d265332957e4ed))
+* give the judge the runner's isolation env ([57b7a2c](https://github.com/netlify/axis/commit/57b7a2c8f1975c851157ec55f4891c62f03c748b))
+
 ## [1.21.0](https://github.com/netlify/axis/compare/v1.20.0...v1.21.0) (2026-10-02)
 
 
